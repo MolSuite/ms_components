@@ -25,6 +25,8 @@ classifiers = [
 ]
 
 # UI components sit on top of the orchestrator (molsuite_flow) and Qt.
+# PyMOL is also required, but it is installed from conda-forge because there is
+# no pymol-open-source distribution on PyPI.
 dependencies = [
     "ms_flow",
     "PySide6>=6.5",
@@ -32,9 +34,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# PyMOL dock widget. Heavy/optional — only ms_pymol needs it; import degrades
-# gracefully without it. Install with: molsuite_components[pymol]
-pymol = ["pymol-open-source>=2.5"]
 # Test + development tooling.
 dev = ["pytest>=7.0"]
 
