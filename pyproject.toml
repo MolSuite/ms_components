@@ -26,7 +26,7 @@ classifiers = [
 
 # UI components sit on top of the orchestrator (molsuite_flow) and Qt.
 dependencies = [
-    "ms_flow>=0.1",
+    "ms_flow",
     "PySide6>=6.5",
     "sqlmodel>=0.0.14",
 ]
