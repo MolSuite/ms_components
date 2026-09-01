@@ -24,12 +24,11 @@ classifiers = [
     "Environment :: X11 Applications :: Qt",
 ]
 
-# UI components sit on top of the orchestrator (molsuite_flow) and Qt.
-# PyMOL is also required, but it is installed from conda-forge because there is
-# no pymol-open-source distribution on PyPI.
+# UI components sit on top of the orchestrator (molsuite_flow), Qt and PyMOL.
 dependencies = [
     "ms_flow",
     "PySide6>=6.5",
+    "pymol-open-source>=3.2.0a0",
     "sqlmodel>=0.0.14",
 ]
 
