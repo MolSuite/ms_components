@@ -1,0 +1,232 @@
+QMainWindow::separator {
+    background: palette(mid);
+    width: 1px;
+    height: 1px;
+}
+
+QToolBar {
+    border: none;
+    padding: 3px;
+    spacing: 3px;
+}
+
+QToolBar::separator {
+    background: palette(mid);
+    width: 1px;
+    margin: 4px 3px;
+}
+
+QToolButton {
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px 6px;
+}
+
+QToolButton:hover {
+    background: palette(alternate-base);
+    border-color: palette(mid);
+}
+
+QToolButton:checked,
+QToolButton:pressed {
+    background: palette(highlight);
+    color: palette(highlighted-text);
+}
+
+
+/* Left gap for the first tab: `tab-bar { left }` shifts the whole bar.
+   Do NOT use margins on ::tab -- Qt places the close button flush to the full
+   tab rect, ignoring margin/padding, so any margin makes it overhang the border
+   (and `::tab:first { margin-left }` is ignored anyway; only padding honours
+   :first). Spacing between tabs comes from padding. */
+/*QTabWidget::tab-bar {*/
+/*    left: 8px;*/
+/*}*/
+
+QTabBar::tab {
+    padding: 1px 16px;
+    margin: 0;
+    border: 1px solid transparent;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+QTabBar::tab:selected {
+    background: palette(base);
+    border-color: palette(mid);
+    border-bottom: 2px solid palette(highlight);
+}
+
+QTabBar::tab:hover:!selected {
+    background: palette(alternate-base);
+}
+
+QLineEdit,
+QPlainTextEdit,
+QTextEdit,
+QSpinBox,
+QDoubleSpinBox,
+QComboBox {
+    border: 1px solid palette(mid);
+    border-radius: 4px;
+    padding: 3px 6px;
+}
+
+/* Styling the box above shrinks the spin buttons to a sliver, so the style's arrows
+   render as a dash. Giving the buttons their own width restores them — no arrow
+   image needed, the base style still paints them (and keeps following the palette). */
+QSpinBox::up-button,
+QSpinBox::down-button,
+QDoubleSpinBox::up-button,
+QDoubleSpinBox::down-button {
+    width: 16px;
+}
+
+QLineEdit:focus,
+QPlainTextEdit:focus,
+QTextEdit:focus,
+QSpinBox:focus,
+QDoubleSpinBox:focus,
+QComboBox:focus {
+    border-color: palette(highlight);
+}
+
+QPushButton {
+    border: 1px solid palette(mid);
+    border-radius: 4px;
+    padding: 5px 14px;
+}
+
+QPushButton:hover {
+    background: palette(alternate-base);
+}
+
+QPushButton:pressed {
+    background: palette(highlight);
+    color: palette(highlighted-text);
+}
+
+QPushButton:default {
+    border-color: palette(highlight);
+}
+
+/* Card = content surface. Nav trees/lists stay flat unless opted in. */
+QTableView,
+QTreeView[card="true"],
+QListView[card="true"] {
+    border: 1px solid palette(mid);
+    border-radius: 4px;
+}
+
+QTreeView,
+QListView {
+    border: none;
+}
+
+QHeaderView::section {
+    background: palette(dark);
+    border: none;
+    border-bottom: 1px solid palette(mid);
+    padding: 1px 3px;
+}
+
+QGroupBox {
+    border: 1px solid palette(mid);
+/*    border-radius: 6px;*/
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 8px;
+    padding: 0 4px;
+}
+
+/* Scrollbars: a scroll area is a lens, not a surface. Fusion paints a filled
+   groove, so every nested scroll area (step -> table) stacks another gray band
+   inside the page. Transparent groove + thin handle: only the handle shows. */
+QScrollBar:vertical {
+    background: transparent;
+    width: 10px;
+    margin: 0;
+}
+
+QScrollBar:horizontal {
+    background: transparent;
+    height: 10px;
+    margin: 0;
+}
+
+QScrollBar::handle {
+    background: palette(mid);
+    border-radius: 5px;
+}
+
+QScrollBar::handle:vertical { min-height: 24px; }
+QScrollBar::handle:horizontal { min-width: 24px; }
+QScrollBar::handle:hover { background: palette(shadow); }
+QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
+QScrollBar::add-page, QScrollBar::sub-page { background: none; }
+
+/* Table toolbar: a band, so the actions read as chrome and not as content floating
+   over the rows. Real QToolBar (extension ☰ + icon/text style come free); the band
+   itself is painted in code because the light themes are too flat for a palette role. */
+#SmartTableToolbar QToolButton, QToolButton#ToolbarBtn {
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 1px 5px;
+}
+
+#SmartTableToolbar QToolButton:hover, QToolButton#ToolbarBtn:hover {
+    background: palette(base);
+    border-color: palette(mid);
+}
+
+#SmartTableToolbar QToolButton:pressed, QToolButton#ToolbarBtn:pressed { background: palette(mid); }
+
+QLabel#ToolbarMeta { color: palette(placeholder-text); }
+
+#PymolControlBar {
+    background: palette(window);
+    border-bottom: 1px solid palette(mid);
+}
+
+QToolBar#PymolToolbar {
+    background: transparent;
+    border: 0;
+    spacing: 1px;
+}
+
+#PymolControlBar QToolButton {
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 1px 5px;
+}
+
+#PymolControlBar QToolButton:hover {
+    background: palette(base);
+    border-color: palette(mid);
+}
+
+#PymolControlBar QToolButton:pressed,
+#PymolControlBar QToolButton:checked {
+    background: palette(mid);
+}
+
+QLabel#PymolSceneContext {
+    color: palette(placeholder-text);
+}
+
+/* Botón de extensión de las toolbars embebidas. Los componentes le asignan un
+   SVG hamburguesa y abren su menú al entrar con el cursor. La regla va al final
+   para vencer la especificidad de las reglas particulares de cada toolbar. */
+QToolButton#qt_toolbar_ext_button,
+#SmartTableToolbar QToolButton#qt_toolbar_ext_button,
+#PymolControlBar QToolButton#qt_toolbar_ext_button {
+    qproperty-arrowType: NoArrow;
+    padding: 0;
+    border: 0;
+    min-width: 20px;
+    min-height: 18px;
+}
