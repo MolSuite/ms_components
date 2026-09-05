@@ -40,10 +40,7 @@ SELECTION_MODES = (
     ("Atoms", 0),
     ("Residues", 1),
     ("Chains", 2),
-    ("Segments", 3),
     ("Objects", 4),
-    ("Molecules", 5),
-    ("C-alphas", 6),
 )
 REPRESENTATIONS = (
     ("Cartoon", "cartoon"),
@@ -136,27 +133,27 @@ class PymolControlBar(QFrame):
                 lambda checked=False, mode=value: self._set_selection_mode(mode)
             )
             self._selection_mode_actions[value] = action
+        selection_menu.addSeparator()
+        selection_menu.addAction("Clear selection", self.clear_selection)
         self.selection_mode_action = self._add_toolbar_action(
             "Selection", "selection.svg",
             "Mouse selection granularity used when clicking the 3D scene.",
             menu=selection_menu,
         )
 
-        self.zoom_action = self._add_toolbar_action(
-            "Zoom", "zoom.svg",
-            "Zoom to the current PyMOL selection or scene target.",
-            self.zoom_active,
+        actions_menu = QMenu("Actions", bar)
+        for label, icon_name, callback in (
+            ("Zoom", "zoom.svg", self.zoom_active),
+            ("Orient", "orient.svg", self.orient_active),
+            ("Center", "center.svg", self.center_active),
+        ):
+            action = actions_menu.addAction(self._toolbar_icon(icon_name), label)
+            action.triggered.connect(callback)
+        self.actions_action = self._add_toolbar_action(
+            "Actions", "actions.svg",
+            "Zoom, orient, or center the current PyMOL selection or scene target.",
+            menu=actions_menu,
         )
-        self.orient_action = self._add_toolbar_action(
-            "Orient", "orient.svg",
-            "Orient the current PyMOL selection or scene target.",
-            self.orient_active,
-        )
-        self.rock_action = self._add_toolbar_action(
-            "Rock", "rock.svg", "Toggle continuous rocking of the 3D scene.",
-            checkable=True,
-        )
-        self.rock_action.toggled.connect(self.set_rocking)
 
         representation_menu = QMenu("Display", bar)
         for label, value in REPRESENTATIONS:
@@ -170,6 +167,20 @@ class PymolControlBar(QFrame):
             "Display", "display.svg",
             "Apply a representation to the current selection or scene target.",
             menu=representation_menu,
+        )
+
+        hide_menu = QMenu("Hide", bar)
+        for label, value in (("Everything", "everything"), *REPRESENTATIONS):
+            action = hide_menu.addAction(label)
+            action.setData(value)
+            action.triggered.connect(
+                lambda checked=False, representation=value:
+                self.hide_representation(representation)
+            )
+        self.hide_action = self._add_toolbar_action(
+            "Hide", "hide.svg",
+            "Hide a representation from the current selection or scene target.",
+            menu=hide_menu,
         )
 
         self.preset_menu = QMenu("Presets", bar)
@@ -188,6 +199,7 @@ class PymolControlBar(QFrame):
 
         self._register_builtin_presets()
         self._sync_selection_mode()
+        self.refresh_context_label()
         self._refresh_preset_menu()
         self._configure_overflow_button()
         if self._cmd is None:
@@ -231,6 +243,26 @@ class PymolControlBar(QFrame):
         """Add an application menu that participates in native toolbar overflow."""
         action = self._add_toolbar_action(
             text, icon_name, tooltip or text, menu=menu
+        )
+        self._configure_overflow_button()
+        return action
+
+    def add_action(
+        self,
+        text: str,
+        *,
+        icon_name: str,
+        tooltip: str = "",
+        callback: Callable[[], None] | None = None,
+        checkable: bool = False,
+    ) -> QAction:
+        """Add one application action to the embedded toolbar."""
+        action = self._add_toolbar_action(
+            text,
+            icon_name,
+            tooltip or text,
+            callback,
+            checkable=checkable,
         )
         self._configure_overflow_button()
         return action
@@ -342,9 +374,7 @@ class PymolControlBar(QFrame):
                 default_preset=str(default_preset or "").strip(),
             )
         self._context = normalized
-        self.context_label.setText(
-            str(normalized.kind or "generic").replace("_", " ").title()
-        )
+        self.refresh_context_label()
         self._refresh_preset_menu()
 
     def register_preset(self, spec: PymolPresetSpec) -> None:
@@ -389,10 +419,10 @@ class PymolControlBar(QFrame):
             lambda: self._cmd.orient(self.active_target()),
         )
 
-    def set_rocking(self, enabled: bool) -> None:
+    def center_active(self) -> None:
         self._run_command(
-            "Rock",
-            lambda: self._cmd.rock(1 if bool(enabled) else 0),
+            "Center",
+            lambda: self._cmd.center(self.active_target()),
         )
 
     def apply_representation(self, representation: str) -> None:
@@ -406,6 +436,65 @@ class PymolControlBar(QFrame):
             self._cmd.show(normalized, target)
 
         self._run_command(f"Display {normalized}", apply)
+
+    def hide_representation(self, representation: str) -> None:
+        normalized = str(representation or "").strip().lower()
+        valid = {"everything", *(value for _label, value in REPRESENTATIONS)}
+        if normalized not in valid:
+            raise ValueError(f"Unsupported PyMOL representation: {representation}")
+        self._run_command(
+            f"Hide {normalized}",
+            lambda: self._cmd.hide(normalized, self.active_target()),
+        )
+
+    def clear_selection(self) -> None:
+        if self._run_command("Clear selection", self._cmd.deselect):
+            self.refresh_context_label()
+
+    def refresh_context_label(self) -> None:
+        """Keep the compact context label useful without turning it into a second status bar."""
+        kind = str(self._context.kind or "generic").replace("_", " ").title()
+        target = str(self._context.target or "all").strip() or "all"
+        summary, details = self._active_selection_summary()
+        if not summary and target != "all":
+            summary = target
+        self.context_label.setText(f"{kind} · {summary}" if summary else kind)
+        context_lines = [f"Scene: {kind}", f"Target: {target}"]
+        for role, selection in dict(self._context.selections or {}).items():
+            context_lines.append(f"{str(role).title()}: {selection}")
+        self.context_label.setToolTip("\n".join([*context_lines, *details]))
+
+    def _active_selection_summary(self) -> tuple[str, list[str]]:
+        if self._cmd is None:
+            return "", []
+        try:
+            atom_count = int(self._cmd.count_atoms("sele") or 0)
+        except Exception:
+            return "", []
+        if atom_count <= 0:
+            return "", []
+        residues: set[tuple[str, str, str]] = set()
+        try:
+            self._cmd.iterate(
+                "sele",
+                "residues.add((chain, resn, resi))",
+                space={"residues": residues},
+            )
+        except Exception:
+            return f"{atom_count} selected atom{'s' if atom_count != 1 else ''}", []
+        labels = [
+            f"{chain + ':' if chain else ''}{resi} {resn}"
+            for chain, resn, resi in sorted(residues)
+        ]
+        if not labels:
+            return f"{atom_count} selected atom{'s' if atom_count != 1 else ''}", []
+        compact = ", ".join(labels[:2])
+        if len(labels) > 2:
+            compact += f" +{len(labels) - 2}"
+        full = labels[:20]
+        if len(labels) > 20:
+            full.append(f"… +{len(labels) - 20} more")
+        return compact, ["Selected residues:", *full]
 
     def apply_preset(self, key: str) -> None:
         normalized_key = str(key or "").strip()
@@ -456,6 +545,7 @@ class PymolControlBar(QFrame):
             lambda: self._cmd.set("mouse_selection_mode", mode, quiet=1),
         ):
             self.selection_mode_changed.emit(mode)
+            self.refresh_context_label()
 
     def _refresh_preset_menu(self) -> None:
         available = self.available_presets()
@@ -491,9 +581,12 @@ class PymolControlBar(QFrame):
 
 
 class PymolDockWidget(MSDockWidget):
+    side_panel_visibility_changed = Signal(bool)
+
     def __init__(self, title: str, manager, parent=None):
         super().__init__(title, manager, parent)
         self.pymol_widget = PyMOLGLWidget(self)
+        self.pymol_widget.installEventFilter(self)
         if self.cmd is not None:
             self.cmd.set("internal_gui", False)
 
@@ -576,6 +669,7 @@ class PymolDockWidget(MSDockWidget):
         self.set_side_panel_visible(visible)
 
     def set_side_panel_visible(self, visible: bool) -> None:
+        was_visible = self.is_side_panel_visible()
         visible = bool(visible and self._side_panel_widget is not None)
         self._side_container.setVisible(visible)
         if self._side_panel_widget is not None:
@@ -584,9 +678,16 @@ class PymolDockWidget(MSDockWidget):
             self._splitter.setSizes([max(480, self.width() - 280), 280])
         else:
             self._splitter.setSizes([1, 0])
+        if visible != was_visible:
+            self.side_panel_visibility_changed.emit(visible)
 
     def is_side_panel_visible(self) -> bool:
         return bool(self._side_container.isVisible())
+
+    def eventFilter(self, watched, event):
+        if watched is self.pymol_widget and event.type() == QEvent.Type.MouseButtonRelease:
+            QTimer.singleShot(0, self.control_bar.refresh_context_label)
+        return super().eventFilter(watched, event)
 
 
 __all__ = [

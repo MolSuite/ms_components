@@ -19,6 +19,7 @@ class FakeCmd:
     def __init__(self):
         self.selection_mode = 1
         self.selected_atoms = 0
+        self.selected_residues: set[tuple[str, str, str]] = set()
         self.calls: list[tuple] = []
 
     def get_setting_int(self, name):
@@ -39,8 +40,17 @@ class FakeCmd:
     def orient(self, target):
         self.calls.append(("orient", target))
 
-    def rock(self, mode):
-        self.calls.append(("rock", mode))
+    def center(self, target):
+        self.calls.append(("center", target))
+
+    def deselect(self):
+        self.selected_atoms = 0
+        self.selected_residues.clear()
+        self.calls.append(("deselect",))
+
+    def iterate(self, selection, _expression, *, space):
+        assert selection == "sele"
+        space["residues"].update(self.selected_residues)
 
     def hide(self, representation, target):
         self.calls.append(("hide", representation, target))
@@ -65,10 +75,14 @@ def test_pymol_toolbar_controls_selection_camera_and_representation():
     bar.set_scene_context("receptor", target="receptor_7")
     bar.zoom_active()
     bar.orient_active()
+    bar.center_active()
     bar.apply_representation("cartoon")
+    bar.hide_representation("cartoon")
     assert ("zoom", "receptor_7", 4) in cmd.calls
     assert ("orient", "receptor_7") in cmd.calls
+    assert ("center", "receptor_7") in cmd.calls
     assert ("show", "cartoon", "receptor_7") in cmd.calls
+    assert ("hide", "cartoon", "receptor_7") in cmd.calls
 
     cmd.selected_atoms = 4
     bar.apply_representation("sticks")
@@ -112,6 +126,25 @@ def test_pymol_toolbar_filters_and_applies_registered_presets():
     assert applied == [("receptor", "receptor_7")]
 
 
+def test_pymol_toolbar_summarizes_selected_residues_in_the_context_label():
+    _app()
+    cmd = FakeCmd()
+    cmd.selected_atoms = 12
+    cmd.selected_residues = {
+        ("A", "GLU", "45"),
+        ("A", "LYS", "50"),
+        ("B", "TYR", "12"),
+    }
+    bar = PymolControlBar(cmd)
+    bar.set_scene_context("receptor", target="receptor_7")
+
+    assert bar.context_label.text() == "Receptor · A:45 GLU, A:50 LYS +1"
+    assert "B:12 TYR" in bar.context_label.toolTip()
+
+    bar.clear_selection()
+    assert ("deselect",) in cmd.calls
+
+
 def test_pymol_toolbar_uses_menu_actions_and_hover_overflow():
     app = _app()
     bar = PymolControlBar(FakeCmd())
@@ -123,11 +156,22 @@ def test_pymol_toolbar_uses_menu_actions_and_hover_overflow():
     assert bar.toolbar.toolButtonStyle() == Qt.ToolButtonIconOnly
     actions = bar.toolbar.actions()
     assert [action.text() for action in actions] == [
-        "Selection", "Zoom", "Orient", "Rock", "Display", "Presets",
+        "Selection", "Actions", "Display", "Hide", "Presets",
     ]
     assert all(action.text() and not action.icon().isNull() for action in actions)
     assert bar.selection_mode_action.menu() is not None
+    assert bar.actions_action.menu() is not None
     assert bar.representation_action.menu() is not None
+    assert bar.hide_action.menu() is not None
+    assert [action.text() for action in bar.selection_mode_action.menu().actions() if not action.isSeparator()] == [
+        "Atoms", "Residues", "Chains", "Objects", "Clear selection",
+    ]
+    assert [action.text() for action in bar.actions_action.menu().actions()] == [
+        "Zoom", "Orient", "Center",
+    ]
+    assert [action.text() for action in bar.hide_action.menu().actions()] == [
+        "Everything", "Cartoon", "Sticks", "Lines", "Surface", "Spheres", "Ribbon", "Dots",
+    ]
     assert bar.preset_action.menu() is not None
     assert bar.context_label.parent() is bar
     assert bar.context_label.text() == "Generic"
