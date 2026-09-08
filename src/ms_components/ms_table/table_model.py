@@ -100,6 +100,27 @@ class SmartTableModel(QAbstractTableModel):
     def clear_data(self) -> None:
         self.load_data([], 0, 1)
 
+    def patch_loaded_row(self, row: int, values: dict[str, Any]) -> bool:
+        """Change displayed values in one loaded row without resetting selection or scroll."""
+        row_data = self.get_row_data(row)
+        if row_data is None:
+            return False
+        changed_columns: list[int] = []
+        offset = 1 if self._config.show_row_numbers else 0
+        for column, col_def in enumerate(self._visible_cols, start=offset):
+            key = col_def.display_key
+            if key in values and row_data.get(key) != values[key]:
+                row_data[key] = values[key]
+                changed_columns.append(column)
+        if not changed_columns:
+            return False
+        self.dataChanged.emit(
+            self.index(row, min(changed_columns)),
+            self.index(row, max(changed_columns)),
+            [Qt.DisplayRole],
+        )
+        return True
+
     def set_column_visible(self, field: str, visible: bool) -> None:
         col_def = self._config.column_by_field(field)
         if col_def and col_def.visible != visible:
@@ -237,6 +258,13 @@ class SmartTableModel(QAbstractTableModel):
                 return str(col_def.tooltip)
 
             case Qt.BackgroundRole:
+                if self._config.row_background is not None:
+                    try:
+                        tint = self._config.row_background(row_data)
+                    except Exception:
+                        tint = None
+                    if tint is not None:
+                        return tint
                 if self._config.alternating_rows and row_idx % 2 == 1:
                     # Subtle colour for alternating rows; the view may override it via QSS
                     return QColor(0, 0, 0, 12)   # semi-transparent

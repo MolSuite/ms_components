@@ -312,6 +312,9 @@ _NUM_OPS: list[tuple[str, FilterOperator, Any]] = [
     ("≥",  FilterOperator.GTE, None),
     ("<",  FilterOperator.LT,  None),
     ("≤",  FilterOperator.LTE, None),
+    # A list of values, so "these exact rows" is expressible as an ordinary column filter -
+    # which is what lets a host turn a selection into a filter the user can see and clear.
+    ("in", FilterOperator.IN,  None),
 ]
 
 
@@ -398,9 +401,8 @@ class FilterPopup(QFrame):
         for label, _, _ in _NUM_OPS:
             self._op_combo.addItem(label)
         self._value_edit = QLineEdit()
-        self._value_edit.setValidator(QDoubleValidator(-1e12, 1e12, 8, self))
-        self._value_edit.setPlaceholderText("Numeric value")
         self._value_edit.returnPressed.connect(self._apply)
+        self._op_combo.currentIndexChanged.connect(self._sync_numeric_editor)
 
         row = QHBoxLayout()
         row.addWidget(self._op_combo)
@@ -410,7 +412,18 @@ class FilterPopup(QFrame):
         if current and current.op in {op for _, op, _ in _NUM_OPS}:
             idx = next((i for i, (_, op, _) in enumerate(_NUM_OPS) if op == current.op), 0)
             self._op_combo.setCurrentIndex(idx)
-            self._value_edit.setText(str(current.value))
+            value = current.value
+            self._value_edit.setText(
+                ", ".join(str(v) for v in value)
+                if isinstance(value, (list, tuple, set)) else str(value)
+            )
+        self._sync_numeric_editor()
+
+    def _sync_numeric_editor(self) -> None:
+        """"in" takes a comma-separated list, so the single-number validator has to go."""
+        is_list = self._op_map[self._op_combo.currentIndex()][1] == FilterOperator.IN
+        self._value_edit.setValidator(None if is_list else QDoubleValidator(-1e12, 1e12, 8, self))
+        self._value_edit.setPlaceholderText("1, 2, 3" if is_list else "Numeric value")
 
     def _build_text(self, layout: QVBoxLayout, current: FilterSpec | None) -> None:
         self._op_map = _TEXT_OPS
@@ -463,6 +476,16 @@ class FilterPopup(QFrame):
         if not text:
             return
         try:
+            if op == FilterOperator.IN:
+                cast = (lambda v: int(float(v))) if self._col.kind == ColumnKind.INTEGER else (
+                    float if self._col.kind == ColumnKind.NUMBER else str
+                )
+                values = [cast(part.strip()) for part in text.split(",") if part.strip()]
+                if not values:
+                    return
+                self.applied.emit(FilterOperator.IN, values)
+                self.close()
+                return
             if self._col.kind == ColumnKind.INTEGER:
                 raw: Any = int(float(text))
             elif self._col.kind == ColumnKind.NUMBER:

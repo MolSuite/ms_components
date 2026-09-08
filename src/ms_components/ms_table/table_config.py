@@ -368,6 +368,9 @@ class TableConfig:
     # action (import, create), a button that triggers it is more useful than
     # `empty_message`. When set it replaces the text. `on_click` receives [].
     empty_action:           Optional["ToolbarAction"]  = None
+    # (row_data: dict) -> QColor | None. Tints a whole row from host state that is not a
+    # column (a marked/selected set, a validation flag). None = leave the default painting.
+    row_background:         Optional[Callable]         = None
 
     def __post_init__(self) -> None:
         self.load_mode = TableLoadMode(self.load_mode)

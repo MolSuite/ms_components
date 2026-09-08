@@ -110,6 +110,9 @@ class SmartTableView(QWidget):
         self._infinite_frontier_page = 0
         self._infinite_total_hint = 0
         self._infinite_total_exact = True
+        # How far the scroll has reached, in rows. Not `loaded_count`: the window drops
+        # pages behind the cursor, so that one shrinks while this keeps growing.
+        self._infinite_loaded_end = 0
         self._active_popup: QWidget | None = None
 
         self._setup_ui()
@@ -150,7 +153,7 @@ class SmartTableView(QWidget):
         if self._is_infinite_mode():
             self._infinite_total_hint = total
             self._infinite_total_exact = True
-            self._infinite_has_more = self._model.window_end < total
+            self._infinite_has_more = self._infinite_loaded_end < total
         self._model.set_total(total)
         return True
 
@@ -194,10 +197,12 @@ class SmartTableView(QWidget):
             if rows:
                 self._infinite_page_cursors[page_index + 1] = self._builder.cursor_of(rows[-1])
             end = page_index * self._builder.page_size + len(rows)
+            total = self._builder.count()
             self._infinite_frontier_page = page_index
-            self._infinite_has_more = has_more
-            self._infinite_total_hint = end + (1 if has_more else 0)
-            self._infinite_total_exact = not has_more
+            self._infinite_loaded_end = end
+            self._infinite_has_more = bool(rows) and end < total
+            self._infinite_total_hint = total
+            self._infinite_total_exact = True
             self._model.load_data(
                 rows,
                 self._infinite_total_hint,
@@ -216,6 +221,18 @@ class SmartTableView(QWidget):
         self._restore_selected_object_ids(selected_ids)
         self._table.verticalScrollBar().setValue(vertical_scroll)
         self._table.horizontalScrollBar().setValue(horizontal_scroll)
+
+    def patch_loaded_rows(self, key: str, patches: dict[Any, dict[str, Any]]) -> bool:
+        """Patch visible cached rows by a raw-object/key value; no model reset or reselection."""
+        changed = False
+        for row in self._model.loaded_rows:
+            data = self._model.get_row_data(row) or {}
+            raw = data.get("__raw__")
+            identity = data.get(key, getattr(raw, key, None))
+            values = patches.get(identity)
+            if values is not None:
+                changed = self._model.patch_loaded_row(row, values) or changed
+        return changed
 
     # ──────────────────────────────────────────
     # UI
@@ -248,6 +265,8 @@ class SmartTableView(QWidget):
         self._toolbar_row = None
         self._injected_actions: list[tuple[ToolbarAction, QAction]] = []
         self._keyed_actions: dict[str, list[QAction]] = {}
+        # False while a host has lent the table out (see set_config_actions_visible).
+        self._config_actions_visible = True
         self._zone_anchor: QAction | None = None
         self._actions_collapsed = self._config.toolbar_collapsible
 
@@ -974,6 +993,16 @@ class SmartTableView(QWidget):
             self._toolbar.insertAction(self._zone_anchor, act)
         self._keyed_actions[key] = added
 
+    def set_config_actions_visible(self, visible: bool) -> None:
+        """Show/hide the actions the config declares (toolbar_left/center/right).
+
+        The built-in controls (Columns, Export, Reload, Settings) stay: they describe the
+        table. The config's own actions describe the *catalog* — a table lent to a tool
+        should not still be offering "Import…".
+        """
+        self._config_actions_visible = bool(visible)
+        self._apply_collapsed_state()
+
     def clear_toolbar_actions(self, key: str) -> None:
         for act in self._keyed_actions.pop(key, []):
             self._toolbar.removeAction(act)
@@ -987,7 +1016,7 @@ class SmartTableView(QWidget):
         for action in self._builtin_actions:
             action.setVisible(not hidden)
         for _, act in self._injected_actions:
-            act.setVisible(not hidden)
+            act.setVisible(not hidden and self._config_actions_visible)
         for acts in self._keyed_actions.values():
             for act in acts:
                 act.setVisible(not hidden)
@@ -1043,11 +1072,15 @@ class SmartTableView(QWidget):
 
         if index.isValid():
             raw = self._model.data(index, RAW_OBJECT_ROLE)
+            # Right-clicking inside the selection acts on the whole selection (file-manager
+            # behaviour); right-clicking outside it acts on the single row under the cursor.
+            selected = self.get_selected_objects()
+            targets = selected if any(obj is raw for obj in selected) else [raw]
 
             for label, callback in self._config.context_menu_actions.items():
                 action = menu.addAction(label)
                 action.triggered.connect(
-                    lambda checked, cb=callback, obj=raw: cb([obj])
+                    lambda checked, cb=callback, objs=targets: cb(list(objs))
                 )
 
             if self._config.context_menu_actions:
@@ -1105,22 +1138,25 @@ class SmartTableView(QWidget):
         """Reload data from the DB with the current filter/sort/page state."""
         if self._is_infinite_mode():
             self._builder.set_page(1)
-            rows, has_more = self._builder.fetch_window_after(None)
+            rows, _has_more = self._builder.fetch_window_after(None)
             self._infinite_pages = {0: rows}
             self._infinite_page_cursors = {0: None}
             if rows:
                 self._infinite_page_cursors[1] = self._builder.cursor_of(rows[-1])
-            self._infinite_has_more = has_more
-            total_hint = len(rows) + (1 if has_more else 0)
+            # ponytail: one COUNT per refresh (not per scrolled page). "100+ records" is not
+            # an answer to "how many are there"; move this off-thread if it ever profiles hot.
+            total = self._builder.count()
             self._infinite_frontier_page = 0
-            self._infinite_total_hint = total_hint
-            self._infinite_total_exact = not has_more
+            self._infinite_loaded_end = len(rows)
+            self._infinite_has_more = bool(rows) and len(rows) < total
+            self._infinite_total_hint = total
+            self._infinite_total_exact = True
             self._model.load_data(
                 rows,
-                total_hint,
+                total,
                 1,
                 window_start=0,
-                total_is_exact=not has_more,
+                total_is_exact=True,
             )
             return
         if reset_page:
@@ -1201,12 +1237,9 @@ class SmartTableView(QWidget):
             if page_index >= self._infinite_frontier_page:
                 self._infinite_frontier_page = page_index
                 end = page_index * self._builder.page_size + len(rows)
-                if self._infinite_total_exact and self._infinite_total_hint >= end:
-                    self._infinite_has_more = end < self._infinite_total_hint
-                else:
-                    self._infinite_has_more = has_more
-                    self._infinite_total_hint = end + (1 if has_more else 0)
-                    self._infinite_total_exact = not has_more
+                self._infinite_loaded_end = end
+                # `not rows` also stops the autofill loop when rows vanished under us.
+                self._infinite_has_more = bool(rows) and end < self._infinite_total_hint
             self._replace_infinite_window(page_index)
         finally:
             self._loading_more = False
@@ -1255,6 +1288,15 @@ class SmartTableView(QWidget):
         self._builder = QueryBuilder(db, self._config)
         self._update_control_summaries()
         self.refresh()
+
+    @property
+    def view(self):
+        """The inner QTableView — for hosts that need to scope focus or shortcuts to it."""
+        return self._table
+
+    def repaint_rows(self) -> None:
+        """Repaint the visible rows without re-querying (host state changed, not the data)."""
+        self._table.viewport().update()
 
     def get_selected_objects(self) -> list[Any]:
         """Return the list of selected SQLModel objects."""
@@ -1322,12 +1364,11 @@ class SmartTableView(QWidget):
 
         if not self._is_infinite_mode():
             text = ""  # the pagination bar already shows the total; do not repeat it
-        elif not self._model.total_is_exact:
-            text = f"{max(loaded, total - 1):,}+ records"
-        elif 0 < loaded < total:
-            text = f"{loaded:,} loaded · {total:,} records"
         else:
-            text = f"{total:,} records"
+            # How far the scroll got, out of how many there are. `loaded` is the window,
+            # which shrinks behind the cursor - the frontier is what the user counts.
+            reached = min(max(self._infinite_loaded_end, loaded), total)
+            text = f"{reached:,} of {total:,} records" if reached < total else f"{total:,} records"
         # The selection sits next to the total: the other half of "what am I looking at".
         if self._selected_count > 0:
             text = f"{self._selected_count:,} sel · {text}" if text else f"{self._selected_count:,} sel"
