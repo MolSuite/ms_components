@@ -137,11 +137,16 @@ class WorkersEditor(QWidget):
     def is_dirty(self) -> bool:
         return self._dirty
 
-    def commit(self) -> None:
+    def commit(self, *, target: str = "project") -> None:
         """Persist the staged workers. Raises so the panel can report the error."""
         if not self._dirty:
             return
-        self._configuration.set_value(self._path, self._workers)
+        setter = (
+            self._configuration.set_global_value
+            if target == "global"
+            else self._configuration.set_value
+        )
+        setter(self._path, self._workers)
         self._dirty = False
         self._status.setText("Saved.")
 

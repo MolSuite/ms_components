@@ -269,6 +269,11 @@ class AppSettingsPanel(QWidget):
         self.reload_button = QPushButton("Reload", self)
         self.reload_button.clicked.connect(self.reload_values)
         footer.addWidget(self.reload_button)
+        self.save_target_label = QLabel("Save to:", self)
+        footer.addWidget(self.save_target_label)
+        self.save_target = QComboBox(self)
+        self.save_target.setMaximumWidth(110)
+        footer.addWidget(self.save_target)
         self.save_button = QPushButton("Save changes", self)
         self.save_button.setDefault(True)
         self.save_button.clicked.connect(self.save_settings)
@@ -337,6 +342,17 @@ class AppSettingsPanel(QWidget):
         self.empty_label.setVisible(not has_pages)
         self.save_button.setEnabled(has_configs)
         self.reload_button.setEnabled(has_configs)
+        selected = self.save_target.currentData()
+        self.save_target.blockSignals(True)
+        self.save_target.clear()
+        if any(bool(configuration.has_project) for configuration in self._configurations.values()):
+            self.save_target.addItem("Project", "project")
+        self.save_target.addItem("Global", "global")
+        index = self.save_target.findData(selected)
+        self.save_target.setCurrentIndex(max(0, index))
+        self.save_target.blockSignals(False)
+        self.save_target_label.setVisible(has_configs)
+        self.save_target.setVisible(has_configs)
 
     def add_config(self, configuration) -> None:
         config_id = str(configuration.config_id)
@@ -790,6 +806,7 @@ class AppSettingsPanel(QWidget):
         return tuple(self._configurations)
 
     def reload_values(self) -> None:
+        self._update_empty_state()
         for row in self._rows.values():
             self._load_row(row)
         for config_id, configuration in self._configurations.items():
@@ -807,22 +824,28 @@ class AppSettingsPanel(QWidget):
             self.status_label.setText("No changes to save.")
             return
         try:
+            target = str(self.save_target.currentData() or "global")
             values = [
                 (self._rows[key], self._editor_value(self._rows[key]))
                 for key in tuple(self._dirty_rows)
             ]
             for row, value in values:
-                row.configuration.set_value(row.entry.path, value)
+                setter = (
+                    row.configuration.set_global_value
+                    if target == "global"
+                    else row.configuration.set_value
+                )
+                setter(row.entry.path, value)
             # Custom editors (the workers map) stage their own state; Save is what
             # writes it, same as every scalar row.
             for editor in pending_custom:
-                editor.commit()
+                editor.commit(target=target)
         except Exception as exc:
             self.status_label.setText("Changes were not saved.")
             QMessageBox.critical(self, f"{self.app_name} configuration", str(exc))
             return
         self.reload_values()
-        self.status_label.setText("Changes saved.")
+        self.status_label.setText(f"Changes saved to {target} settings.")
         self.settings_saved.emit()
 
     def _reset_row(self, row: _ParameterRow) -> None:
