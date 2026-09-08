@@ -79,18 +79,21 @@ def test_keyset_walks_the_whole_table_without_offset(db):
     assert "OFFSET" not in sql.upper()
 
 
-def test_infinite_scroll_replaces_old_pages_without_counting(db, monkeypatch):
+def test_infinite_scroll_replaces_old_pages_and_counts_once(db, monkeypatch):
+    """One COUNT per refresh, none per scrolled page: "100+ records" is not an answer to
+    "how many are there", but paying for a COUNT on every page would be."""
     QApplication.instance() or QApplication(["ms-table-window-test"])
     view = SmartTableView(db, _config(infinite_cache_pages=2, max_loaded_rows=N_ROWS))
-    monkeypatch.setattr(view._builder, "count", lambda: pytest.fail("infinite scroll must not COUNT"))
+    assert view._model.total_items == N_ROWS and view._model.total_is_exact
 
+    monkeypatch.setattr(view._builder, "count", lambda: pytest.fail("scrolling must not COUNT"))
     for _ in range(10):
         view.load_next_page()
 
-    assert view._model.loaded_count == 2 * PAGE
+    assert view._model.loaded_count == 2 * PAGE  # the window still slides
     assert view._model.window_start == 9 * PAGE
-    assert view._model.total_items == 11 * PAGE + 1  # boundary + one sentinel row
-    assert not view._model.total_is_exact
+    assert view._model.total_items == N_ROWS
+    assert view._infinite_loaded_end == 11 * PAGE  # the frontier, which is what the label shows
 
 
 def test_a_column_can_be_a_sql_expression(db):

@@ -103,6 +103,29 @@ def test_panel_resets_project_value_and_accepts_additional_config(tmp_path):
         panel.deleteLater()
 
 
+def test_panel_can_save_to_global_without_replacing_project_value(tmp_path):
+    app = QApplication.instance() or QApplication([])
+    del app
+    configuration = _configuration(tmp_path)
+    configuration.set_value("molecule_display.preview_limit", 60)
+    configuration.set_project_root(tmp_path / "project")
+    configuration.set_value("molecule_display.preview_limit", 80)
+    panel = AppSettingsPanel(configurations=[configuration])
+
+    try:
+        assert panel.save_target.currentData() == "project"
+        panel.editor("testdock", "molecule_display.preview_limit").setValue(65)
+        panel.save_target.setCurrentIndex(panel.save_target.findData("global"))
+        panel.save_button.click()
+
+        assert configuration.get_global_value("molecule_display.preview_limit") == 65
+        assert configuration.get_value("molecule_display.preview_limit") == 80
+        assert configuration.get_source("molecule_display.preview_limit") == "project"
+        assert panel.status_label.text() == "Changes saved to global settings."
+    finally:
+        panel.deleteLater()
+
+
 class _ToolSettings(BaseModel):
     version: str = "3.1.1"
 
