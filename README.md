@@ -12,8 +12,7 @@ PyMOL is installed automatically from the `pymol-open-source` alpha wheels on
 PyPI (`>=3.2.0a0`):
 
 ```bash
-pip install git+https://github.com/MolSuite/ms_flow
-pip install git+https://github.com/MolSuite/ms_components
+pip install ms_components
 ```
 
 ## License

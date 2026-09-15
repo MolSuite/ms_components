@@ -8,12 +8,10 @@ dock, steppers, tool panels, and the shared theme.
 
 `ms_components` requires Python 3.12. PyMOL comes from the
 `pymol-open-source` alpha wheels on PyPI and is installed automatically as a
-dependency; no conda environment is needed. Until the MolSuite packages are
-published on PyPI, install them from Git:
+dependency, together with `ms_flow`; no conda environment is needed:
 
 ```bash
-pip install "ms_flow @ git+https://github.com/MolSuite/ms_flow"
-pip install "ms_components @ git+https://github.com/MolSuite/ms_components"
+pip install ms_components
 ```
 
 ## Components
