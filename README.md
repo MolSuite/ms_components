@@ -8,11 +8,10 @@ Part of the [MolSuite](https://molsuite.github.io/) stack. Built on top of
 
 ## Install
 
-PyMOL is required and must be installed from conda-forge before the Python
-packages (it is not distributed on PyPI):
+PyMOL is installed automatically from the `pymol-open-source` alpha wheels on
+PyPI (`>=3.2.0a0`):
 
 ```bash
-conda install -c conda-forge pymol-open-source
 pip install git+https://github.com/MolSuite/ms_flow
 pip install git+https://github.com/MolSuite/ms_components
 ```
