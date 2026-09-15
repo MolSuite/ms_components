@@ -33,6 +33,26 @@ QToolButton:pressed {
     color: palette(highlighted-text);
 }
 
+/* tool_panel: a collapsible section's heading. The id outranks the :hover/:pressed
+   rules above, so it never grows a button frame. */
+QToolButton#SectionToggle {
+    border: none;
+    background: transparent;
+    padding: 0;
+}
+
+/* tool_panel: the 3 px run progress line, quiet next to the status bar. */
+QProgressBar#ToolProgress {
+    border: none;
+    border-radius: 1px;
+    background: palette(midlight);
+}
+
+QProgressBar#ToolProgress::chunk {
+    border-radius: 1px;
+    background: palette(highlight);
+}
+
 
 /* Left gap for the first tab: `tab-bar { left }` shifts the whole bar.
    Do NOT use margins on ::tab -- Qt places the close button flush to the full
