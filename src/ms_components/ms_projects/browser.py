@@ -1692,15 +1692,6 @@ class MolSuiteSettingsPanel(QWidget):
         bp.clicked.connect(lambda: self._choose_path(self.projects_db_input))
         pdl.addWidget(bp)
         pf.addRow("Projects DB", pdr)
-        self.executor_db_input = QLineEdit(self.paths_card)
-        edr = QWidget(self.paths_card)
-        edl = QHBoxLayout(edr)
-        edl.setContentsMargins(0,0,0,0)
-        edl.addWidget(self.executor_db_input)
-        be = QPushButton("Browse", edr)
-        be.clicked.connect(lambda: self._choose_path(self.executor_db_input))
-        edl.addWidget(be)
-        pf.addRow("Executor DB", edr)
         pl.addLayout(pf)
         ll.addWidget(self.paths_card)
         self.runtime_card = QFrame(self)
@@ -1810,7 +1801,6 @@ class MolSuiteSettingsPanel(QWidget):
 
     def _apply_settings_to_form(self, s: Settings):
         self.projects_db_input.setText(str(s.projects_db))
-        self.executor_db_input.setText("" if s.executor_db is None else str(s.executor_db))
         self.poll_interval_spin.setValue(float(s.general.poll_interval))
         self.general_log_level_combo.setCurrentText(str(s.general.log_level))
         self.app_log_level_combo.setCurrentText(str(s.logging.app_level))
@@ -1837,7 +1827,6 @@ class MolSuiteSettingsPanel(QWidget):
     def save_settings(self):
         updates={
             "projects_db": Path(self.projects_db_input.text().strip()).expanduser().resolve(),
-            "executor_db": Path(self.executor_db_input.text().strip()).expanduser().resolve() if self.executor_db_input.text().strip() else None,
             "general.poll_interval": float(self.poll_interval_spin.value()),
             "general.log_level": str(self.general_log_level_combo.currentText()),
             "logging.app_level": str(self.app_log_level_combo.currentText()),
