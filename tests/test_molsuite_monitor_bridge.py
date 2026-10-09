@@ -1,4 +1,4 @@
-"""The monitor bridge over a real MolSuite: what it shows of the engine's jobs."""
+"""The monitor bridge over a real Workspace: what it shows of the engine's jobs."""
 from __future__ import annotations
 
 import sqlite3
@@ -12,7 +12,7 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication
 
-from ms_flow import MolSuite, job, table_sink, task
+from ms_flow import Workspace, job, table_sink, task
 from ms_components.ms_monitor import MolSuiteMonitorBridge
 
 GATE = threading.Event()
@@ -36,10 +36,10 @@ def ms(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
     QApplication.instance() or QApplication([])
-    molsuite = MolSuite(app_id="monitor-test")
-    yield molsuite
+    workspace = Workspace(app_id="monitor-test")
+    yield workspace
     GATE.set()
-    molsuite.shutdown()
+    workspace.shutdown()
 
 
 def _open(ms, tmp_path):
@@ -59,13 +59,13 @@ def _visible(bridge):
 
 
 def test_no_project_shows_nothing(ms):
-    snapshot = MolSuiteMonitorBridge(molsuite=ms, poll_ms=50).refresh_now()
+    snapshot = MolSuiteMonitorBridge(workspace=ms, poll_ms=50).refresh_now()
     assert (snapshot.has_project, snapshot.project_id, snapshot.jobs, snapshot.jobs_active) == (False, None, [], 0)
 
 
 def test_a_job_is_followed_to_its_end_and_read_back_from_the_journal(ms, tmp_path):
     _open(ms, tmp_path)
-    bridge = MolSuiteMonitorBridge(molsuite=ms, poll_ms=50)
+    bridge = MolSuiteMonitorBridge(workspace=ms, poll_ms=50)
     finished = []
     bridge.job_finished.connect(lambda job_id, status: finished.append((job_id, status)))
 
@@ -98,7 +98,7 @@ def test_a_job_is_followed_to_its_end_and_read_back_from_the_journal(ms, tmp_pat
 
 def test_cancel_reaches_the_engine(ms, tmp_path):
     _open(ms, tmp_path)
-    bridge = MolSuiteMonitorBridge(molsuite=ms, poll_ms=50)
+    bridge = MolSuiteMonitorBridge(workspace=ms, poll_ms=50)
     GATE.clear()
     job_id = ms.submit(halves, executor="thread")
     state = _visible(bridge)

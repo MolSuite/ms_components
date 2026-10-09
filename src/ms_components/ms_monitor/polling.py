@@ -45,13 +45,13 @@ class MolSuiteMonitorPoller(QObject):
     def __init__(
         self,
         *,
-        molsuite,
+        workspace,
         poll_ms: int = 500,
         max_recent_jobs: int = 20,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
-        self._molsuite = molsuite
+        self._workspace = workspace
         # Only poll fast while jobs are active; back off hard when idle.
         self._active_poll_ms = max(100, poll_ms)
         self._idle_poll_ms = max(self._active_poll_ms, 3000)
@@ -119,13 +119,13 @@ class MolSuiteMonitorPoller(QObject):
         self.project_snapshot_updated.emit(snapshot)
 
     def _build_snapshot(self) -> ProjectMonitorState:
-        molsuite = self._molsuite
-        context = molsuite.active_context
-        activity = molsuite.get_project_activity()
+        workspace = self._workspace
+        context = workspace.active_context
+        activity = workspace.get_project_activity()
         now = time.time()
         # Live state comes from the engine's memory, history from the project's journal;
         # `jobs()` merges both and gives them oldest first.
-        jobs = [job_state(job, now) for job in molsuite.jobs(self._max_recent_jobs)][::-1]
+        jobs = [job_state(job, now) for job in workspace.jobs(self._max_recent_jobs)][::-1]
         jobs.sort(key=lambda job: job.is_terminal)  # stable: active first, newest first in each
         project_id = activity.get("project_id") if context is not None else None
         return ProjectMonitorState(

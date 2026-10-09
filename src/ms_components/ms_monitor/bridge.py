@@ -30,18 +30,18 @@ class MolSuiteMonitorBridge(QObject):
     def __init__(
         self,
         *,
-        molsuite,
+        workspace,
         poll_ms: int = MonitorConfig.model_fields["poll_ms"].default,
         max_recent_jobs: int = MonitorConfig.model_fields["max_recent_jobs"].default,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
-        self._molsuite = molsuite
+        self._workspace = workspace
         self._poll_ms = poll_ms
         self._max_recent_jobs = max_recent_jobs
         self._thread: QThread | None = None
         self._poller = MolSuiteMonitorPoller(
-            molsuite=molsuite,
+            workspace=workspace,
             poll_ms=poll_ms,
             max_recent_jobs=max_recent_jobs,
         )
@@ -53,8 +53,8 @@ class MolSuiteMonitorBridge(QObject):
         return self._poller.current_snapshot
 
     @property
-    def molsuite(self):
-        return self._molsuite
+    def workspace(self):
+        return self._workspace
 
     @property
     def sync_state(self) -> MonitorSyncState:
@@ -106,7 +106,7 @@ class MolSuiteMonitorBridge(QObject):
         if job is not None and job.chunks_failed:
             failures = [
                 FailureState(int(row["attempt"]), str(row["error"] or ""), str(row.get("input") or ""))
-                for row in self._molsuite.job_failures(job_id, failure_limit)
+                for row in self._workspace.job_failures(job_id, failure_limit)
             ]
         return JobDetailState(job_id=job_id, job=job, failures=failures)
 
@@ -122,7 +122,7 @@ class MolSuiteMonitorBridge(QObject):
             self._emit_action_failed("cancel_job", f"Job '{job_id}' runs in another process; cancel it there.")
             return False
         try:
-            self._molsuite.engine.cancel(job.engine_id)
+            self._workspace.engine.cancel(job.engine_id)
         except Exception as exc:
             self._emit_action_failed("cancel_job", str(exc))
             return False
