@@ -105,7 +105,7 @@ class MolSuiteMonitorBridge(QObject):
         failures: list[FailureState] = []
         if job is not None and job.chunks_failed:
             failures = [
-                FailureState(attempt=int(row["attempt"]), error=str(row["error"] or ""))
+                FailureState(int(row["attempt"]), str(row["error"] or ""), str(row.get("input") or ""))
                 for row in self._molsuite.job_failures(job_id, failure_limit)
             ]
         return JobDetailState(job_id=job_id, job=job, failures=failures)

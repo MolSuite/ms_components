@@ -85,6 +85,7 @@ def test_a_job_is_followed_to_its_end_and_read_back_from_the_journal(ms, tmp_pat
 
     failures = bridge.get_job_detail(state.job_id).failures
     assert sorted(failure.error.strip().splitlines()[-1] for failure in failures) == ["ValueError: odd 1", "ValueError: odd 3"]
+    assert sorted(failure.input for failure in failures) == ["1", "3"]
 
     # another session of the project: the same job, now only on record
     ms.close_project()

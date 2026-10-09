@@ -9,9 +9,10 @@ TERMINAL_JOB_STATUSES = {"completed", "completed_with_errors", "failed", "cancel
 
 @dataclass(slots=True)
 class FailureState:
-    """One chunk that failed: the attempt that gave up and its traceback."""
+    """One chunk that failed: the attempt that gave up, its traceback and a short repr of its input."""
     attempt: int
     error: str
+    input: str = ""
 
 
 @dataclass(slots=True)

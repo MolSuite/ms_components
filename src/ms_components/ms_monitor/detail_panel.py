@@ -90,7 +90,8 @@ class JobDetailPanel(QFrame):
             # one-line reasons; the Errors tab has the full tracebacks.
             reasons = [f"job: {_reason(job.error)}"] if job.error else []
             reasons += [
-                f"chunk (attempt {failure.attempt}): {_reason(failure.error) or 'failed (no message recorded)'}"
+                f"{failure.input or 'chunk'} (attempt {failure.attempt}): "
+                f"{_reason(failure.error) or 'failed (no message recorded)'}"
                 for failure in detail.failures
             ]
             if reasons:
@@ -109,6 +110,7 @@ class JobDetailPanel(QFrame):
         blocks = [f"JOB ERROR\n{job_error}"] if job_error else []
         blocks += [
             f"CHUNK {index}  —  attempt {failure.attempt}\n"
+            + (f"input: {failure.input}\n" if failure.input else "") +
             f"{failure.error or '(no error message recorded for this chunk)'}"
             for index, failure in enumerate(detail.failures, start=1)
         ]
