@@ -1,4 +1,4 @@
-"""Runs a list of provisioning ``Step``s off the GUI thread and shows the output.
+"""Runs a list of ``ms_env`` ``Step``s off the GUI thread and shows the output.
 
 Used for anything that touches a remote host or boots a cluster: testing an
 executor, preparing its environment, ``ray up``. Modality is the caller's call —
@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ms_flow.core.executor.provisioning import Step, run_step
+from ms_env import Step, run_step
 
 
 class StepWorker(QThread):

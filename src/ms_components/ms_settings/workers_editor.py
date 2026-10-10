@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from ms_components.step_dialog import run_steps_dialog
-from ms_flow.core.executor.provisioning import test_steps
+from ms_flow.core.settings.probes import test_steps
 from ms_flow.core.settings.models import (
     HPCWorkerConfig,
     ProcessPoolWorkerConfig,
