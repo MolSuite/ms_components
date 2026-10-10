@@ -124,6 +124,7 @@ class MolSuiteMonitorWidget(QWidget):
         self._refresh_button.clicked.connect(self._refresh_from_bridge)
         self._cancel_button.clicked.connect(self._cancel_selected_job)
         self._jobs_view.job_selected.connect(self._on_current_job_changed)
+        self._jobs_view.unfolded_changed.connect(self._on_unfolded_changed)
 
         if bridge is not None:
             self.attach_bridge(bridge)
@@ -243,6 +244,10 @@ class MolSuiteMonitorWidget(QWidget):
             return
         if self._bridge.cancel_job(job_id):
             self._bridge.request_refresh()
+
+    def _on_unfolded_changed(self, job_ids) -> None:
+        if self._bridge is not None:
+            self._bridge.set_unfolded_jobs(job_ids)
 
     def _on_current_job_changed(self, *_args) -> None:
         # Triggered only by an explicit click on a job card → reload its detail once.

@@ -16,6 +16,16 @@ class FailureState:
 
 
 @dataclass(slots=True)
+class TaskMonitorState:
+    """One task in flight, as `ms_flow.engine.TaskSnapshot` gives it."""
+    input: str  # a short repr of the chunk it runs; of the first one when it carries several
+    chunks: int = 1
+    attempt: int = 1
+    seconds: float = 0.0  # since it was handed to its executor
+    progress: float | None = None  # percent; None when the task does not say how far it is
+
+
+@dataclass(slots=True)
 class MonitorSyncState:
     in_progress: bool = False
     last_refresh_at: datetime | None = None
@@ -39,6 +49,7 @@ class JobMonitorState:
     throughput_eps: float = 0.0
     started_at: datetime | None = None
     finished_at: datetime | None = None
+    tasks: list[TaskMonitorState] = field(default_factory=list)  # read only while its card is unfolded
 
     @property
     def is_terminal(self) -> bool:

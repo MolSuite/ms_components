@@ -9,7 +9,9 @@ pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QApplication
 
 from ms_components.ms_monitor.detail_panel import JobDetailPanel
-from ms_components.ms_monitor.models import FailureState, JobDetailState, JobMonitorState, ProjectMonitorState
+from ms_components.ms_monitor.job_cards import JobCard
+from ms_components.ms_monitor.models import (FailureState, JobDetailState, JobMonitorState, ProjectMonitorState,
+                                             TaskMonitorState)
 from ms_components.ms_monitor.widget import MolSuiteMonitorWidget
 
 TRACEBACK = 'Traceback (most recent call last):\n  File "dock.py", line 3, in dock\nValueError: bad ligand\n'
@@ -34,6 +36,24 @@ def test_detail_panel_shows_the_reason_in_the_summary_and_the_traceback_in_error
     panel.clear()
     assert (panel._summary.toPlainText(), panel._errors.toPlainText()) == ("", "")
     assert panel._tabs.tabText(panel._errors_tab_index) == "Errors"
+
+
+def test_an_unfolded_card_lists_the_tasks_in_flight():
+    QApplication.instance() or QApplication([])
+    tasks = [TaskMonitorState(input=f"lig{i}", seconds=75, progress=40.0 if i else None) for i in range(14)]
+    card, told = JobCard(_job(tasks=tasks)), []
+    card.unfolded.connect(lambda job_id, unfolded: told.append((job_id, unfolded)))
+    assert card._task_rows == []  # folded: nothing is built
+
+    card._toggle.click()
+    assert told == [("abc123", True)] and len(card._task_rows) == 12
+    assert card._tasks_note.text() == "+2 more tasks…"
+    watched, unwatched = card._task_rows[1], card._task_rows[0]
+    assert (watched._far.text(), watched._bar._busy) == ("40%", None)
+    assert unwatched._far.text() == "1m" and unwatched._bar._busy is not None  # how far is unknown: it only runs
+
+    card.set_job(_job(status="completed", tasks=[]))
+    assert card._task_rows == [] and card._tasks_note.text() == "No tasks in flight"
 
 
 def test_monitor_widget_shows_the_jobs_and_empties_without_a_project():

@@ -5,7 +5,7 @@ from datetime import datetime
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
-from ms_components.ms_monitor.models import JobMonitorState, ProjectMonitorState
+from ms_components.ms_monitor.models import JobMonitorState, ProjectMonitorState, TaskMonitorState
 
 
 def job_state(job, now: float) -> JobMonitorState:
@@ -60,6 +60,7 @@ class MolSuiteMonitorPoller(QObject):
         self._current_project_id: str | None = None
         self._last_snapshot: ProjectMonitorState | None = None
         self._job_cache: dict[str, JobMonitorState] = {}
+        self.unfolded: frozenset[str] = frozenset()  # the jobs whose tasks in flight are asked for
 
     @property
     def current_snapshot(self) -> ProjectMonitorState | None:
@@ -127,6 +128,13 @@ class MolSuiteMonitorPoller(QObject):
         # `jobs()` merges both and gives them oldest first.
         jobs = [job_state(job, now) for job in workspace.jobs(self._max_recent_jobs)][::-1]
         jobs.sort(key=lambda job: job.is_terminal)  # stable: active first, newest first in each
+        for job in jobs:
+            if job.job_id in self.unfolded and not job.is_terminal:
+                job.tasks = [
+                    TaskMonitorState(task.input, task.chunks, task.attempt, task.seconds,
+                                     None if task.progress is None else 100.0 * task.progress)
+                    for task in workspace.job_tasks(job.engine_id)
+                ]
         project_id = activity.get("project_id") if context is not None else None
         return ProjectMonitorState(
             project_id=project_id,

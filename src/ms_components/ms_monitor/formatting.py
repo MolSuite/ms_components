@@ -8,6 +8,15 @@ def format_throughput(eps: float) -> str:
     return "-" if eps <= 0.0 else f"{eps:.2f} chunks/s"
 
 
+def format_duration(seconds: float) -> str:
+    seconds = int(max(0.0, seconds))
+    if seconds < 60:
+        return f"{seconds}s"
+    if seconds < 3600:
+        return f"{seconds // 60}m"
+    return f"{seconds // 3600}h"
+
+
 def format_relative_time(value: datetime | None, *, now: datetime | None = None) -> str:
     if value is None:
         return "-"

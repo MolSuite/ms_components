@@ -97,6 +97,11 @@ class MolSuiteMonitorBridge(QObject):
         self._set_sync_state(in_progress=False, last_refresh_at=datetime.now())
         return self._poller.current_snapshot
 
+    def set_unfolded_jobs(self, job_ids) -> None:
+        """The jobs whose tasks in flight the next polls bring (`JobMonitorState.tasks`)."""
+        self._poller.unfolded = frozenset(job_ids)
+        self.request_refresh()
+
     def get_job_detail(self, job_id: str | None, *, failure_limit: int = 200) -> JobDetailState | None:
         """The job as last polled plus its failed chunks, read from the project's journal."""
         if not job_id:
