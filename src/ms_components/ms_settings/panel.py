@@ -190,7 +190,7 @@ class AppSettingsPanel(QWidget):
         self._search_hits: dict[str, list[str]] = {}
         self._highlighted: list[QLabel] = []
         self._dirty_rows: set[tuple[str, str]] = set()
-        # Editors that own a whole collection (workers map) and stage it themselves.
+        # Editors that own a whole section (who runs the jobs) and stage it themselves.
         self._custom_editors: list[Any] = []
         self._setup_ui()
 
@@ -370,8 +370,11 @@ class AppSettingsPanel(QWidget):
             node.entries.append(entry)
         provider = getattr(configuration, "custom_editors", None)
         for kind, path, title in provider() if callable(provider) else ():
-            node = self._node(f"{config_id}/{path.split('.')[0]}", str(title), config_id)
-            node.configuration = configuration
+            node = root
+            for segment in path.split(".")[:2]:
+                node = self._node(f"{node.key}/{segment}", _titleize(segment), node.key)
+                node.configuration = configuration
+            node.title = str(title)
             node.custom.append((kind, path, title))
         self._build_branch(root.key)
         if self.tree.currentItem() is None:
@@ -557,14 +560,16 @@ class AppSettingsPanel(QWidget):
 
     def _add_custom_editors(self, node: _Node, layout, parent) -> None:
         """A provider may expose ``custom_editors() -> [(kind, path, title), ...]`` to
-        get a dedicated widget for a collection the scalar walker can't render (e.g. the
-        ``workers`` executor map). Unknown kinds are skipped."""
+        get a dedicated widget for what the scalar walker can't render well (who runs the
+        jobs: one choice and the fields of it). Unknown kinds are skipped, and so is this
+        one without a runtime to put the choice in place."""
+        apply = getattr(getattr(self.runtime, "workspace", None), "run_process_on", None)
         for kind, path, _title in node.custom:
-            if kind != "workers":
+            if kind != "process" or apply is None:
                 continue
-            from ms_components.ms_settings.workers_editor import WorkersEditor
+            from ms_components.ms_settings.process_editor import ProcessRoleEditor
 
-            widget = WorkersEditor(configuration=node.configuration, path=path, parent=parent)
+            widget = ProcessRoleEditor(configuration=node.configuration, apply=apply, path=path, parent=parent)
             self._custom_editors.append(widget)
             layout.addWidget(widget)
 
@@ -836,8 +841,8 @@ class AppSettingsPanel(QWidget):
                     else row.configuration.set_value
                 )
                 setter(row.entry.path, value)
-            # Custom editors (the workers map) stage their own state; Save is what
-            # writes it, same as every scalar row.
+            # Custom editors stage their own state; Save is what writes it, same as
+            # every scalar row.
             for editor in pending_custom:
                 editor.commit(target=target)
         except Exception as exc:
