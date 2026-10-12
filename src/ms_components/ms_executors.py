@@ -183,6 +183,7 @@ class KeptPage(QWidget):
             kind.removeItem(kind.findData("loky"))
         if kind is not None:
             kind.currentIndexChanged.connect(self._only_of_kind)
+            self._editors["hosts"].itemChanged.connect(self._one_host)
             self._only_of_kind()
         self.remove_button.setEnabled(bool(name) and name != "local")
         self.said.setText("")
@@ -193,6 +194,22 @@ class KeptPage(QWidget):
         for key, field in self._model.model_fields.items():
             only = (field.json_schema_extra or {}).get("kind")
             self._form.setRowVisible(self._editors[key], only in (None, kind))
+        self._form.labelForField(self._editors["hosts"]).setText("Login node" if kind == "queue" else "Hosts")
+        self._one_host()
+
+    def _one_host(self, ticked: QListWidgetItem | None = None) -> None:
+        """A queue is asked through one machine, its login node, and has nothing to do with
+        the others kept: ticking one unticks the rest."""
+        ticks = self._editors["hosts"]
+        if self._editors["kind"].currentData() != "queue":
+            return
+        on = [item for item in map(ticks.item, range(ticks.count())) if item.checkState() == Qt.CheckState.Checked]
+        keep = ticked if ticked in on else on[0] if on else None
+        ticks.blockSignals(True)
+        for item in on:
+            if item is not keep:
+                item.setCheckState(Qt.CheckState.Unchecked)
+        ticks.blockSignals(False)
 
     def _save(self) -> None:
         name = self.name.text().strip()

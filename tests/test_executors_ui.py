@@ -5,7 +5,7 @@ import time
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from ms_components.ms_executors import ExecutorsPanel, KeptPage
+from ms_components.ms_executors import ExecutorsPanel, KeptPage, _value
 
 
 class _Ray:
@@ -64,9 +64,16 @@ def test_hosts_and_executors_are_kept_and_started_from_the_ui(tmp_path, monkeypa
         kind, ticks = executors._editors["kind"], executors._editors["hosts"]
         assert [kind.itemData(i) for i in range(kind.count())] == ["ray", "queue"]
         assert executors._editors["scheduler"].isHidden() and executors._editors["on_login_node"].isHidden()
+        for row in range(ticks.count()):
+            ticks.item(row).setCheckState(Qt.CheckState.Checked)
         kind.setCurrentIndex(kind.findData("queue"))
         assert not executors._editors["scheduler"].isHidden()
+        # A queue has one machine, its login node: the ticks of a Ray do not stay, and one tick takes the other's place.
+        assert executors._form.labelForField(ticks).text() == "Login node" and _value(ticks) == ["local"]
+        ticks.item(1).setCheckState(Qt.CheckState.Checked)
+        assert _value(ticks) == ["laptop"]
         kind.setCurrentIndex(kind.findData("ray"))
+        assert executors._form.labelForField(ticks).text() == "Hosts"
         executors.name.setText("lab")
         for row in range(ticks.count()):
             ticks.item(row).setCheckState(Qt.CheckState.Checked)
