@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 
 from PySide6.QtCore import QMetaObject, QObject, QThread, Qt, Signal
@@ -33,10 +34,17 @@ class MolSuiteMonitorBridge(QObject):
         workspace,
         poll_ms: int = MonitorConfig.model_fields["poll_ms"].default,
         max_recent_jobs: int = MonitorConfig.model_fields["max_recent_jobs"].default,
+        resume=None,
+        destinations=None,
         parent: QObject | None = None,
     ) -> None:
+        """`resume(job_id, executor or None)` and `destinations(job_id) -> names` are for an
+        application that keeps its own rules of where a job may go: left out, the workspace
+        continues the job and every active executor is offered."""
         super().__init__(parent)
         self._workspace = workspace
+        self._resume = resume or self._workspace_resume
+        self._destinations = destinations or self._active_executors
         self._poll_ms = poll_ms
         self._max_recent_jobs = max_recent_jobs
         self._thread: QThread | None = None
@@ -133,6 +141,39 @@ class MolSuiteMonitorBridge(QObject):
             return False
         self.operator_action_succeeded.emit("cancel_job", job_id)
         return True
+
+    def job_destinations(self, job_id: str) -> list[str]:
+        """The executors the job recorded as `job_id` may be continued on: none for a job that
+        cannot be submitted again."""
+        try:
+            return list(self._destinations(job_id))
+        except Exception:
+            return []
+
+    def resume_job(self, job_id: str, executor: str | None = None) -> None:
+        """Continue the job recorded as `job_id`, on `executor` when one is given: a job that is
+        running is stopped first. It answers at once, since a job takes its time to stop: the
+        outcome comes as the operator action `resume_job`."""
+
+        def run() -> None:
+            try:
+                self._resume(job_id, executor)
+            except Exception as exc:
+                self.operator_action_failed.emit("resume_job", str(exc))
+            else:
+                self.operator_action_succeeded.emit("resume_job", job_id)
+
+        threading.Thread(target=run, name="monitor-resume", daemon=True).start()
+
+    def _workspace_resume(self, job_id: str, executor: str | None) -> None:
+        if executor:
+            self._workspace.move(job_id, executor)
+        else:
+            self._workspace.resume(job_id)
+
+    def _active_executors(self, job_id: str) -> list[str]:
+        self._workspace.origin(job_id)
+        return [row["name"] for row in self._workspace.executors() if row["state"] == "on"]
 
     def _visible_job(self, job_id: str, *, refresh: bool = False) -> JobMonitorState | None:
         snapshot = self.refresh_now() if refresh else self.current_snapshot

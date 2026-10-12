@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QPushButton,
     QSplitter,
     QVBoxLayout,
@@ -102,7 +103,15 @@ class MolSuiteMonitorWidget(QWidget):
         filter_row.addWidget(self._search_input, 1)
         filter_row.addWidget(self._status_filter)
         filter_row.addWidget(self._refresh_button)
+        self._resume_button = QPushButton("Resume", self)
+        self._resume_button.setToolTip("Continue a job that was canceled or interrupted, where it ran.")
+        self._move_button = QPushButton("Move to…", self)
+        self._move_button.setToolTip("Continue the job on another executor: one that is running is stopped first.")
+        self._move_button.setMenu(QMenu(self._move_button))
         filter_row.addWidget(self._cancel_button)
+        filter_row.addWidget(self._resume_button)
+        filter_row.addWidget(self._move_button)
+        self._set_job_actions(None)
         layout.addLayout(filter_row)
 
         self._jobs_view = JobCardList(self)
@@ -123,6 +132,8 @@ class MolSuiteMonitorWidget(QWidget):
         self._status_filter.currentIndexChanged.connect(self._apply_filters)
         self._refresh_button.clicked.connect(self._refresh_from_bridge)
         self._cancel_button.clicked.connect(self._cancel_selected_job)
+        self._resume_button.clicked.connect(lambda: self._resume_selected_job())
+        self._move_button.menu().aboutToShow.connect(self._fill_destinations)
         self._jobs_view.job_selected.connect(self._on_current_job_changed)
         self._jobs_view.unfolded_changed.connect(self._on_unfolded_changed)
 
@@ -167,7 +178,7 @@ class MolSuiteMonitorWidget(QWidget):
         self._status_filter.clear()
         self._status_filter.addItem("All statuses", "all")
         self._status_filter.blockSignals(False)
-        self._cancel_button.setEnabled(False)
+        self._set_job_actions(None)
         self._detail_panel.clear()
         self._detail_job_id = None
 
@@ -209,6 +220,7 @@ class MolSuiteMonitorWidget(QWidget):
         # through the errors of the selected job is never yanked back to the top.
         if selected_job_id:
             self._jobs_view.select_job(selected_job_id)
+        self._set_job_actions(self._selected_job())  # the buttons do follow the job, as it ends
 
     def _rebuild_filters(self, snapshot: ProjectMonitorState) -> None:
         current_status = self._status_filter.currentData()
@@ -245,6 +257,27 @@ class MolSuiteMonitorWidget(QWidget):
         if self._bridge.cancel_job(job_id):
             self._bridge.request_refresh()
 
+    def _set_job_actions(self, job) -> None:
+        stopped = job is not None and job.status in ("canceled", "interrupted")
+        self._cancel_button.setEnabled(job is not None and not job.is_terminal)
+        self._resume_button.setEnabled(stopped)
+        self._move_button.setEnabled(stopped or (job is not None and not job.is_terminal))
+
+    def _fill_destinations(self) -> None:
+        menu, job_id = self._move_button.menu(), self._selected_job_id()
+        menu.clear()
+        for name in (self._bridge.job_destinations(job_id) if self._bridge is not None and job_id else ()):
+            menu.addAction(name, lambda name=name: self._resume_selected_job(name))
+        if menu.isEmpty():
+            menu.addAction("This job cannot be continued").setEnabled(False)
+
+    def _resume_selected_job(self, executor: str | None = None) -> None:
+        job_id = self._selected_job_id()
+        if self._bridge is None or not job_id:
+            return
+        self._action_label.setText(f"Action: moving {job_id[:8]} to {executor}" if executor else f"Action: resuming {job_id[:8]}")
+        self._bridge.resume_job(job_id, executor)
+
     def _on_unfolded_changed(self, job_ids) -> None:
         if self._bridge is not None:
             self._bridge.set_unfolded_jobs(job_ids)
@@ -256,11 +289,10 @@ class MolSuiteMonitorWidget(QWidget):
     def _load_detail(self) -> None:
         if self._bridge is None:
             self._detail_panel.clear()
-            self._cancel_button.setEnabled(False)
+            self._set_job_actions(None)
             return
         job_id = self._selected_job_id()
-        job = self._selected_job()
-        self._cancel_button.setEnabled(job is not None and not job.is_terminal)
+        self._set_job_actions(self._selected_job())
         if not job_id:
             self._detail_panel.clear()
             self._detail_job_id = None
@@ -291,6 +323,9 @@ class MolSuiteMonitorWidget(QWidget):
     def _handle_action_success(self, action: str, payload: str) -> None:
         if action == "cancel_job":
             self._action_label.setText(f"Action: cancellation requested for {payload[:8]}")
+        elif action == "resume_job":
+            self._action_label.setText(f"Action: {payload[:8]} continues")
+            self._bridge.request_refresh()
         else:
             self._action_label.setText(f"Action: {action}")
 

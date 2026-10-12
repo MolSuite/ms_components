@@ -114,3 +114,47 @@ def test_cancel_reaches_the_engine(ms, tmp_path):
     GATE.set()
     assert ms.engine.wait(job_id, 30).status == "canceled"
     assert bridge.refresh_now().jobs[0].status == "canceled"
+
+
+def test_a_job_is_moved_while_it_runs_from_the_buttons_of_the_monitor(ms, tmp_path, monkeypatch):
+    from ms_components.ms_monitor.widget import MolSuiteMonitorWidget
+
+    _open(ms, tmp_path)
+    bridge, heard = MolSuiteMonitorBridge(workspace=ms, poll_ms=50, destinations=lambda key: [ms.origin(key) and "thread"]), []
+    bridge.operator_action_succeeded.connect(lambda action, key: heard.append((action, key)))
+    bridge.operator_action_failed.connect(lambda action, why: heard.append((action, why)))
+    widget = MolSuiteMonitorWidget()
+    widget.attach_bridge(bridge)
+    asked, cancel = threading.Event(), ms.engine.cancel
+    monkeypatch.setattr(ms.engine, "cancel", lambda job_id: (cancel(job_id), asked.set()))
+    GATE.clear()
+    first = ms.submit(halves, executor="thread")
+    state = _visible(bridge)
+    widget.update_snapshot(bridge.current_snapshot)
+    widget._jobs_view._on_card_clicked(state.job_id)
+
+    assert widget._move_button.isEnabled() and not widget._resume_button.isEnabled()
+    widget._fill_destinations()
+    offered = [action.text() for action in widget._move_button.menu().actions()]
+    assert offered == ["thread"] and bridge.job_destinations("no such job") == []
+    assert bridge._active_executors(state.job_id) == ["local"]  # what is offered when nobody says
+
+    next(action for action in widget._move_button.menu().actions() if action.text() == "thread").trigger()
+    assert asked.wait(10)  # the tasks are let go once the job was told to stop, or it just ends
+    GATE.set()
+    end = time.monotonic() + 30
+    while not heard:
+        assert time.monotonic() < end, "the move never answered"
+        QApplication.processEvents()
+        time.sleep(0.01)
+    assert heard == [("resume_job", state.job_id)]
+    assert ms.engine.wait(first, 30).status == "canceled"
+    [moved] = [job for job in ms.engine.jobs() if job.key == state.job_id and job.id != first]
+    assert ms.engine.wait(moved.id, 30).status == "completed_with_errors"  # the odd ones
+
+    bridge.resume_job(state.job_id)  # it has ended: nothing to continue, and the monitor says why
+    while len(heard) < 2:
+        assert time.monotonic() < end, "the refusal never answered"
+        QApplication.processEvents()
+        time.sleep(0.01)
+    assert heard[1][0] == "resume_job" and "already ended" in heard[1][1]
