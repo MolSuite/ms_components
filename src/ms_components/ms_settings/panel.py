@@ -106,7 +106,6 @@ class _Node:
     configuration: Any = None
     entries: list = field(default_factory=list)
     child_keys: list = field(default_factory=list)
-    custom: list = field(default_factory=list)
     widget: QWidget | None = None
 
 
@@ -190,8 +189,6 @@ class AppSettingsPanel(QWidget):
         self._search_hits: dict[str, list[str]] = {}
         self._highlighted: list[QLabel] = []
         self._dirty_rows: set[tuple[str, str]] = set()
-        # Editors that own a whole section (who runs the jobs) and stage it themselves.
-        self._custom_editors: list[Any] = []
         self._setup_ui()
 
         sources = configurations
@@ -368,14 +365,6 @@ class AppSettingsPanel(QWidget):
                 node = self._node(f"{node.key}/{segment}", _titleize(segment), node.key)
                 node.configuration = configuration
             node.entries.append(entry)
-        provider = getattr(configuration, "custom_editors", None)
-        for kind, path, title in provider() if callable(provider) else ():
-            node = root
-            for segment in path.split(".")[:2]:
-                node = self._node(f"{node.key}/{segment}", _titleize(segment), node.key)
-                node.configuration = configuration
-            node.title = str(title)
-            node.custom.append((kind, path, title))
         self._build_branch(root.key)
         if self.tree.currentItem() is None:
             self.select_node(root.key)
@@ -447,12 +436,11 @@ class AppSettingsPanel(QWidget):
             toc.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
             toc.linkActivated.connect(self.select_node)
             layout.addWidget(toc)
-        elif not node.custom:
+        else:
             empty = QLabel("This section does not expose editable values.", content)
             _muted(empty)
             layout.addWidget(empty)
 
-        self._add_custom_editors(node, layout, content)
         layout.addStretch(1)
         scroll.setWidget(content)
         return scroll
@@ -557,11 +545,6 @@ class AppSettingsPanel(QWidget):
         for label in self._highlighted:
             _set_hit(label, False)
         self._highlighted.clear()
-
-    def _add_custom_editors(self, node: _Node, layout, parent) -> None:
-        """A provider may expose ``custom_editors() -> [(kind, path, title), ...]`` to
-        get a dedicated widget for what the scalar walker can't render well. Unknown kinds
-        are skipped, and no kind is known now: the lists of hosts and executors come next."""
 
     @staticmethod
     def _layer_paths(configuration) -> str:
@@ -808,14 +791,11 @@ class AppSettingsPanel(QWidget):
             label = self._pages[config_id].findChild(QLabel, f"paths_{config_id}")
             if label is not None:
                 label.setText(self._layer_paths(configuration))
-        for editor in self._custom_editors:
-            editor.reload()
         self._dirty_rows.clear()
         self.status_label.setText("Values reloaded.")
 
     def save_settings(self) -> None:
-        pending_custom = [editor for editor in self._custom_editors if editor.is_dirty]
-        if not self._dirty_rows and not pending_custom:
+        if not self._dirty_rows:
             self.status_label.setText("No changes to save.")
             return
         try:
@@ -831,10 +811,6 @@ class AppSettingsPanel(QWidget):
                     else row.configuration.set_value
                 )
                 setter(row.entry.path, value)
-            # Custom editors stage their own state; Save is what writes it, same as
-            # every scalar row.
-            for editor in pending_custom:
-                editor.commit(target=target)
         except Exception as exc:
             self.status_label.setText("Changes were not saved.")
             QMessageBox.critical(self, f"{self.app_name} configuration", str(exc))
