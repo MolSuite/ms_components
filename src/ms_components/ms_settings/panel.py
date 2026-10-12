@@ -560,18 +560,8 @@ class AppSettingsPanel(QWidget):
 
     def _add_custom_editors(self, node: _Node, layout, parent) -> None:
         """A provider may expose ``custom_editors() -> [(kind, path, title), ...]`` to
-        get a dedicated widget for what the scalar walker can't render well (who runs the
-        jobs: one choice and the fields of it). Unknown kinds are skipped, and so is this
-        one without a runtime to put the choice in place."""
-        apply = getattr(getattr(self.runtime, "workspace", None), "run_process_on", None)
-        for kind, path, _title in node.custom:
-            if kind != "process" or apply is None:
-                continue
-            from ms_components.ms_settings.process_editor import ProcessRoleEditor
-
-            widget = ProcessRoleEditor(configuration=node.configuration, apply=apply, path=path, parent=parent)
-            self._custom_editors.append(widget)
-            layout.addWidget(widget)
+        get a dedicated widget for what the scalar walker can't render well. Unknown kinds
+        are skipped, and no kind is known now: the lists of hosts and executors come next."""
 
     @staticmethod
     def _layer_paths(configuration) -> str:

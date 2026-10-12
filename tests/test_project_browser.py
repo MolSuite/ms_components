@@ -340,14 +340,12 @@ def test_molsuite_settings_panel_updates_global_settings(tmp_path, monkeypatch):
         panel.general_log_level_combo.setCurrentText("DEBUG")
         panel.executor_log_level_combo.setCurrentText("ERROR")
         panel.cpus_spin.setValue(3)
-        panel.max_processes_spin.setValue(2)
         panel.save_settings()
 
         assert manager.settings.general.poll_interval == 1.75
         assert manager.settings.general.log_level == "DEBUG"
         assert manager.settings.logging.executor_level == "ERROR"
-        assert manager.settings.resources.local.cpus == 3
-        assert manager.settings.resources.local.max_processes == 2
+        assert manager.settings.hosts["local"].cpus == 3
     finally:
         panel.deleteLater()
 
