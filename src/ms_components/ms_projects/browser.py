@@ -1737,47 +1737,19 @@ class MolSuiteSettingsPanel(QWidget):
         sg = QGridLayout()
         self.cpus_tile=StatTile("CPUs",self.resources_card)
         self.gpus_tile=StatTile("GPUs",self.resources_card)
-        self.threads_tile=StatTile("Max threads",self.resources_card)
-        self.processes_tile=StatTile("Max processes",self.resources_card)
         sg.addWidget(self.cpus_tile,0,0)
         sg.addWidget(self.gpus_tile,0,1)
-        sg.addWidget(self.threads_tile,1,0)
-        sg.addWidget(self.processes_tile,1,1)
         resl.addLayout(sg)
         resf = QFormLayout()
         self.cpus_spin=QSpinBox(self.resources_card)
-        self.cpus_spin.setRange(1,512)
+        # As `hosts.local` says it: 0 is all it has, a negative number leaves that many free.
+        self.cpus_spin.setRange(-512,512)
         resf.addRow("CPUs",self.cpus_spin)
         self.gpus_spin=QSpinBox(self.resources_card)
-        self.gpus_spin.setRange(0,64)
+        self.gpus_spin.setRange(-64,64)
         resf.addRow("GPUs",self.gpus_spin)
-        self.max_threads_spin=QSpinBox(self.resources_card)
-        self.max_threads_spin.setRange(1,2048)
-        resf.addRow("Max threads",self.max_threads_spin)
-        self.max_processes_spin=QSpinBox(self.resources_card)
-        self.max_processes_spin.setRange(1,512)
-        resf.addRow("Max processes",self.max_processes_spin)
         resl.addLayout(resf)
         rr.addWidget(self.resources_card)
-        self.workers_card=QFrame(self)
-        self.workers_card.setProperty("surface","panel")
-        wl=QVBoxLayout(self.workers_card)
-        wl.setContentsMargins(16,16,16,16)
-        wt=QLabel("Registered workers",self.workers_card)
-        wt.setProperty("role","headline")
-        wt.setStyleSheet("font-size:18px;")
-        wl.addWidget(wt)
-        wh=QLabel("Workers available in the global configuration.",self.workers_card)
-        wh.setProperty("role","muted")
-        wh.setWordWrap(True)
-        wl.addWidget(wh)
-        self.workers_table=QTableWidget(0,5,self.workers_card)
-        self.workers_table.setHorizontalHeaderLabels(["Name","Type","Enabled","CPU","GPU"])
-        self.workers_table.verticalHeader().setVisible(False)
-        self.workers_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.workers_table.horizontalHeader().setStretchLastSection(True)
-        wl.addWidget(self.workers_table)
-        rr.addWidget(self.workers_card,1)
         ar=QHBoxLayout()
         ar.addStretch(1)
         self.reload_button=QPushButton("Reload",self)
@@ -1805,24 +1777,11 @@ class MolSuiteSettingsPanel(QWidget):
         self.general_log_level_combo.setCurrentText(str(s.general.log_level))
         self.app_log_level_combo.setCurrentText(str(s.logging.app_level))
         self.executor_log_level_combo.setCurrentText(str(s.logging.executor_level))
-        lo=s.resources.local
+        lo=s.hosts["local"]
         self.cpus_spin.setValue(int(lo.cpus))
         self.gpus_spin.setValue(int(lo.gpus))
-        self.max_threads_spin.setValue(int(lo.max_threads))
-        self.max_processes_spin.setValue(int(lo.max_processes))
-        self.cpus_tile.set_value(str(lo.cpus))
-        self.gpus_tile.set_value(str(lo.gpus))
-        self.threads_tile.set_value(str(lo.max_threads))
-        self.processes_tile.set_value(str(lo.max_processes))
-        workers=s.workers.model_dump(mode="python")
-        self.workers_table.setRowCount(len(workers))
-        for row,(n,p) in enumerate(sorted(workers.items())):
-            self.workers_table.setItem(row,0,QTableWidgetItem(str(n)))
-            self.workers_table.setItem(row,1,QTableWidgetItem(str(p.get("type",""))))
-            self.workers_table.setItem(row,2,QTableWidgetItem("Yes" if p.get("enabled",True) else "No"))
-            self.workers_table.setItem(row,3,QTableWidgetItem(str(p.get("cpus",""))))
-            self.workers_table.setItem(row,4,QTableWidgetItem(str(p.get("gpus",""))))
-        self.workers_table.resizeColumnsToContents()
+        self.cpus_tile.set_value(str(lo.cpus) if lo.cpus>0 else "All" if not lo.cpus else f"All but {-lo.cpus}")
+        self.gpus_tile.set_value(str(lo.gpus) if lo.gpus>0 else "All" if not lo.gpus else f"All but {-lo.gpus}")
 
     def save_settings(self):
         updates={
@@ -1831,10 +1790,8 @@ class MolSuiteSettingsPanel(QWidget):
             "general.log_level": str(self.general_log_level_combo.currentText()),
             "logging.app_level": str(self.app_log_level_combo.currentText()),
             "logging.executor_level": str(self.executor_log_level_combo.currentText()),
-            "resources.local.cpus": int(self.cpus_spin.value()),
-            "resources.local.gpus": int(self.gpus_spin.value()),
-            "resources.local.max_threads": int(self.max_threads_spin.value()),
-            "resources.local.max_processes": int(self.max_processes_spin.value()),
+            "hosts.local.cpus": int(self.cpus_spin.value()),
+            "hosts.local.gpus": int(self.gpus_spin.value()),
         }
         try:
             for k,v in updates.items(): self.settings_manager.update_setting(k,v)

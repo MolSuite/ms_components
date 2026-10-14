@@ -1,43 +1,25 @@
-from ms_components.ms_monitor.bridge import MolSuiteMonitorBridge
-from ms_components.ms_monitor.config import MonitorConfig
-from ms_components.ms_monitor.chunk_panel import ChunkPanel
-from ms_components.ms_monitor.events_panel import EventsPanel
-from ms_components.ms_monitor.executors_tab import ExecutorsTab
-from ms_components.ms_monitor.job_filter_proxy import JobFilterProxyModel
-from ms_components.ms_monitor.job_tree_model import JobTreeModel
-from ms_components.ms_monitor.models import (
-    ChunkMonitorState,
-    ExecutorMonitorState,
-    EventMonitorState,
-    JobMonitorState,
-    JobDetailState,
-    LogMonitorState,
-    MonitorActionCapability,
-    MonitorSyncState,
-    OutputMonitorState,
-    ProjectMonitorState,
-    RuntimeHealthState,
-)
-from ms_components.ms_monitor.widget import MolSuiteMonitorWidget
+"""The monitor of MolSuite jobs. Its names are loaded when first asked for: `config` is read
+by processes that never open a window, and they must not pay for Qt."""
+from importlib import import_module
 
-__all__ = [
-    "ChunkMonitorState",
-    "ChunkPanel",
-    "ExecutorMonitorState",
-    "EventMonitorState",
-    "EventsPanel",
-    "ExecutorsTab",
-    "JobFilterProxyModel",
-    "JobDetailState",
-    "JobTreeModel",
-    "JobMonitorState",
-    "LogMonitorState",
-    "MonitorActionCapability",
-    "MonitorConfig",
-    "MonitorSyncState",
-    "MolSuiteMonitorBridge",
-    "MolSuiteMonitorWidget",
-    "OutputMonitorState",
-    "ProjectMonitorState",
-    "RuntimeHealthState",
-]
+_LAZY = {
+    "FailureState": "models",
+    "JobDetailPanel": "detail_panel",
+    "JobDetailState": "models",
+    "JobMonitorState": "models",
+    "MonitorConfig": "config",
+    "MonitorSyncState": "models",
+    "MolSuiteMonitorBridge": "bridge",
+    "MolSuiteMonitorWidget": "widget",
+    "ProjectMonitorState": "models",
+}
+
+
+def __getattr__(name: str):
+    if name not in _LAZY:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = globals()[name] = getattr(import_module(f"{__name__}.{_LAZY[name]}"), name)
+    return value
+
+
+__all__ = sorted(_LAZY)

@@ -1,10 +1,9 @@
 """Card-based job list for the monitor.
 
-Visual widgets ported from ms_taskmanager (glow bars, status dots, executor
-badges) adapted to consume JobMonitorState and to plug into the monitor widget:
-filtering by visibility, click-to-select, and a job_selected signal that drives
-the detail panels. Per-chunk detail lives only in the bottom ChunkPanel — the
-card shows the job-level rollup, never the individual chunks.
+Visual widgets ported from ms_taskmanager (glow bars, status dots) adapted to
+consume JobMonitorState and to plug into the monitor widget: filtering by
+visibility, click-to-select, and a job_selected signal that drives the detail
+panel. The card shows the job-level rollup; unfolded, the tasks in flight under it.
 """
 from __future__ import annotations
 
@@ -21,29 +20,21 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ms_components.ms_monitor.models import ChunkMonitorState, JobMonitorState
+from ms_components.ms_monitor.formatting import format_duration
+from ms_components.ms_monitor.models import JobMonitorState, TaskMonitorState
 from ms_components.ms_monitor.palette import P
 
 def status_color(status: str, default: str | None = None) -> str:
     """Resolve a job status to a live palette/semantic color."""
     return {
         "running": P["accent"],
-        "pending": P["text_muted"],
-        "staging": P["warn"],
+        "waiting": P["text_muted"],
         "completed": P["ok"],
+        "completed_with_errors": P["warn"],
         "failed": P["error"],
         "canceled": P["text_muted"],
+        "interrupted": P["text_muted"],
     }.get(status, default if default is not None else P["text_muted"])
-
-
-# Executor-type badges: fixed identity colors (like status), not theme chrome.
-EXECUTOR_BADGE = {
-    "thread": ("#1a3a2a", "#2ed573", "THR"),
-    "process": ("#1a2a3a", "#4f8cff", "PRC"),
-    "ray": ("#2a1a3a", "#a78bfa", "RAY"),
-    "dask": ("#2a2a1a", "#fbbf24", "DSK"),
-    "hpc": ("#3a1a1a", "#f87171", "HPC"),
-}
 
 
 def eta_label(job: JobMonitorState) -> str:
@@ -114,14 +105,38 @@ class GlowBar(QWidget):
         super().__init__(parent)
         self._value = value
         self._status = status
+        self._busy: QPropertyAnimation | None = None  # runs while how far it is is not known
+        self._phase = 0.0
         self.setFixedHeight(6)
         self.setMinimumWidth(60)
 
     def set_value(self, v, status=None):
-        self._value = max(0.0, min(100.0, v))
+        """`None`: how far it is is not known, and a segment comes and goes instead."""
+        if (v is None) != (self._busy is not None):
+            if v is None:
+                self._busy = QPropertyAnimation(self, b"phase")
+                self._busy.setDuration(1600)
+                self._busy.setStartValue(0.0)
+                self._busy.setEndValue(1.0)
+                self._busy.setEasingCurve(QEasingCurve.SineCurve)
+                self._busy.setLoopCount(-1)
+                self._busy.start()
+            else:
+                self._busy.stop()
+                self._busy = None
+        self._value = max(0.0, min(100.0, v or 0.0))
         if status:
             self._status = status
         self.update()
+
+    def get_phase(self):
+        return self._phase
+
+    def set_phase(self, v):
+        self._phase = v
+        self.update()
+
+    phase = Property(float, get_phase, set_phase)
 
     def paintEvent(self, _):
         p = QPainter(self)
@@ -130,10 +145,16 @@ class GlowBar(QWidget):
         p.setBrush(QBrush(QColor(P['bg'])))
         p.setPen(Qt.NoPen)
         p.drawRoundedRect(0, 0, w, h, 3, 3)
+        color = QColor(status_color(self._status, P['accent']))
+        if self._busy is not None:
+            color.setAlphaF(0.7)
+            p.setBrush(QBrush(color))
+            segment = w // 4
+            p.drawRoundedRect(int((w - segment) * self._phase), 0, segment, h, 3, 3)
+            return
         if self._value <= 0:
             return
         fw = max(6, int(w * self._value / 100))
-        color = QColor(status_color(self._status, P['accent']))
         grad = QLinearGradient(0, 0, fw, 0)
         dim = QColor(color)
         dim.setAlphaF(0.4)
@@ -143,73 +164,56 @@ class GlowBar(QWidget):
         p.drawRoundedRect(0, 0, fw, h, 3, 3)
 
 
-class ExecutorBadge(QLabel):
-    def __init__(self, executor_name: str, parent=None):
-        super().__init__(parent)
-        key = (executor_name or "").lower().split("-")[0].split("_")[0]
-        bg, fg, text = EXECUTOR_BADGE.get(
-            key, (P['panel_alt'], P["text_muted"], (executor_name or "?")[:3].upper())
-        )
-        self.setText(text)
-        self.setFixedHeight(18)
-        self.setAlignment(Qt.AlignCenter)
-        self.setContentsMargins(6, 0, 6, 0)
-        self.setStyleSheet(
-            f"""QLabel {{
-                background: {bg}; color: {fg};
-                border: 1px solid {fg}; border-radius: 3px;
-                font-size: 10px; font-weight: bold;
-                letter-spacing: 0.5px; padding: 0 4px;
-            }}"""
-        )
+_TASKS_SHOWN = 12  # rows under an unfolded job; the rest are counted
 
 
-class ChunkRow(QWidget):
-    """One live chunk inside an expanded job card: short_id · bar · %."""
+class TaskRow(QWidget):
+    """One task in flight inside an unfolded job card: what it runs · bar · how far."""
 
-    def __init__(self, chunk: ChunkMonitorState, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 1, 0, 1)
         lay.setSpacing(8)
-        self._id = QLabel(chunk.short_id)
-        self._id.setFixedWidth(76)
-        self._id.setStyleSheet(
-            f"color:palette(placeholder-text); font-size:10px; font-family:monospace; background:transparent;"
+        self._what = QLabel()
+        self._what.setFixedWidth(220)
+        self._what.setStyleSheet(
+            "color:palette(placeholder-text); font-size:10px; font-family:monospace; background:transparent;"
         )
-        lay.addWidget(self._id)
-        self._bar = GlowBar(chunk.progress, chunk.status or "running")
+        lay.addWidget(self._what)
+        self._bar = GlowBar(0.0, "running")
         self._bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         lay.addWidget(self._bar)
-        self._pct = QLabel()
-        self._pct.setFixedWidth(38)
-        self._pct.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._pct.setStyleSheet("color:palette(highlight); font-size:10px; background:transparent;")
-        lay.addWidget(self._pct)
-        self.update_chunk(chunk)
+        self._far = QLabel()
+        self._far.setFixedWidth(38)
+        self._far.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._far.setStyleSheet("color:palette(highlight); font-size:10px; background:transparent;")
+        lay.addWidget(self._far)
 
-    def update_chunk(self, chunk: ChunkMonitorState) -> None:
-        self._bar.set_value(chunk.progress, chunk.status or "running")
-        self._pct.setText(f"{chunk.progress:.0f}%")
+    def set_task(self, task: TaskMonitorState) -> None:
+        what = task.input if task.chunks == 1 else f"×{task.chunks} {task.input}"
+        self._what.setText(self._what.fontMetrics().elidedText(what, Qt.ElideMiddle, self._what.width()))
+        took = format_duration(task.seconds)
+        self._bar.set_value(task.progress, "running")  # None: not watched, so the bar only says it runs
+        self._far.setText(took if task.progress is None else f"{task.progress:.0f}%")
+        self.setToolTip(f"{what}\nattempt {task.attempt} · running for {took}")
 
 
 class JobCard(QWidget):
     """Job rollup card. Updated in-place via set_job(). Emits clicked(job_id).
 
-    Header shows the job-level rollup (status, executor, ETA, progress, chunk
-    counters). Expanding the card (▶) reveals its live per-chunk rows, sourced
-    from job.chunks which the snapshot already populates.
+    Shows the job-level rollup: status, ETA, progress and chunk counters. Its ▶ unfolds the
+    tasks in flight, which the monitor asks for only while a card is unfolded.
     """
 
     clicked = Signal(str)
+    unfolded = Signal(str, bool)
 
     def __init__(self, job: JobMonitorState, parent=None):
         super().__init__(parent)
         self._job = job
         self._selected = False
-        self._expanded = False
-        self._chunk_rows: dict[str, ChunkRow] = {}
-        self._chunks_overflow: QLabel | None = None
+        self._task_rows: list[TaskRow] = []
         self._setup_ui()
         self.set_job(job)
 
@@ -243,7 +247,7 @@ class JobCard(QWidget):
         self._title.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         top.addWidget(self._title)
 
-        # Chunk counters live between the name and the executor/ETA indicators (compact,
+        # Chunk counters live between the name and the ETA indicator (compact,
         # one line) instead of on a separate row below the bar.
         self._counters_lbl = QLabel()
         self._counters_lbl.setTextFormat(Qt.RichText)
@@ -251,9 +255,6 @@ class JobCard(QWidget):
             f"color:palette(placeholder-text); font-size:11px; background:transparent;"
         )
         top.addWidget(self._counters_lbl)
-
-        self._badge = ExecutorBadge(self._job.executor_name)
-        top.addWidget(self._badge)
 
         self._eta_lbl = QLabel()
         self._eta_lbl.setStyleSheet(
@@ -274,16 +275,18 @@ class JobCard(QWidget):
         top.addWidget(self._info_btn)
 
         self._toggle = QPushButton("▶")
+        self._toggle.setCheckable(True)
         self._toggle.setFixedSize(20, 20)
         self._toggle.setCursor(QCursor(Qt.PointingHandCursor))
-        self._toggle.setToolTip("Show live chunks")
+        self._toggle.setToolTip("Show the tasks in flight")
         self._toggle.setStyleSheet(
             f"""QPushButton {{ background:transparent; color:palette(placeholder-text);
                 border:1px solid palette(mid); border-radius:4px; font-size:9px; }}
             QPushButton:hover {{ color:palette(highlight); border-color:palette(highlight); }}"""
         )
-        self._toggle.clicked.connect(self._toggle_chunks)
+        self._toggle.toggled.connect(self._on_toggled)
         top.addWidget(self._toggle)
+
         hdr_lay.addLayout(top)
 
         prog = QHBoxLayout()
@@ -297,17 +300,39 @@ class JobCard(QWidget):
         prog.addWidget(self._pct_lbl)
         hdr_lay.addLayout(prog)
 
-        # Collapsible live-chunk list (hidden until the card is expanded).
-        self._chunks_wrap = QWidget(self)
-        self._chunks_wrap.setVisible(False)
-        self._chunks_wrap.setStyleSheet("background:transparent;")
-        self._chunks_layout = QVBoxLayout(self._chunks_wrap)
-        self._chunks_layout.setContentsMargins(18, 2, 4, 2)
-        self._chunks_layout.setSpacing(2)
-        self._chunks_empty = QLabel("No active chunks")
-        self._chunks_empty.setStyleSheet("color:palette(placeholder-text); font-size:10px; background:transparent;")
-        self._chunks_layout.addWidget(self._chunks_empty)
-        hdr_lay.addWidget(self._chunks_wrap)
+        self._tasks_wrap = QWidget(self)
+        self._tasks_wrap.setVisible(False)
+        self._tasks_wrap.setStyleSheet("background:transparent;")
+        self._tasks_layout = QVBoxLayout(self._tasks_wrap)
+        self._tasks_layout.setContentsMargins(18, 2, 4, 2)
+        self._tasks_layout.setSpacing(2)
+        self._tasks_note = QLabel()  # nothing in flight, or how many more than the rows shown
+        self._tasks_note.setStyleSheet("color:palette(placeholder-text); font-size:10px; background:transparent;")
+        self._tasks_layout.addWidget(self._tasks_note)
+        hdr_lay.addWidget(self._tasks_wrap)
+
+    def _on_toggled(self, unfolded: bool):
+        self._tasks_wrap.setVisible(unfolded)
+        self._toggle.setText("▼" if unfolded else "▶")
+        self._refresh_tasks()
+        self.unfolded.emit(self._job.job_id, unfolded)
+
+    def _refresh_tasks(self):
+        # Rows are reused in place, so the bars neither flicker nor restart at every poll.
+        tasks = self._job.tasks
+        shown = tasks[:_TASKS_SHOWN]
+        while len(self._task_rows) > len(shown):
+            row = self._task_rows.pop()
+            row.setParent(None)
+            row.deleteLater()
+        for index, task in enumerate(shown):
+            if index == len(self._task_rows):
+                self._task_rows.append(TaskRow())
+                self._tasks_layout.insertWidget(index, self._task_rows[-1])
+            self._task_rows[index].set_task(task)
+        more = len(tasks) - len(shown)
+        self._tasks_note.setText(f"+{more} more tasks…" if more else "No tasks in flight")
+        self._tasks_note.setVisible(bool(more) or not shown)
 
     def _apply_card_style(self):
         border = P["accent"] if self._selected else P["border"]
@@ -325,12 +350,12 @@ class JobCard(QWidget):
 
     def set_job(self, job: JobMonitorState):
         self._job = job
-        label = job.task_type or job.origin_id or job.job_id[:12]
+        label = job.name or job.job_id[:12]
         sc = status_color(job.status)
-        status = job.status + (" (canceling)" if job.cancel_requested and not job.is_terminal else "")
+        status = job.status.replace("_", " ").upper()
         self._title.setText(
             f"{label} <span style='color:{sc}; font-size:10px; "
-            f"font-weight:normal;'>[{status.upper()}]</span>"
+            f"font-weight:normal;'>[{status}]</span>"
         )
         self._title.setToolTip(f"{job.error}\n\n{job.job_id}" if job.error else job.job_id)
         self._dot.set_status(job.status)
@@ -341,79 +366,31 @@ class JobCard(QWidget):
         )
         self._pct_lbl.setText(f"{job.progress:.1f}%")
 
-        failed = job.chunks_failed + job.chunks_stage_failed
         parts = []
         if job.chunks_done:
             parts.append(f"<span style='color:{P['ok']}'>{job.chunks_done:,} ✓</span>")
         if job.chunks_running:
             parts.append(f"<span style='color:{P['accent']}'>{job.chunks_running} ⚙</span>")
-        if job.chunks_pending:
-            parts.append(f"<span style='color:{P['text_muted']}'>{job.chunks_pending:,} ⏳</span>")
-        if failed:
-            parts.append(f"<span style='color:{P['error']}'>{failed} ✗</span>")
+        if job.chunks_failed:
+            parts.append(f"<span style='color:{P['error']}'>{job.chunks_failed:,} ✗</span>")
         total = f"  / {job.chunks_total:,}" if job.chunks_total else ""
         self._counters_lbl.setText("  ·  ".join(parts) + total)
-
-        if self._expanded:
-            self._refresh_chunk_rows()
-
-    def _toggle_chunks(self):
-        self._expanded = not self._expanded
-        self._chunks_wrap.setVisible(self._expanded)
-        self._toggle.setText("▼" if self._expanded else "▶")
-        if self._expanded:
-            self._refresh_chunk_rows()
-
-    def _refresh_chunk_rows(self):
-        # Incremental update (like ms_taskmanager) so in-flight bars don't flicker
-        # or reset scroll on every poll. Cap the visible rows; count the rest.
-        MAX = 12
-        chunks = list(self._job.chunks or [])
-        visible = chunks[:MAX]
-        visible_ids = {c.chunk_id for c in visible}
-        for cid in list(self._chunk_rows):
-            if cid not in visible_ids:
-                row = self._chunk_rows.pop(cid)
-                row.setParent(None)
-                row.deleteLater()
-        for chunk in visible:
-            row = self._chunk_rows.get(chunk.chunk_id)
-            if row is None:
-                row = ChunkRow(chunk)
-                self._chunk_rows[chunk.chunk_id] = row
-                insert_at = self._chunks_layout.count()
-                if self._chunks_overflow is not None:
-                    insert_at -= 1
-                self._chunks_layout.insertWidget(insert_at, row)
-            else:
-                row.update_chunk(chunk)
-        self._chunks_empty.setVisible(not visible)
-        overflow = len(chunks) - MAX
-        if self._chunks_overflow is None:
-            self._chunks_overflow = QLabel()
-            self._chunks_overflow.setStyleSheet(
-                f"color:palette(placeholder-text); font-size:10px; background:transparent;"
-            )
-            self._chunks_layout.addWidget(self._chunks_overflow)
-        self._chunks_overflow.setVisible(overflow > 0)
-        if overflow > 0:
-            self._chunks_overflow.setText(f"  +{overflow} more chunks…")
+        if self._toggle.isChecked():
+            self._refresh_tasks()
 
     def _show_info_tooltip(self):
         j = self._job
-        failed = j.chunks_failed + j.chunks_stage_failed
+        total = f"{j.chunks_total:,}" if j.chunks_total else "?"
         tip = (
-            f"<b style='color:{P['accent']}'>{j.task_type or j.job_id[:16]}</b>"
+            f"<b style='color:{P['accent']}'>{j.name or j.job_id[:16]}</b>"
             f"<hr style='border-color:{P['border']}'>"
-            f"<b>Job ID:</b> {j.job_id}<br>"
-            f"<b>Origin:</b> {j.origin_id or '—'}<br>"
-            f"<b>Executor:</b> {j.executor_name or '—'}<br>"
-            f"<b>Priority:</b> {j.priority}<br>"
-            f"<b>Chunks:</b> {j.chunks_done:,} ✓ / {j.chunks_total:,} total<br>"
+            f"<b>Key:</b> {j.job_id}<br>"
+            f"<b>Chunks:</b> {j.chunks_done:,} ✓ / {total} total<br>"
             f"<b>Running:</b> {j.chunks_running}  "
-            f"<b>Pending:</b> {j.chunks_pending:,}  "
-            f"<b>Failed:</b> {failed}<br>"
-            f"<b>Throughput:</b> {j.throughput_eps:.2f} eps  ·  <b>ETA:</b> {eta_label(j)}"
+            f"<b>Failed:</b> {j.chunks_failed:,}  "
+            f"<b>Retried:</b> {j.chunks_retried:,}<br>"
+            f"<b>Peak memory:</b> {j.peak_mem_mb or '—'} MB<br>"
+            f"<b>Throughput:</b> {j.throughput_eps:.2f} chunks/s  ·  <b>ETA:</b> {eta_label(j)}"
         )
         QToolTip.showText(
             self._info_btn.mapToGlobal(QPoint(self._info_btn.width() + 4, 0)),
@@ -426,14 +403,15 @@ class JobCardList(QScrollArea):
     """Scrollable list of JobCards. Drop-in replacement for the job QTreeView."""
 
     job_selected = Signal(str)
+    unfolded_changed = Signal(object)  # the ids of the jobs whose tasks are shown
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._cards: dict[str, JobCard] = {}
+        self._unfolded: set[str] = set()
         self._selected_id: str | None = None
         self._search = ""
         self._status_filter = "all"
-        self._executor_filter = "all"
 
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -460,12 +438,15 @@ class JobCardList(QScrollArea):
                 card.deleteLater()
                 if jid == self._selected_id:
                     self._selected_id = None
+                if jid in self._unfolded:
+                    self._on_card_unfolded(jid, False)
         # insert/update in snapshot order; stretch is the last item.
         for pos, job in enumerate(jobs):
             card = self._cards.get(job.job_id)
             if card is None:
                 card = JobCard(job)
                 card.clicked.connect(self._on_card_clicked)
+                card.unfolded.connect(self._on_card_unfolded)
                 self._cards[job.job_id] = card
             else:
                 card.set_job(job)
@@ -480,6 +461,13 @@ class JobCardList(QScrollArea):
         self._cards.clear()
         self._selected_id = None
         self._empty_lbl.setVisible(True)
+        if self._unfolded:
+            self._unfolded.clear()
+            self.unfolded_changed.emit(frozenset())
+
+    def _on_card_unfolded(self, job_id: str, unfolded: bool) -> None:
+        (self._unfolded.add if unfolded else self._unfolded.discard)(job_id)
+        self.unfolded_changed.emit(frozenset(self._unfolded))
 
     # -- selection ---------------------------------------------------------
     def selected_job(self) -> JobMonitorState | None:
@@ -514,10 +502,6 @@ class JobCardList(QScrollArea):
         self._status_filter = str(status or "all").strip().lower() or "all"
         self._apply_filters()
 
-    def set_executor_filter(self, executor_name: str) -> None:
-        self._executor_filter = str(executor_name or "all").strip().lower() or "all"
-        self._apply_filters()
-
     def _apply_filters(self) -> None:
         for card in self._cards.values():
             card.setVisible(self._accepts(card.job))
@@ -525,12 +509,4 @@ class JobCardList(QScrollArea):
     def _accepts(self, job: JobMonitorState) -> bool:
         if self._status_filter != "all" and job.status.lower() != self._status_filter:
             return False
-        if self._executor_filter != "all" and job.executor_name.lower() != self._executor_filter:
-            return False
-        if self._search:
-            haystack = " ".join(
-                [job.job_id, job.task_type, job.origin_id, job.executor_name, job.status]
-            ).lower()
-            if self._search not in haystack:
-                return False
-        return True
+        return self._search in f"{job.job_id} {job.name} {job.status}".lower()
