@@ -19,7 +19,8 @@ pip install ms_components
 | Module | Responsibility |
 | --- | --- |
 | `ms_components.ms_table` | Declarative, paginated table over SQLModel |
-| `ms_components.ms_monitor` | Job, executor, and event monitor for a MolSuite runtime |
+| `ms_components.ms_monitor` | Job monitor for an `ms_flow` workspace: cancel, resume, move |
+| `ms_components.ms_executors` | Hosts and executors: Settings pages and the panel that starts them |
 | `ms_components.ms_projects` | Project browser and project menu |
 | `ms_components.ms_settings` | Typed editor for application settings |
 | `ms_components.ms_pymol` | PyMOL dock and control bar |
