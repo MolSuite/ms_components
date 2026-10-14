@@ -11,6 +11,10 @@ Names beginning with an underscore are implementation details.
 
 ::: ms_components.ms_monitor
 
+## Hosts and executors
+
+::: ms_components.ms_executors
+
 ## Projects
 
 ::: ms_components.ms_projects

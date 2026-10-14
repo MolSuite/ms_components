@@ -15,6 +15,11 @@ PyPI (`>=3.2.0a0`):
 pip install ms_components
 ```
 
+## Documentation
+
+<https://molsuite.github.io/ms_components/>: a guide to each component, examples,
+and the API reference.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Third-party icon/asset licenses live in `licenses/`.

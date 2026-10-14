@@ -88,18 +88,25 @@ app.exec()
 
 ## Job monitor for a running job
 
-Attach the monitor to a `MolSuite` runtime and watch a job advance. The worker
-must live in an importable module:
+Attach the monitor to a `Workspace` and watch a job advance. The task and the
+job must live in an importable module:
 
 ```python
 # workers.py
 import time
 
+from ms_flow import file_sink, job, task
 
-def slow_square(payload: dict) -> dict:
+
+@task()
+def slow_square(value: int) -> dict:
     time.sleep(0.1)
-    value = int(payload["value"])
     return {"value": value, "square": value * value}
+
+
+@job(task=slow_square, output=file_sink("squares.json"))
+def slow_squares(params, project):
+    yield from range(100)
 ```
 
 ```python
@@ -107,26 +114,21 @@ from PySide6.QtWidgets import QApplication
 
 from ms_components.ms_monitor import MolSuiteMonitorBridge, MolSuiteMonitorWidget
 from ms_components.theme import apply_theme
-from ms_flow.api import MolSuite
-from workers import slow_square
+from ms_flow import Workspace
+from workers import slow_squares
 
 app = QApplication([])
 apply_theme("auto", app)
 
-ms = MolSuite(app_id="monitor-demo")
+ms = Workspace(app_id="monitor-demo")
 ms.create_or_open_project(name="monitor-demo", folder="./monitor-demo", activate=True)
 
-bridge = MolSuiteMonitorBridge(molsuite=ms, poll_ms=500)
+bridge = MolSuiteMonitorBridge(workspace=ms, poll_ms=500)
 monitor = MolSuiteMonitorWidget(bridge=bridge)
 bridge.start()
-app.aboutToQuit.connect(bridge.stop)   # stop polling before the runtime shuts down
+app.aboutToQuit.connect(bridge.stop)   # stop polling before the workspace shuts down
 
-ms.run(
-    name="slow-squares",
-    input=[{"value": value} for value in range(100)],
-    process=slow_square,
-    executor="thread",
-)
+ms.submit(slow_squares, executor="thread")
 
 monitor.resize(1100, 650)
 monitor.show()

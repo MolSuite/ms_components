@@ -135,28 +135,46 @@ action bar state.
 
 ## Job monitor
 
-The bridge polls a `MolSuite` runtime and translates its snapshots into Qt
+The bridge polls an `ms_flow` `Workspace` and translates its snapshots into Qt
 signals and models; the widget only presents them. You can embed the whole
 monitor or consume only the bridge signals.
 
 ```python
-from ms_flow.api import MolSuite
+from ms_flow import Workspace
 from ms_components.ms_monitor import MolSuiteMonitorBridge, MolSuiteMonitorWidget
 
-ms = MolSuite(app_id="demo")
+ms = Workspace(app_id="demo")
 ms.create_or_open_project(name="demo", folder="./demo-project", activate=True)
 
-bridge = MolSuiteMonitorBridge(molsuite=ms, poll_ms=500)
+bridge = MolSuiteMonitorBridge(workspace=ms, poll_ms=500)
 monitor = MolSuiteMonitorWidget(bridge=bridge)
 bridge.bridge_error.connect(print)
-bridge.job_finished.connect(lambda *args: print("job finished", args))
+bridge.job_finished.connect(lambda job_id, status: print("job finished", job_id, status))
 bridge.start()
 monitor.show()
 ```
 
 When closing, call `bridge.stop()` first and `ms.shutdown()` afterwards. The
-supported operator actions are refresh, cancel, and — when the job keeps a
-re-buildable source — resubmit.
+operator can cancel jobs, **Resume** a job that was interrupted or canceled,
+and **Move** a job to another active executor. An application with its own
+rules of where a job may go passes `resume(job_id, executor)` and
+`destinations(job_id)` to the bridge.
+
+## Where jobs run
+
+`ms_components.ms_executors` edits the hosts and executors kept by `ms_flow`.
+Both widgets go through the `Workspace`, which refuses what cannot be done now
+(changing an executor while it is active, for example) and says why.
+
+```python
+from ms_components.ms_executors import ExecutorsPanel, KeptPage
+
+hosts = KeptPage(ms, "hosts")            # a Settings page: the machines
+executors = KeptPage(ms, "executors")    # a Settings page: who runs jobs on them
+panel = ExecutorsPanel(ms)               # the quick window that starts and stops executors
+panel.settings_requested.connect(lambda: print("open the Settings page"))
+panel.show()
+```
 
 ## Projects, settings, and PyMOL
 
@@ -164,7 +182,7 @@ re-buildable source — resubmit.
   and create projects through the public `ms_flow` project catalog. Connect
   `project_requested` to open the chosen project; do not read the MolSuite
   databases from the UI.
-- `AppSettingsDialog(runtime=...)` edits the layered configuration of a
-  MolSuite runtime.
+- `AppSettingsDialog(runtime=...)` edits the layered configuration of an
+  application.
 - `PymolDockWidget(title, manager)` needs the PyMOL `cmd`/manager object of the
   application's PyMOL integration.
