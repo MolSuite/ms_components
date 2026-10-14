@@ -382,6 +382,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#where-jobs-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Where jobs run
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#projects-settings-and-pymol" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -548,6 +559,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#where-jobs-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Where jobs run
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#projects-settings-and-pymol" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -700,33 +722,47 @@ a widget you fill with content.</p>
 Inside a stepper, put one <code>ToolPanel</code> per step so each step keeps its own
 action bar state.</p>
 <h2 id="job-monitor">Job monitor<a class="headerlink" href="#job-monitor" title="Permanent link">&para;</a></h2>
-<p>The bridge polls a <code>MolSuite</code> runtime and translates its snapshots into Qt
+<p>The bridge polls an <code>ms_flow</code> <code>Workspace</code> and translates its snapshots into Qt
 signals and models; the widget only presents them. You can embed the whole
 monitor or consume only the bridge signals.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">ms_flow.api</span><span class="w"> </span><span class="kn">import</span> <span class="n">MolSuite</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">ms_flow</span><span class="w"> </span><span class="kn">import</span> <span class="n">Workspace</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ms_components.ms_monitor</span><span class="w"> </span><span class="kn">import</span> <span class="n">MolSuiteMonitorBridge</span><span class="p">,</span> <span class="n">MolSuiteMonitorWidget</span>
 
-<span class="n">ms</span> <span class="o">=</span> <span class="n">MolSuite</span><span class="p">(</span><span class="n">app_id</span><span class="o">=</span><span class="s2">"demo"</span><span class="p">)</span>
+<span class="n">ms</span> <span class="o">=</span> <span class="n">Workspace</span><span class="p">(</span><span class="n">app_id</span><span class="o">=</span><span class="s2">"demo"</span><span class="p">)</span>
 <span class="n">ms</span><span class="o">.</span><span class="n">create_or_open_project</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"demo"</span><span class="p">,</span> <span class="n">folder</span><span class="o">=</span><span class="s2">"./demo-project"</span><span class="p">,</span> <span class="n">activate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-<span class="n">bridge</span> <span class="o">=</span> <span class="n">MolSuiteMonitorBridge</span><span class="p">(</span><span class="n">molsuite</span><span class="o">=</span><span class="n">ms</span><span class="p">,</span> <span class="n">poll_ms</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+<span class="n">bridge</span> <span class="o">=</span> <span class="n">MolSuiteMonitorBridge</span><span class="p">(</span><span class="n">workspace</span><span class="o">=</span><span class="n">ms</span><span class="p">,</span> <span class="n">poll_ms</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
 <span class="n">monitor</span> <span class="o">=</span> <span class="n">MolSuiteMonitorWidget</span><span class="p">(</span><span class="n">bridge</span><span class="o">=</span><span class="n">bridge</span><span class="p">)</span>
 <span class="n">bridge</span><span class="o">.</span><span class="n">bridge_error</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="nb">print</span><span class="p">)</span>
-<span class="n">bridge</span><span class="o">.</span><span class="n">job_finished</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="s2">"job finished"</span><span class="p">,</span> <span class="n">args</span><span class="p">))</span>
+<span class="n">bridge</span><span class="o">.</span><span class="n">job_finished</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="s2">"job finished"</span><span class="p">,</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">status</span><span class="p">))</span>
 <span class="n">bridge</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
 <span class="n">monitor</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </code></pre></div>
 <p>When closing, call <code>bridge.stop()</code> first and <code>ms.shutdown()</code> afterwards. The
-supported operator actions are refresh, cancel, and — when the job keeps a
-re-buildable source — resubmit.</p>
+operator can cancel jobs, <strong>Resume</strong> a job that was interrupted or canceled,
+and <strong>Move</strong> a job to another active executor. An application with its own
+rules of where a job may go passes <code>resume(job_id, executor)</code> and
+<code>destinations(job_id)</code> to the bridge.</p>
+<h2 id="where-jobs-run">Where jobs run<a class="headerlink" href="#where-jobs-run" title="Permanent link">&para;</a></h2>
+<p><code>ms_components.ms_executors</code> edits the hosts and executors kept by <code>ms_flow</code>.
+Both widgets go through the <code>Workspace</code>, which refuses what cannot be done now
+(changing an executor while it is active, for example) and says why.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">ms_components.ms_executors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutorsPanel</span><span class="p">,</span> <span class="n">KeptPage</span>
+
+<span class="n">hosts</span> <span class="o">=</span> <span class="n">KeptPage</span><span class="p">(</span><span class="n">ms</span><span class="p">,</span> <span class="s2">"hosts"</span><span class="p">)</span>            <span class="c1"># a Settings page: the machines</span>
+<span class="n">executors</span> <span class="o">=</span> <span class="n">KeptPage</span><span class="p">(</span><span class="n">ms</span><span class="p">,</span> <span class="s2">"executors"</span><span class="p">)</span>    <span class="c1"># a Settings page: who runs jobs on them</span>
+<span class="n">panel</span> <span class="o">=</span> <span class="n">ExecutorsPanel</span><span class="p">(</span><span class="n">ms</span><span class="p">)</span>               <span class="c1"># the quick window that starts and stops executors</span>
+<span class="n">panel</span><span class="o">.</span><span class="n">settings_requested</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="s2">"open the Settings page"</span><span class="p">))</span>
+<span class="n">panel</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
 <h2 id="projects-settings-and-pymol">Projects, settings, and PyMOL<a class="headerlink" href="#projects-settings-and-pymol" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>ProjectsMenuWidget(app_id=...)</code> and <code>ProjectBrowserWindow(app_id=...)</code> list
   and create projects through the public <code>ms_flow</code> project catalog. Connect
   <code>project_requested</code> to open the chosen project; do not read the MolSuite
   databases from the UI.</li>
-<li><code>AppSettingsDialog(runtime=...)</code> edits the layered configuration of a
-  MolSuite runtime.</li>
+<li><code>AppSettingsDialog(runtime=...)</code> edits the layered configuration of an
+  application.</li>
 <li><code>PymolDockWidget(title, manager)</code> needs the PyMOL <code>cmd</code>/manager object of the
   application's PyMOL integration.</li>
 </ul>

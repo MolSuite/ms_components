@@ -1118,6 +1118,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#hosts-and-executors" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Hosts and executors
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ms_components.ms_executors" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;ms_executors
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ms_executors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ms_components.ms_executors.KeptPage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;KeptPage
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ms_components.ms_executors.ExecutorsPanel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ExecutorsPanel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#projects" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2586,6 +2636,56 @@
       </span>
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hosts-and-executors" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Hosts and executors
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ms_components.ms_executors" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;ms_executors
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ms_executors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ms_components.ms_executors.KeptPage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;KeptPage
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ms_components.ms_executors.ExecutorsPanel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ExecutorsPanel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -8459,6 +8559,345 @@ by processes that never open a window, and they must not pay for Qt.</p>
 
 
 
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="hosts-and-executors">Hosts and executors<a class="headerlink" href="#hosts-and-executors" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="ms_components.ms_executors" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-module"></code>            <span class="doc doc-object-name doc-module-name">ms_executors</span>
+
+
+<a href="#ms_components.ms_executors" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>The machines that run jobs and who runs them on them.</p>
+<p><code>KeptPage</code> is a Settings page: the entries kept under one name each (<code>hosts</code> or <code>executors</code>)
+and the form of the one chosen. <code>ExecutorsPanel</code> is the quick window that starts and stops the
+executors. Both go through a <code>ms_flow.Workspace</code> (<code>save_host</code>, <code>remove_host</code>, <code>save_executor</code>,
+<code>remove_executor</code>, <code>executors</code>, <code>activate</code>, <code>deactivate</code>), which is who refuses what is not to
+be done now, and says why.</p>
+
+
+
+
+
+
+
+
+
+
+<p><span class="doc-section-title">Classes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="            KeptPage (ms_components.ms_executors.KeptPage)" href="./#ms_components.ms_executors.KeptPage">KeptPage</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>The entries kept in <code>table</code> (<code>hosts</code> or <code>executors</code>) and the form of the chosen one.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="            ExecutorsPanel (ms_components.ms_executors.ExecutorsPanel)" href="./#ms_components.ms_executors.ExecutorsPanel">ExecutorsPanel</a></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>Who runs jobs now: a row for each executor kept, started and stopped from here.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="ms_components.ms_executors.KeptPage" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">KeptPage</span>
+
+
+<a href="#ms_components.ms_executors.KeptPage" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">KeptPage</span><span class="p">(</span><span class="n">workspace</span><span class="p">,</span> <span class="n">table</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n"><span title="PySide6.QtWidgets.QWidget">QWidget</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="PySide6.QtWidgets.QWidget">QWidget</span></code></p>
+
+
+
+        <p>The entries kept in <code>table</code> (<code>hosts</code> or <code>executors</code>) and the form of the chosen one.</p>
+<p>"Save" and "Remove" act at once, through the workspace: an entry is whole or it is not
+kept, so the "Save changes" of the dialog around this page is not for it.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+                  <details class="mkdocstrings-source">
+                    <summary>Source code in <code>src/ms_components/ms_executors.py</code></summary>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workspace</span><span class="p">,</span> <span class="n">table</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_workspace</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_table</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_one</span> <span class="o">=</span> <span class="n">workspace</span><span class="p">,</span> <span class="n">table</span><span class="p">,</span> <span class="n">table</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">settings</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">workspace</span><span class="o">.</span><span class="n">settings_manager</span><span class="o">.</span><span class="n">settings</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_model</span> <span class="o">=</span> <span class="n">get_args</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">model_fields</span><span class="p">[</span><span class="n">table</span><span class="p">]</span><span class="o">.</span><span class="n">annotation</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_editors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">QWidget</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_body</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">root</span> <span class="o">=</span> <span class="n">QHBoxLayout</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="n">left</span> <span class="o">=</span> <span class="n">QVBoxLayout</span><span class="p">()</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">names</span> <span class="o">=</span> <span class="n">QListWidget</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="o">.</span><span class="n">setMaximumWidth</span><span class="p">(</span><span class="mi">190</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="o">.</span><span class="n">currentTextChanged</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span> <span class="n">name</span><span class="p">:</span> <span class="n">name</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_show</span><span class="p">(</span><span class="n">name</span><span class="p">))</span>
+    <span class="n">left</span><span class="o">.</span><span class="n">addWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">buttons</span> <span class="o">=</span> <span class="n">QHBoxLayout</span><span class="p">()</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">new_button</span> <span class="o">=</span> <span class="n">QPushButton</span><span class="p">(</span><span class="s2">"New"</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">new_button</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_show</span><span class="p">(</span><span class="kc">None</span><span class="p">))</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">remove_button</span> <span class="o">=</span> <span class="n">QPushButton</span><span class="p">(</span><span class="s2">"Remove"</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">remove_button</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_remove</span><span class="p">)</span>
+    <span class="n">buttons</span><span class="o">.</span><span class="n">addWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">new_button</span><span class="p">)</span>
+    <span class="n">buttons</span><span class="o">.</span><span class="n">addWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">remove_button</span><span class="p">)</span>
+    <span class="n">left</span><span class="o">.</span><span class="n">addLayout</span><span class="p">(</span><span class="n">buttons</span><span class="p">)</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">addLayout</span><span class="p">(</span><span class="n">left</span><span class="p">)</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">_right</span> <span class="o">=</span> <span class="n">QVBoxLayout</span><span class="p">()</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">said</span> <span class="o">=</span> <span class="n">QLabel</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">said</span><span class="o">.</span><span class="n">setWordWrap</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">save_button</span> <span class="o">=</span> <span class="n">QPushButton</span><span class="p">(</span><span class="s2">"Save"</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">save_button</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_save</span><span class="p">)</span>
+    <span class="n">foot</span> <span class="o">=</span> <span class="n">QHBoxLayout</span><span class="p">()</span>
+    <span class="n">foot</span><span class="o">.</span><span class="n">addWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">said</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">foot</span><span class="o">.</span><span class="n">addWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">save_button</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_right</span><span class="o">.</span><span class="n">addStretch</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_right</span><span class="o">.</span><span class="n">addLayout</span><span class="p">(</span><span class="n">foot</span><span class="p">)</span>
+    <span class="n">root</span><span class="o">.</span><span class="n">addLayout</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_right</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">reload</span><span class="p">()</span>
+</code></pre></div></td></tr></table></div>
+                  </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="ms_components.ms_executors.ExecutorsPanel" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">ExecutorsPanel</span>
+
+
+<a href="#ms_components.ms_executors.ExecutorsPanel" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">ExecutorsPanel</span><span class="p">(</span><span class="n">workspace</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n"><span title="PySide6.QtWidgets.QWidget">QWidget</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="PySide6.QtWidgets.QDialog">QDialog</span></code></p>
+
+
+
+        <p>Who runs jobs now: a row for each executor kept, started and stopped from here.</p>
+<p>Starting one waits for its machines, so it is done in a thread, and what is done on a
+machine that is being prepared is shown line by line. The round mark is the executor a job
+goes to when nobody is named.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+                  <details class="mkdocstrings-source">
+                    <summary>Source code in <code>src/ms_components/ms_executors.py</code></summary>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workspace</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">setWindowTitle</span><span class="p">(</span><span class="s2">"Executors"</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">setModal</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="mi">640</span><span class="p">,</span> <span class="mi">260</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_workspace</span> <span class="o">=</span> <span class="n">workspace</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_busy</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># the ones a thread of this panel is starting or stopping</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_shown</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_body</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">buttons</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">QPushButton</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">states</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">QLabel</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">defaults</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">QRadioButton</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">_layout</span> <span class="o">=</span> <span class="n">QVBoxLayout</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">said</span> <span class="o">=</span> <span class="n">QPlainTextEdit</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">said</span><span class="o">.</span><span class="n">setReadOnly</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">said</span><span class="o">.</span><span class="n">setVisible</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_layout</span><span class="o">.</span><span class="n">addWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">said</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_layout</span><span class="o">.</span><span class="n">addStretch</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># takes the room left only while nothing is said</span>
+    <span class="n">foot</span> <span class="o">=</span> <span class="n">QHBoxLayout</span><span class="p">()</span>
+    <span class="n">foot</span><span class="o">.</span><span class="n">addStretch</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">settings_button</span> <span class="o">=</span> <span class="n">QPushButton</span><span class="p">(</span><span class="s2">"Hosts and executors…"</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">settings_button</span><span class="o">.</span><span class="n">setToolTip</span><span class="p">(</span><span class="s2">"They are made and changed in Settings."</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">settings_button</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">settings_requested</span><span class="o">.</span><span class="n">emit</span><span class="p">)</span>
+    <span class="n">foot</span><span class="o">.</span><span class="n">addWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">settings_button</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_layout</span><span class="o">.</span><span class="n">addLayout</span><span class="p">(</span><span class="n">foot</span><span class="p">)</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">line</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_say</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">ended</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_ended</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_timer</span> <span class="o">=</span> <span class="n">QTimer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_timer</span><span class="o">.</span><span class="n">setInterval</span><span class="p">(</span><span class="mi">1000</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_timer</span><span class="o">.</span><span class="n">timeout</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">refresh</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">refresh</span><span class="p">()</span>
+</code></pre></div></td></tr></table></div>
+                  </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 
 
