@@ -249,6 +249,10 @@ def test_project_tree_widget_rebalances_columns_on_resize():
         assert header.sectionSize(5) <= 38
     finally:
         widget.close()
+        # PySide6 6.12 crashes at exit if this parentless widget (it holds a QShortcut)
+        # is left to the garbage collector instead of being deleted by Qt.
+        widget.deleteLater()
+        QApplication.processEvents()
 
 
 def test_project_browser_window_disables_other_tools_for_scoped_app(tmp_path, monkeypatch):

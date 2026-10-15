@@ -738,6 +738,9 @@ class SmartTableView(QWidget):
             return
         if self._model.total_items == 0:
             return
+        # A refresh reloads from the top but leaves the scrollbar where it was, so no scroll
+        # signal comes: load the rows the viewport shows, or they stay blank until one does.
+        self._on_scroll_changed(self._table.verticalScrollBar().value())
         if not self._infinite_has_more:
             return
         if self._model.loaded_count >= self._viewport_row_capacity():
@@ -1255,11 +1258,13 @@ class SmartTableView(QWidget):
         known_pages = sorted(self._infinite_pages)
         if not known_pages:
             return
-        if focus_page >= max(known_pages):
-            keep = [page for page in known_pages if page >= focus_page - cache_pages + 1]
-        else:
-            keep = [page for page in known_pages if focus_page <= page < focus_page + cache_pages]
-        keep = keep[-cache_pages:]
+        # Only pages contiguous with the focus: the model window is one run of rows, so a gap
+        # (a jump from page 0 to 2) would show page 2's rows where page 1's belong.
+        step = -1 if focus_page >= max(known_pages) else 1
+        keep = [focus_page]
+        while len(keep) < cache_pages and keep[-1] + step in self._infinite_pages:
+            keep.append(keep[-1] + step)
+        keep.sort()
         self._infinite_pages = {page: self._infinite_pages[page] for page in keep}
         start_page = min(keep)
         rows = [row for page in sorted(keep) for row in self._infinite_pages[page]]
