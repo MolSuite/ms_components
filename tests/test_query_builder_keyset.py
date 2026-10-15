@@ -141,3 +141,31 @@ def test_simple_table_hides_filters_and_search():
         show_search=False,
     )
     assert not any(c.filterable or c.searchable for c in config.columns)
+
+
+def test_refresh_while_scrolled_loads_the_rows_on_screen(db):
+    """A refresh reloads from the top but keeps the scrollbar: no scroll signal comes, so
+    the view has to load what it shows by itself or those rows stay blank."""
+    app = QApplication.instance() or QApplication(["ms-table-refresh-test"])
+    view = SmartTableView(db, _config(infinite_cache_pages=3, max_loaded_rows=N_ROWS))
+    view.resize(600, 400)
+    view.show()
+    app.processEvents()
+    for _ in range(2):
+        view.load_next_page()
+    target = 2 * PAGE + 10  # page 2, with page 0 the only one a refresh brings back
+    view._table.verticalScrollBar().setValue(target)
+    app.processEvents()
+
+    view.refresh()
+    for _ in range(5):
+        app.processEvents()
+
+    first = view._table.verticalScrollBar().value()
+    assert first == target
+    last = first + view._viewport_row_capacity() - 1
+    for row in (first, last):
+        assert view._model.is_row_loaded(row)
+        # and the right row, not a neighbouring page's: the window is one contiguous run
+        assert view._model.get_raw_object(row).id == row + 1
+    view.close()
