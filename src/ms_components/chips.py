@@ -21,6 +21,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+# Rounded pill chips: any QFrame with the ``chip_objet`` property under a widget carrying this
+# sheet. palette() roles, so they follow the active theme. MetricFilterBar shares it.
+CHIP_STYLE = """
+    QFrame[chip_objet="true"] {
+        border: 1px solid palette(mid); border-radius: 9px; background: palette(button);
+    }
+    QFrame[chip_objet="true"] QLabel { border: none; background: transparent; }
+    QFrame[chip_objet="true"] QToolButton { border: none; background: transparent; padding: 0; }
+    QFrame[chip_objet="true"] QToolButton:hover { color: palette(highlight); }
+"""
+
 
 class FlowLayout(QLayout):
     """Left-to-right layout that wraps onto new lines (Qt's flow-layout example, trimmed)."""
@@ -90,15 +101,7 @@ class ChipsSelect(QWidget):
     changed = Signal()
     heightChanged = Signal()
 
-    # Rounded pill chips; palette() roles so they follow the active theme.
-    _STYLE = """
-        QFrame[chip_objet="true"] {
-            border: 1px solid palette(mid); border-radius: 9px; background: palette(button);
-        }
-        QFrame[chip_objet="true"] QLabel { border: none; background: transparent; }
-        QFrame[chip_objet="true"] QToolButton { border: none; background: transparent; padding: 0; }
-        QFrame[chip_objet="true"] QToolButton:hover { color: palette(highlight); }
-    """
+    _STYLE = CHIP_STYLE
 
     def __init__(self, parent=None, *, editable: bool = False, reorderable: bool = False, normalize=None):
         super().__init__(parent)

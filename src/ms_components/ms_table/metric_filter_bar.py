@@ -13,13 +13,15 @@ a JSON of metrics). That decoupling is what makes it reusable; the `FilterPanel`
 package is a different thing: it filters a `TableConfig` by equality/ILIKE and cannot express
 ranges.
 
-No styles of its own: `QFrame.StyledPanel` picks up the app theme's colours.
+Chips are the same rounded pills as `ChipsSelect` (`ms_components.chips.CHIP_STYLE`).
 """
 from __future__ import annotations
 
 from typing import Iterable, Sequence
 
 from PySide6.QtCore import Qt, Signal
+
+from ms_components.chips import CHIP_STYLE
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -90,9 +92,9 @@ class _Chip(QFrame):
     def __init__(self, field: str, op: str, text: str, parent: QWidget | None = None):
         super().__init__(parent)
         self.setObjectName("MetricChip")
-        self.setFrameShape(QFrame.StyledPanel)
+        self.setProperty("chip_objet", True)  # the pill look of CHIP_STYLE
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(6, 0, 0, 0)
+        layout.setContentsMargins(8, 1, 4, 1)
         layout.setSpacing(2)
         label = QLabel(text, self)
         font = label.font()  # one point smaller: a chip is state, not a headline
@@ -128,6 +130,7 @@ class MetricFilterBar(QWidget):
         empty_text: str = "No filters — everything is shown.",
     ):
         super().__init__(parent)
+        self.setStyleSheet(CHIP_STYLE)
         self._fields = tuple(fields)
         self._labels = {key: label for key, label in fields}
         self._decimals = decimals
@@ -218,6 +221,7 @@ if __name__ == "__main__":  # minimal check: range, edit, removal and the dialog
     assert sorted(bar.conditions()) == [("score", "gte", -9.5), ("score", "lte", -9.0)]
     bar.add_condition("score", "lte", -8.0)  # same field+operator = an edit
     assert ("score", "lte", -8.0) in bar.conditions() and len(bar.conditions()) == 2
+    assert bar._chips[("score", "lte")].property("chip_objet")  # the same pill as ChipsSelect
     bar.add_condition("nope", "lte", 1.0)  # unknown field: ignored
     assert len(bar.conditions()) == 2
     bar._chips[("score", "gte")].removed.emit("score", "gte")
