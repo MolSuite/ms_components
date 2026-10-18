@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from PySide6.QtWidgets import QApplication
-from PySide6.QtWidgets import QDialog
+from PySide6.QtWidgets import QDialog, QMessageBox
 
 from ms_flow.core.apps import AppManifest
 from ms_components.ms_projects import ProjectsMenuWidget
@@ -165,5 +165,23 @@ def test_projects_menu_widget_opens_created_project_when_enabled(monkeypatch):
 
         assert created == ["created"]
         assert opened == ["created"]
+    finally:
+        widget.deleteLater()
+
+
+def test_the_host_open_project_is_handed_back_not_deleted(monkeypatch):
+    QApplication.instance() or QApplication([])
+    backend = _FakeBackend()
+    deleted, handed = [], []
+    backend.delete_projects = lambda ids, delete_files=True: deleted.extend(ids)
+    monkeypatch.setattr("ms_components.ms_projects.widget.QMessageBox.question",
+                        lambda *a, **k: QMessageBox.Yes)
+    widget = ProjectsMenuWidget(app_id="amdockvs", backend=backend)
+    widget.active_project_id = "p1"
+    widget.active_project_delete_requested.connect(handed.append)
+    try:
+        items = [SimpleNamespace(id="p1", name="Docking One"), SimpleNamespace(id="p2", name="Docking Two")]
+        widget._on_delete(items)
+        assert handed == ["p1"] and deleted == ["p2"]
     finally:
         widget.deleteLater()

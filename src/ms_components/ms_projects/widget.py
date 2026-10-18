@@ -38,6 +38,8 @@ def _project_color(index: int) -> str:
 class ProjectsMenuWidget(QFrame):
     project_requested = Signal(str)
     project_created = Signal(str)
+    # The host app's open project was confirmed for deletion: the host closes it, then deletes it.
+    active_project_delete_requested = Signal(str)
 
     def __init__(
         self,
@@ -62,6 +64,9 @@ class ProjectsMenuWidget(QFrame):
             bool(allow_app_selection) if allow_app_selection is not None else self.app_id is None
         )
         self._app_color_map: dict[str, str] = {}
+        # Set by the host to the project it has open: deleting it under a live app would leave the
+        # app writing into a removed folder, so it is handed back through the signal instead.
+        self.active_project_id: str | None = None
         self._setup_ui()
         self.refresh()
 
@@ -249,6 +254,12 @@ class ProjectsMenuWidget(QFrame):
             QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
+            return
+        in_use = [p for p in projects if self.active_project_id and str(p.id) == self.active_project_id]
+        projects = [p for p in projects if p not in in_use]
+        for project in in_use:
+            self.active_project_delete_requested.emit(str(project.id))
+        if not projects:
             return
 
         progress = QProgressDialog("Deleting projects...", None, 0, len(projects), self)
