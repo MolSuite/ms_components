@@ -130,6 +130,19 @@ QPushButton:default {
     border-color: palette(highlight);
 }
 
+/* A split button (QToolButton with a menu arrow) is an action button, not a toolbar icon:
+   framed like QPushButton, the arrow in its own segment. */
+QToolButton[popupMode="MenuButtonPopup"] {
+    border: 1px solid palette(mid);
+    padding: 5px 14px;
+    padding-right: 24px;
+}
+
+QToolButton[popupMode="MenuButtonPopup"]::menu-button {
+    border-left: 1px solid palette(mid);
+    width: 18px;
+}
+
 /* Card = content surface. Nav trees/lists stay flat unless opted in. */
 QTableView,
 QTreeView[card="true"],
