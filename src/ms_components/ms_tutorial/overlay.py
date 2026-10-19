@@ -25,6 +25,7 @@ class TutorialOverlay(QWidget):
         self.hole = QRect()
         self.step: TutorialStep | None = None
         self._size_key = None
+        self._place_key = None
         self.panel = QFrame(self)
         self.panel.setObjectName("TutorialCallout")
         self.panel.setFrameShape(QFrame.Shape.StyledPanel)
@@ -64,6 +65,7 @@ class TutorialOverlay(QWidget):
     def set_step(self, tutorial_title: str, step: TutorialStep, index: int, count: int):
         self.step = step
         self._size_key = None
+        self._place_key = None
         self.counter.setText(f"{tutorial_title} · {index + 1} / {count}")
         self.title.setText(step.title)
         self.body.setPlainText(step.text)
@@ -120,6 +122,12 @@ class TutorialOverlay(QWidget):
                      for p in candidates]
         position = next((p for p in positions if not QRect(p, size).intersects(self.hole)),
                         positions[-1])
+        # The tracker calls this every tick: an unchanged layout must not repaint the window.
+        # ponytail: a sibling raised over a still overlay stays on top until the target moves.
+        place_key = (QRect(self.hole), position, interactive, self.size())
+        if place_key == self._place_key and self.isVisible():
+            return
+        self._place_key = place_key
         self.panel.move(position)
         region = QRegion(self.rect())
         if interactive:

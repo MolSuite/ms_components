@@ -363,3 +363,22 @@ def test_a_later_step_on_a_hidden_target_fails_instead_of_running_unseen(ui):
     controller.next()
     app.processEvents()
     assert not controller.is_active and "hidden" in failures[0]
+
+
+def test_a_still_tour_does_not_repaint_on_every_tracker_tick(ui):
+    app, _window, _button, _other, controller = ui
+    controller.start(tour())
+    QTest.qWait(200)
+    paints = []
+
+    class Counter(QObject):
+        def eventFilter(self, _obj, event):
+            if event.type() == QEvent.Type.Paint:
+                paints.append(1)
+            return False
+
+    counter = Counter()
+    controller.overlay.installEventFilter(counter)
+    QTest.qWait(800)  # ten tracker ticks
+    controller.overlay.removeEventFilter(counter)
+    assert len(paints) <= 1
