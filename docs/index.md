@@ -25,6 +25,7 @@ pip install ms_components
 | `ms_components.ms_settings` | Typed editor for application settings |
 | `ms_components.ms_pymol` | PyMOL dock and control bar |
 | `ms_components.ms_stepper` | Step-by-step wizard widget |
+| [`ms_components.ms_tutorial`](ms_tutorial.md) | Informative and interactive tours, with Python bindings and optional TOML content |
 | `ms_components.tool_panel` | Configure-then-run frame shared by tools |
 | `ms_components.step_dialog` | Dialog that runs provisioning steps off the GUI thread |
 | `ms_components.theme` | Themes, palette roles, and fonts |

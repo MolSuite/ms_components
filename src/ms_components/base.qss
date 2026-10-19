@@ -4,6 +4,17 @@ QMainWindow::separator {
     height: 1px;
 }
 
+QFrame#TutorialCallout {
+    background: palette(window);
+    border: 1px solid palette(mid);
+    border-radius: 8px;
+}
+
+QTextBrowser#TutorialText {
+    background: transparent;
+    border: none;
+}
+
 QToolBar {
     border: none;
     padding: 3px;

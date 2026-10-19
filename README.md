@@ -3,6 +3,10 @@
 PySide6 UI components for MolSuite: smart table, project browser, job monitor,
 PyMOL dock, steppers and the shared theming (`themes/` + `base.qss`).
 
+[`ms_tutorial`](docs/ms_tutorial.md) provides informative and interactive tours:
+Python binds existing widgets/signals, while content can be defined in Python or
+TOML. Try `PYTHONPATH=src python examples/tutorial_demo.py` from a source checkout.
+
 Part of the [MolSuite](https://molsuite.github.io/) stack. Built on top of
 [`ms_flow`](https://github.com/MolSuite/ms_flow).
 

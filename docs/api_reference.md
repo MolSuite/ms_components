@@ -31,6 +31,10 @@ Names beginning with an underscore are implementation details.
 
 ::: ms_components.ms_stepper
 
+## Guided tutorials
+
+::: ms_components.ms_tutorial
+
 ## Tool panel
 
 ::: ms_components.tool_panel
