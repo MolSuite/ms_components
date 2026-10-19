@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 from PySide6.QtCore import Qt, QSize, QMimeData, QPoint, QByteArray, QObject, QEvent, QTimer, QtMsgType, \
     qInstallMessageHandler
-from PySide6.QtGui import QAction, QCursor, QDrag, QIcon
+from PySide6.QtGui import QAction, QDrag, QIcon
 from PySide6.QtWidgets import (QDockWidget, QFrame, QMainWindow, QMenu, QSizePolicy, QToolBar, QToolButton, QVBoxLayout,
                                QHBoxLayout, QLabel, QStyle,
                                QApplication, QWidget)
@@ -207,8 +207,6 @@ class TitleBarWidget(QWidget):
 
     def mouseReleaseEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton and self._drag_start is not None:
-            if self._system_move_started:
-                self._dock.finish_native_window_drag()
             self._drag_start = None
             self._system_move_started = False
             self._manual_move = False
@@ -221,7 +219,9 @@ class TitleBarWidget(QWidget):
             manager = self._dock._manager
             dock_id = self._dock.objectName()
             if manager is not None and manager.is_windowed(dock_id):
-                self._dock.dock_to_main_window()
+                # A window behaves like any other: double click maximizes; only
+                # "Dock to Main Window" brings it back.
+                self._dock.showNormal() if self._dock.isMaximized() else self._dock.showMaximized()
             else:
                 self._dock.open_in_window()
             event.accept()
@@ -386,7 +386,8 @@ class MSDockWidget(QDockWidget):
         self.setParent(
             None,
             Qt.WindowType.Window
-            | Qt.WindowType.CustomizeWindowHint,
+            | Qt.WindowType.CustomizeWindowHint
+            | Qt.WindowType.WindowMinMaxButtonsHint,  # lets the WM maximize/tile it
         )
         if geometry.isValid():
             self.setGeometry(geometry)
@@ -402,10 +403,6 @@ class MSDockWidget(QDockWidget):
             global_pos,
             title_offset,
         )
-
-    def finish_native_window_drag(self) -> None:
-        if self._manager is not None:
-            self._manager.finish_native_window_drag()
 
 
     def open_settings(self):
@@ -794,10 +791,6 @@ class DockManager:
         # the region it came from. This lets users keep (for example) PyMOL on a
         # second monitor while opening another tool in the original side panel.
         self._windowed: set[str] = set()
-        self._moving_window_id: str | None = None
-        self._native_move_poll = QTimer(mw)
-        self._native_move_poll.setInterval(30)
-        self._native_move_poll.timeout.connect(self._poll_native_window_move)
 
         # ── FIX P2: single flag that blocks ALL reactive handlers ──
         # While True, _on_dock_visibility_changed and
@@ -1015,34 +1008,17 @@ class DockManager:
         global_pos: QPoint,
         title_offset: QPoint,
     ) -> bool:
-        """Detach if needed, then delegate movement/snapping to the window manager."""
+        """Detach if needed, then delegate movement/snapping to the window manager.
+
+        Dropping a window, even over the main window, never docks it again."""
         dock = self.docks.get(dock_id)
         if dock is None:
             return False
         if dock_id not in self._windowed:
             self.open_in_window(dock_id)
             dock.move(global_pos - title_offset)
-        self._moving_window_id = dock_id
-        self._native_move_poll.start()
         handle = dock.windowHandle()
         return bool(handle is not None and handle.startSystemMove())
-
-    def _poll_native_window_move(self) -> None:
-        if QApplication.mouseButtons() & Qt.MouseButton.LeftButton:
-            return
-        self.finish_native_window_drag()
-
-    def finish_native_window_drag(self, global_pos: QPoint | None = None) -> None:
-        """Redock in the original region when a native drag ends over AMDock."""
-        dock_id = self._moving_window_id
-        self._moving_window_id = None
-        self._native_move_poll.stop()
-        if dock_id is None or dock_id not in self._windowed:
-            return
-        cursor_pos = global_pos if global_pos is not None else QCursor.pos()
-        local_pos = self.mw.mapFromGlobal(cursor_pos)
-        if self.mw.isVisible() and self.mw.rect().contains(local_pos):
-            self.dock_to_main_window(dock_id)
 
     def dock_to_main_window(self, dock_id: str) -> None:
         """Return a detached dock to its configured region."""
@@ -1079,8 +1055,6 @@ class DockManager:
 
     def close_windowed_docks(self) -> None:
         """Reattach hidden external windows so they die with the main window."""
-        self._moving_window_id = None
-        self._native_move_poll.stop()
         self._updating = True
         try:
             for dock_id in tuple(self._windowed):

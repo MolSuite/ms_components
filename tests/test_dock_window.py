@@ -126,7 +126,7 @@ def test_dock_title_actions_keep_a_visible_icon_area(app):
     window.close()
 
 
-def test_title_double_click_and_drop_over_main_window_redock(app):
+def test_a_window_stays_a_window_on_double_click_and_drop(app):
     window = QMainWindow()
     window.resize(600, 400)
     manager = DockManager(window)
@@ -137,26 +137,20 @@ def test_title_double_click_and_drop_over_main_window_redock(app):
 
     manager.open_in_window("movable")
     app.processEvents()
+    assert dock.windowFlags() & Qt.WindowType.WindowMaximizeButtonHint  # the WM may maximize/tile it
     QTest.mouseDClick(dock._title_bar, Qt.MouseButton.LeftButton)
     app.processEvents()
+    assert manager.is_windowed("movable") and dock.parent() is None  # double click maximizes, never redocks
 
-    assert not manager.is_windowed("movable")
-    assert dock.parent() is window
-
-    outside = window.mapToGlobal(window.rect().bottomRight()) + dock.pos()
-    manager.begin_native_window_drag("movable", outside, dock._title_bar.pos())
+    # Dragging it over the main window and letting go leaves it a window too.
+    manager.begin_native_window_drag("movable", window.mapToGlobal(window.rect().center()), dock._title_bar.pos())
+    QTest.mouseRelease(dock._title_bar, Qt.MouseButton.LeftButton)
     app.processEvents()
+    assert manager.is_windowed("movable") and dock.parent() is None
 
-    assert manager.is_windowed("movable")
-    assert dock.parent() is None
-
-    manager.finish_native_window_drag(
-        window.mapToGlobal(window.rect().center())
-    )
+    manager.dock_to_main_window("movable")
     app.processEvents()
-
-    assert not manager.is_windowed("movable")
-    assert dock.parent() is window
+    assert not manager.is_windowed("movable") and dock.parent() is window
 
     window.close()
     app.processEvents()

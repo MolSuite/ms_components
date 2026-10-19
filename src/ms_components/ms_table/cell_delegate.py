@@ -59,11 +59,13 @@ from __future__ import annotations
 from typing import Any, Callable, Optional
 
 from PySide6.QtCore import QModelIndex, QRect, QRectF, QSize, Qt
-from PySide6.QtGui import QPainter, QPixmap, QImage
+from PySide6.QtGui import QImage, QPainter, QPalette, QPixmap
 from PySide6.QtWidgets import (
     QApplication, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
     QWidget,
 )
+
+from .table_config import ColumnKind
 
 # from .table_model import RAW_OBJECT_ROLE, COLUMN_DEF_ROLE
 
@@ -182,6 +184,32 @@ class CellWidgetDelegate(QStyledItemDelegate):
         style.drawPrimitive(QStyle.PE_PanelItemViewItem, option, painter, option.widget)
 
         row_data = self._get_row_data(index)
+
+        # ── progress mode: a fraction 0..1 as the style's own progress bar ──
+        if col_def.kind == ColumnKind.PROGRESS:
+            try:
+                fraction = min(max(float(row_data.get(col_def.display_key) or 0.0), 0.0), 1.0)
+            except (TypeError, ValueError):
+                fraction = 0.0
+            # ponytail: painted by hand: CE_ProgressBar under an app stylesheet draws the
+            # table's rules, not QProgressBar's, and a partial chunk came out as a line.
+            rect, pal = QRectF(option.rect.adjusted(4, 5, -4, -5)), option.palette
+            painter.save()
+            painter.setRenderHint(QPainter.Antialiasing)
+            # A selected row is Highlight already: the track goes Base so the fill still shows.
+            track = pal.color(QPalette.Base) if option.state & QStyle.State_Selected else pal.color(QPalette.Text)
+            if not option.state & QStyle.State_Selected:
+                track.setAlpha(40)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(track)
+            painter.drawRoundedRect(rect, 3, 3)
+            if fraction > 0:
+                painter.setBrush(pal.color(QPalette.Highlight))
+                painter.drawRoundedRect(QRectF(rect.x(), rect.y(), rect.width() * fraction, rect.height()), 3, 3)
+            painter.setPen(pal.color(QPalette.Text))
+            painter.drawText(rect, Qt.AlignCenter, f"{int(fraction * 100)}%")  # floored: 99.9% is not "100%"
+            painter.restore()
+            return
 
         # ── paint_factory mode (SVG / image) ───────────────────────────────
         if col_def.paint_factory is not None:

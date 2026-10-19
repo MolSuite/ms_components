@@ -70,6 +70,8 @@ class ColumnKind(str, Enum):
     NUMBER  = "number"
     INTEGER = "integer"
     CHOICE  = "choice"
+    # A fraction 0..1 drawn as a progress bar with its percentage (no formatter: the bar needs the number).
+    PROGRESS = "progress"
 
 
 class TableLoadMode(str, Enum):

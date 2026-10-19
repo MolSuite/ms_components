@@ -64,7 +64,7 @@ from .column_panel import ColumnConfigDialog
 from .pagination_control import PaginationControl
 from .query_builder import QueryBuilder
 from .session_provider import SessionProvider
-from .table_config import ColumnDef, FilterOperator, FilterSpec, SortSpec, TableConfig, TableLoadMode, ToolbarAction
+from .table_config import ColumnDef, ColumnKind, FilterOperator, FilterSpec, SortSpec, TableConfig, TableLoadMode, ToolbarAction
 from .table_model import RAW_OBJECT_ROLE, SmartTableModel
 
 _TOOLBAR_ICONS = Path(__file__).parent / "icons"
@@ -374,7 +374,8 @@ class SmartTableView(QWidget):
                 col_def.paint_factory  is not None or
                 col_def.widget_factory is not None or
                 col_def.editor_factory is not None or
-                col_def.cell_height    is not None
+                col_def.cell_height    is not None or
+                col_def.kind == ColumnKind.PROGRESS
             )
             if has_delegate:
                 logical_idx = i + offset
