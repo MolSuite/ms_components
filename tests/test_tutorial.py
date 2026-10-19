@@ -352,3 +352,14 @@ def test_duplicate_step_ids_are_rejected():
     step = TutorialStep("duplicate", "run", "Run", "Text")
     with pytest.raises(ValueError, match="unique"):
         Tutorial("duplicate", "Duplicate", (step, step))
+
+
+def test_a_later_step_on_a_hidden_target_fails_instead_of_running_unseen(ui):
+    app, _window, _button, other, controller = ui
+    failures = []
+    controller.failed.connect(lambda _tid, message: failures.append(message))
+    other.hide()
+    controller.start(tour())
+    controller.next()
+    app.processEvents()
+    assert not controller.is_active and "hidden" in failures[0]

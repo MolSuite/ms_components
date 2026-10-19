@@ -164,6 +164,12 @@ class TutorialController(QObject):
             binding = self.targets[step.target]
             if binding.prepare is not None:
                 binding.prepare()
+            source = binding.widget
+            target = source() if callable(source) else source
+            # A step starts on a visible target; only a target that hides mid-step just hides the
+            # overlay (and comes back). Otherwise the tour would stay active, unseen, eating Escape.
+            if isinstance(target, QWidget) and isValid(target) and not target.isVisible():
+                raise ValueError(f"Target '{step.target}' is hidden; provide a prepare callback")
             self._refresh()
             if not self.is_active:
                 return
