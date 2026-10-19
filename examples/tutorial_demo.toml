@@ -1,0 +1,21 @@
+id = "interactive-demo"
+title = "Tutorial interactivo"
+
+[[steps]]
+id = "load"
+target = "input.load"
+title = "Carga el ejemplo"
+text = "Pulsa Cargar ejemplo. La guía escucha la señal existente desde fuera del componente."
+advance_on = "input.loaded"
+
+[[steps]]
+id = "details"
+target = "details.text"
+title = "Otra ventana"
+text = "El controlador ha abierto un diálogo mediante una función de navegación. Este paso es informativo y avanza con Next."
+
+[[steps]]
+id = "summary"
+target = "input.status"
+title = "Terminado"
+text = "La aplicación conserva sus propios slots. El tutorial solo añade sus conexiones mientras están activas."
