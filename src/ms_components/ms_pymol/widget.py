@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +53,10 @@ REPRESENTATIONS = (
 )
 
 _TOOLBAR_ICONS = Path(__file__).parent / "icons"
+COMPARISON_COLORS = (
+    "orange", "tv_green", "cyan", "magenta", "yellow",
+    "salmon", "violet", "lime", "deepteal", "hotpink",
+)
 
 
 @dataclass(frozen=True)
@@ -61,6 +65,11 @@ class PymolSceneContext:
     target: str = "all"
     selections: Mapping[str, str] = field(default_factory=dict)
     default_preset: str = ""
+    grid_labels: Mapping[int, str] = field(default_factory=dict)
+
+    @property
+    def is_comparison(self) -> bool:
+        return self.kind in {"comparison", "offtarget"}
 
     def selection(self, role: str, fallback: str = "") -> str:
         value = str(dict(self.selections or {}).get(str(role)) or "").strip()
@@ -100,6 +109,8 @@ class PymolControlBar(QFrame):
         super().__init__(parent)
         self._cmd = cmd
         self._context = PymolSceneContext()
+        self._grid_label_objects: set[str] = set()
+        self._comparison_layout = "grid"
         self._presets: dict[str, PymolPresetSpec] = {}
         self.setObjectName("PymolControlBar")
 
@@ -168,6 +179,18 @@ class PymolControlBar(QFrame):
             "Apply a representation to the current selection or scene target.",
             menu=representation_menu,
         )
+        self.comparison_menu = representation_menu.addMenu("Comparison")
+        self.comparison_menu.menuAction().setVisible(False)
+        comparison_group = QActionGroup(self.comparison_menu)
+        comparison_group.setExclusive(True)
+        self._comparison_layout_actions: dict[str, QAction] = {}
+        for label, value in (("Grid", "grid"), ("Overlay", "overlay")):
+            action = self.comparison_menu.addAction(label)
+            action.setCheckable(True)
+            action.setChecked(value == self._comparison_layout)
+            comparison_group.addAction(action)
+            action.triggered.connect(lambda checked=False, layout=value: self.set_comparison_layout(layout))
+            self._comparison_layout_actions[value] = action
 
         hide_menu = QMenu("Hide", bar)
         for label, value in (("Everything", "everything"), *REPRESENTATIONS):
@@ -359,6 +382,7 @@ class PymolControlBar(QFrame):
         target: str = "all",
         selections: Mapping[str, str] | None = None,
         default_preset: str = "",
+        grid_labels: Mapping[int, str] | None = None,
     ) -> None:
         if isinstance(context, PymolSceneContext):
             normalized = context
@@ -372,10 +396,135 @@ class PymolControlBar(QFrame):
                     if str(key).strip() and str(value).strip()
                 },
                 default_preset=str(default_preset or "").strip(),
+                grid_labels=dict(grid_labels or {}),
             )
+        was_comparison = self._context.is_comparison
         self._context = normalized
+        self.comparison_menu.menuAction().setVisible(normalized.is_comparison)
+        if was_comparison or normalized.is_comparison:
+            self._run_command("Grid labels", self._sync_grid_labels)
         self.refresh_context_label()
         self._refresh_preset_menu()
+
+    @property
+    def comparison_layout(self) -> str:
+        return self._comparison_layout
+
+    def set_comparison_layout(self, layout: str) -> None:
+        if layout not in self._comparison_layout_actions:
+            raise ValueError(f"Unsupported comparison layout: {layout}")
+        if not self._context.is_comparison:
+            raise ValueError("A comparison scene is required to change its layout.")
+        previous = self._comparison_layout
+        self._comparison_layout = layout
+
+        def apply() -> None:
+            self._sync_grid_labels()
+            self._cmd.refresh()
+
+        if not self._run_command("Comparison layout", apply):
+            self._comparison_layout = previous
+        for value, action in self._comparison_layout_actions.items():
+            action.setChecked(value == self._comparison_layout)
+
+    def _sync_grid_labels(self, *, color_objects: bool = True) -> None:
+        labels = dict(self._context.grid_labels)
+        if self._context.is_comparison:
+            self._cmd.set("grid_mode", int(self._comparison_layout == "grid"))
+            slot_names: dict[int, list[str]] = {}
+            for obj in self._cmd.get_object_list(self._context.target):
+                if obj in self._grid_label_objects:
+                    continue
+                slot = self._cmd.get_setting_int("grid_slot", obj)
+                if slot > 0:
+                    color = COMPARISON_COLORS[(slot - 1) % len(COMPARISON_COLORS)]
+                    if color_objects:
+                        self._cmd.set("cartoon_color", color, selection=obj)
+                        self._cmd.color(color, f"({obj}) and elem C")
+                    slot_names.setdefault(slot, []).append(self._cmd.get_title(obj, 1) or obj)
+            if not labels:
+                labels = {slot: " + ".join(names) for slot, names in slot_names.items()}
+        else:
+            labels = {}
+            self._cmd.set("grid_mode", 0)
+
+        wanted = {f"panel_text{slot}" for slot in labels}
+        for obj in self._grid_label_objects - wanted:
+            self._cmd.delete(obj)
+        self._grid_label_objects.intersection_update(wanted)
+        existing = set(self._cmd.get_names("objects"))
+        for slot, title in sorted(labels.items()):
+            if slot <= 0:
+                raise ValueError("Grid label slots must be positive integers.")
+            obj = f"panel_text{slot}"
+            if obj not in existing:
+                self._cmd.pseudoatom(obj, label=title)
+                self._grid_label_objects.add(obj)
+                self._cmd.hide("everything", obj)
+                self._cmd.set("label_relative_mode", 1, selection=obj)
+                self._cmd.set("label_size", 14, selection=obj)
+                self._cmd.set("label_position", [1, -1, 0], selection=obj)
+                self._cmd.set("grid_slot", slot, selection=obj)
+            elif obj in self._grid_label_objects:
+                self._cmd.label(obj, repr(title))
+            else:
+                raise ValueError(f"Grid label object '{obj}' already exists.")
+            color = COMPARISON_COLORS[(slot - 1) % len(COMPARISON_COLORS)]
+            self._cmd.set("label_color", color, selection=obj)
+            self._cmd.set("label_outline_color", "front", selection=obj)
+            self._cmd.show("labels", obj)
+        self._position_comparison_labels()
+
+    def _position_comparison_labels(self) -> None:
+        if not self._context.is_comparison:
+            return
+        existing = set(self._cmd.get_names("objects"))
+        height = max(1, self._cmd.get_viewport()[1])
+        offset = 0.0
+        for obj in sorted(self._grid_label_objects & existing,
+                          key=lambda name: self._cmd.get_setting_int("grid_slot", name)):
+            self._cmd.set("label_screen_point", [-1, 1 - offset, 0], selection=obj)
+            if self._comparison_layout == "overlay":
+                offset += 2 * (abs(self._cmd.get_setting_float("label_size", obj)) + 6) / height
+
+    def replace_comparison_object(
+        self, name: str, data: bytes, fmt: str, *, reference: str, label: str,
+    ) -> bool:
+        def apply() -> None:
+            if not self._context.is_comparison:
+                raise ValueError("A comparison scene is required to replace an object.")
+            objects = self._cmd.get_names("objects")
+            if name not in objects or reference not in objects:
+                raise ValueError("The comparison object and its reference must already exist.")
+            if name == reference:
+                raise ValueError("The comparison object must differ from its reference.")
+            slot = self._cmd.get_setting_int("grid_slot", reference)
+            if slot <= 0:
+                raise ValueError("The comparison reference must have a positive grid slot.")
+            auto_zoom = self._cmd.get_setting_int("auto_zoom")
+            temporary = self._cmd.get_unused_name("_comparison_pose")
+            try:
+                self._cmd.set("auto_zoom", 0)
+                self._cmd.load_raw(data, fmt, temporary)
+                self._cmd.matrix_copy(reference, temporary)
+                self._cmd.set("grid_slot", slot, temporary)
+                self._cmd.show("sticks", temporary)
+                self._cmd.color("atomic", temporary)
+                color = COMPARISON_COLORS[(slot - 1) % len(COMPARISON_COLORS)]
+                self._cmd.set("cartoon_color", color, temporary)
+                self._cmd.color(color, f"({temporary}) and elem C")
+                self._cmd.delete(name)
+                self._cmd.set_name(temporary, name)
+                self._context = replace(
+                    self._context, grid_labels={**self._context.grid_labels, slot: label},
+                )
+                self._sync_grid_labels(color_objects=False)
+            finally:
+                if temporary in self._cmd.get_names("objects"):
+                    self._cmd.delete(temporary)
+                self._cmd.set("auto_zoom", auto_zoom)
+
+        return self._run_command("Replace comparison object", apply)
 
     def register_preset(self, spec: PymolPresetSpec) -> None:
         key = str(spec.key or "").strip()
@@ -507,6 +656,8 @@ class PymolControlBar(QFrame):
 
         def apply() -> None:
             spec.callback(self._cmd, self._context)
+            if self._context.is_comparison:
+                self._sync_grid_labels()
 
         if self._run_command(spec.label, apply):
             self.preset_applied.emit(normalized_key)
@@ -586,12 +737,12 @@ class PymolDockWidget(MSDockWidget):
     def __init__(self, title: str, manager, parent=None):
         super().__init__(title, manager, parent)
         self.pymol_widget = PyMOLGLWidget(self)
-        self.pymol_widget.installEventFilter(self)
         if self.cmd is not None:
             self.cmd.set("internal_gui", False)
 
         self.control_bar = PymolControlBar(self.cmd, self)
         self.toolbar = self.control_bar
+        self.pymol_widget.installEventFilter(self)
 
         self._side_panel_widget: QWidget | None = None
         self._splitter = QSplitter(Qt.Horizontal, self)
@@ -640,16 +791,30 @@ class PymolDockWidget(MSDockWidget):
         target: str = "all",
         selections: Mapping[str, str] | None = None,
         default_preset: str = "",
+        grid_labels: Mapping[int, str] | None = None,
     ) -> None:
         self.control_bar.set_scene_context(
             context,
             target=target,
             selections=selections,
             default_preset=default_preset,
+            grid_labels=grid_labels,
         )
 
     def register_preset(self, spec: PymolPresetSpec) -> None:
         self.control_bar.register_preset(spec)
+
+    def set_comparison_layout(self, layout: str) -> None:
+        self.control_bar.set_comparison_layout(layout)
+
+    @property
+    def comparison_layout(self) -> str:
+        return self.control_bar.comparison_layout
+
+    def replace_comparison_object(
+        self, name: str, data: bytes, fmt: str, *, reference: str, label: str,
+    ) -> bool:
+        return self.control_bar.replace_comparison_object(name, data, fmt, reference=reference, label=label)
 
     def unregister_preset(self, key: str) -> None:
         self.control_bar.unregister_preset(key)
@@ -687,10 +852,13 @@ class PymolDockWidget(MSDockWidget):
     def eventFilter(self, watched, event):
         if watched is self.pymol_widget and event.type() == QEvent.Type.MouseButtonRelease:
             QTimer.singleShot(0, self.control_bar.refresh_context_label)
+        elif watched is self.pymol_widget and event.type() == QEvent.Type.Resize and self.scene_context.is_comparison:
+            QTimer.singleShot(0, self.control_bar._position_comparison_labels)
         return super().eventFilter(watched, event)
 
 
 __all__ = [
+    "COMPARISON_COLORS",
     "PymolControlBar",
     "PymolDockWidget",
     "PymolPresetSpec",
