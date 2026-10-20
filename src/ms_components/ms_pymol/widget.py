@@ -61,6 +61,7 @@ class PymolSceneContext:
     target: str = "all"
     selections: Mapping[str, str] = field(default_factory=dict)
     default_preset: str = ""
+    grid_labels: Mapping[int, str] = field(default_factory=dict)
 
     def selection(self, role: str, fallback: str = "") -> str:
         value = str(dict(self.selections or {}).get(str(role)) or "").strip()
@@ -100,6 +101,7 @@ class PymolControlBar(QFrame):
         super().__init__(parent)
         self._cmd = cmd
         self._context = PymolSceneContext()
+        self._grid_label_objects: set[str] = set()
         self._presets: dict[str, PymolPresetSpec] = {}
         self.setObjectName("PymolControlBar")
 
@@ -359,6 +361,7 @@ class PymolControlBar(QFrame):
         target: str = "all",
         selections: Mapping[str, str] | None = None,
         default_preset: str = "",
+        grid_labels: Mapping[int, str] | None = None,
     ) -> None:
         if isinstance(context, PymolSceneContext):
             normalized = context
@@ -372,10 +375,57 @@ class PymolControlBar(QFrame):
                     if str(key).strip() and str(value).strip()
                 },
                 default_preset=str(default_preset or "").strip(),
+                grid_labels=dict(grid_labels or {}),
             )
+        was_offtarget = self._context.kind == "offtarget"
         self._context = normalized
+        if was_offtarget or normalized.kind == "offtarget":
+            self._run_command("Grid labels", self._sync_grid_labels)
         self.refresh_context_label()
         self._refresh_preset_menu()
+
+    def _sync_grid_labels(self) -> None:
+        labels = dict(self._context.grid_labels)
+        if self._context.kind == "offtarget":
+            self._cmd.set("grid_mode", 1)
+            if not labels:
+                slot_names: dict[int, list[str]] = {}
+                for obj in self._cmd.get_object_list(self._context.target):
+                    if obj in self._grid_label_objects:
+                        continue
+                    slot = self._cmd.get_setting_int("grid_slot", obj)
+                    if slot > 0:
+                        title = self._cmd.get_title(obj, 1) or obj
+                        slot_names.setdefault(slot, []).append(title)
+                labels = {slot: " + ".join(names) for slot, names in slot_names.items()}
+        else:
+            labels = {}
+            self._cmd.set("grid_mode", 0)
+
+        wanted = {f"panel_text{slot}" for slot in labels}
+        for obj in self._grid_label_objects - wanted:
+            self._cmd.delete(obj)
+        self._grid_label_objects.intersection_update(wanted)
+        existing = set(self._cmd.get_names("objects"))
+        for slot, title in labels.items():
+            if slot <= 0:
+                raise ValueError("Grid label slots must be positive integers.")
+            obj = f"panel_text{slot}"
+            if obj not in existing:
+                self._cmd.pseudoatom(obj, label=title)
+                self._grid_label_objects.add(obj)
+                self._cmd.hide("everything", obj)
+                self._cmd.set("label_relative_mode", 1, selection=obj)
+                self._cmd.set("label_screen_point", [-1, 1, 0], selection=obj)
+                self._cmd.set("label_size", 14, selection=obj)
+                self._cmd.set("label_position", [1, -1, 0], selection=obj)
+                self._cmd.set("label_color", "front", selection=obj)
+                self._cmd.set("grid_slot", slot, selection=obj)
+            elif obj in self._grid_label_objects:
+                self._cmd.label(obj, repr(title))
+            else:
+                raise ValueError(f"Grid label object '{obj}' already exists.")
+            self._cmd.show("labels", obj)
 
     def register_preset(self, spec: PymolPresetSpec) -> None:
         key = str(spec.key or "").strip()
@@ -507,6 +557,8 @@ class PymolControlBar(QFrame):
 
         def apply() -> None:
             spec.callback(self._cmd, self._context)
+            if self._context.kind == "offtarget":
+                self._sync_grid_labels()
 
         if self._run_command(spec.label, apply):
             self.preset_applied.emit(normalized_key)
@@ -640,12 +692,14 @@ class PymolDockWidget(MSDockWidget):
         target: str = "all",
         selections: Mapping[str, str] | None = None,
         default_preset: str = "",
+        grid_labels: Mapping[int, str] | None = None,
     ) -> None:
         self.control_bar.set_scene_context(
             context,
             target=target,
             selections=selections,
             default_preset=default_preset,
+            grid_labels=grid_labels,
         )
 
     def register_preset(self, spec: PymolPresetSpec) -> None:
