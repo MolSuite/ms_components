@@ -9633,16 +9633,7 @@ dialog so Reload / Save / Close share one row).</p>
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">108</span>
 <span class="normal">109</span>
 <span class="normal">110</span>
 <span class="normal">111</span>
@@ -9740,10 +9731,35 @@ dialog so Reload / Save / Close share one row).</p>
 <span class="normal">203</span>
 <span class="normal">204</span>
 <span class="normal">205</span>
-<span class="normal">206</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_cmd</span> <span class="o">=</span> <span class="n">cmd</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_context</span> <span class="o">=</span> <span class="n">PymolSceneContext</span><span class="p">()</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_grid_label_objects</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_comparison_layout</span> <span class="o">=</span> <span class="s2">"grid"</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_presets</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">PymolPresetSpec</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">setObjectName</span><span class="p">(</span><span class="s2">"PymolControlBar"</span><span class="p">)</span>
 
@@ -9812,6 +9828,18 @@ dialog so Reload / Save / Close share one row).</p>
         <span class="s2">"Apply a representation to the current selection or scene target."</span><span class="p">,</span>
         <span class="n">menu</span><span class="o">=</span><span class="n">representation_menu</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">comparison_menu</span> <span class="o">=</span> <span class="n">representation_menu</span><span class="o">.</span><span class="n">addMenu</span><span class="p">(</span><span class="s2">"Comparison"</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">comparison_menu</span><span class="o">.</span><span class="n">menuAction</span><span class="p">()</span><span class="o">.</span><span class="n">setVisible</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">comparison_group</span> <span class="o">=</span> <span class="n">QActionGroup</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">comparison_menu</span><span class="p">)</span>
+    <span class="n">comparison_group</span><span class="o">.</span><span class="n">setExclusive</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_comparison_layout_actions</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">QAction</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">"Grid"</span><span class="p">,</span> <span class="s2">"grid"</span><span class="p">),</span> <span class="p">(</span><span class="s2">"Overlay"</span><span class="p">,</span> <span class="s2">"overlay"</span><span class="p">)):</span>
+        <span class="n">action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">comparison_menu</span><span class="o">.</span><span class="n">addAction</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+        <span class="n">action</span><span class="o">.</span><span class="n">setCheckable</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">action</span><span class="o">.</span><span class="n">setChecked</span><span class="p">(</span><span class="n">value</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_comparison_layout</span><span class="p">)</span>
+        <span class="n">comparison_group</span><span class="o">.</span><span class="n">addAction</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
+        <span class="n">action</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span> <span class="n">checked</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">layout</span><span class="o">=</span><span class="n">value</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">set_comparison_layout</span><span class="p">(</span><span class="n">layout</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_comparison_layout_actions</span><span class="p">[</span><span class="n">value</span><span class="p">]</span> <span class="o">=</span> <span class="n">action</span>
 
     <span class="n">hide_menu</span> <span class="o">=</span> <span class="n">QMenu</span><span class="p">(</span><span class="s2">"Hide"</span><span class="p">,</span> <span class="n">bar</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">"Everything"</span><span class="p">,</span> <span class="s2">"everything"</span><span class="p">),</span> <span class="o">*</span><span class="n">REPRESENTATIONS</span><span class="p">):</span>
@@ -9882,20 +9910,20 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_menu_action</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_menu_action</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">menu</span><span class="p">:</span> <span class="n">QMenu</span><span class="p">,</span>
@@ -9933,25 +9961,25 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span>
-<span class="normal">264</span>
-<span class="normal">265</span>
-<span class="normal">266</span>
-<span class="normal">267</span>
-<span class="normal">268</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_action</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_action</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -9994,18 +10022,18 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">454</span>
-<span class="normal">455</span>
-<span class="normal">456</span>
-<span class="normal">457</span>
-<span class="normal">458</span>
-<span class="normal">459</span>
-<span class="normal">460</span>
-<span class="normal">461</span>
-<span class="normal">462</span>
-<span class="normal">463</span>
-<span class="normal">464</span>
-<span class="normal">465</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">refresh_context_label</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">603</span>
+<span class="normal">604</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span>
+<span class="normal">609</span>
+<span class="normal">610</span>
+<span class="normal">611</span>
+<span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">refresh_context_label</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Keep the compact context label useful without turning it into a second status bar."""</span>
     <span class="n">kind</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">kind</span> <span class="ow">or</span> <span class="s2">"generic"</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"_"</span><span class="p">,</span> <span class="s2">" "</span><span class="p">)</span><span class="o">.</span><span class="n">title</span><span class="p">()</span>
     <span class="n">target</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">target</span> <span class="ow">or</span> <span class="s2">"all"</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">"all"</span>
@@ -10038,7 +10066,50 @@ dialog so Reload / Save / Close share one row).</p>
 
     </div>
 
-</div><h2 id="stepper">Stepper<a class="headerlink" href="#stepper" title="Permanent link">&para;</a></h2>
+</div><p>Comparison scenes provide grid and overlay layouts without reloading structures
+or changing the camera. Assign each structure/pose pair the same positive PyMOL
+<code>grid_slot</code>, then pass its display name:</p>
+<div class="highlight"><pre><span></span><code><span class="n">dock</span><span class="o">.</span><span class="n">set_scene_context</span><span class="p">(</span>
+    <span class="s2">"comparison"</span><span class="p">,</span>
+    <span class="n">grid_labels</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="s2">"Complex A"</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="s2">"Complex B"</span><span class="p">},</span>
+<span class="p">)</span>
+<span class="n">dock</span><span class="o">.</span><span class="n">set_comparison_layout</span><span class="p">(</span><span class="s2">"overlay"</span><span class="p">)</span>
+</code></pre></div>
+<p><code>grid_labels</code> is also accepted by <code>PymolControlBar</code> and <code>PymolSceneContext</code>.
+Without explicit labels, molecular object titles (or object names when no title
+is available) are joined per positive <code>grid_slot</code> within the context's <code>target</code>.
+Applications must pass display names if those names are not present in PyMOL.</p>
+<p>The <strong>Display &gt; Comparison &gt; Grid / Overlay</strong> menu appears only in comparison
+scenes. The chosen layout persists when changing poses or applying presets.
+Overlay displays the existing coordinates together; alignment remains the
+caller's responsibility.</p>
+<p>Each label is a pseudoatom named <code>panel_text&lt;slot&gt;</code>, initially sized 14.
+Grid labels appear at the top-left of their panel; overlay labels form a stacked
+legend that follows viewport resizing. Receptor cartoons, carbon atoms and label
+text share the slot's <code>COMPARISON_COLORS</code> color. Heteroatom colors are preserved.
+The label outline uses PyMOL's background-adaptive <code>front</code> color for readability
+on light and dark backgrounds. The palette has ten colors and repeats beyond ten
+slots.
+Existing labels are updated in place, so individual settings remain editable,
+for example <code>cmd.set("label_size", 18, "panel_text3")</code>. Presets restore label
+visibility after changing molecular representations.</p>
+<p>To replace one pose without rebuilding the scene, pass its bytes directly:</p>
+<div class="highlight"><pre><span></span><code><span class="n">dock</span><span class="o">.</span><span class="n">replace_comparison_object</span><span class="p">(</span>
+    <span class="s2">"pose_a"</span><span class="p">,</span> <span class="n">pdb_bytes</span><span class="p">,</span> <span class="s2">"pdb"</span><span class="p">,</span>
+    <span class="n">reference</span><span class="o">=</span><span class="s2">"receptor_a"</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"Complex A [P2]"</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>The new object inherits the reference's transformation and slot, is shown as
+sticks, and receives the same comparison color. Camera and auto-zoom settings
+are preserved. The previous object remains available until the replacement loads
+successfully. This API neither fetches data nor calls the hosting application.
+Hosts remain responsible for reading their data and discarding stale requests.</p>
+<p>Setting any non-comparison scene context after a comparison context removes
+the managed labels and sets <code>grid_mode</code> to zero. Applications should update
+the scene context when leaving their off-target view, even without loading a
+new structure. Unrelated grid scenes and user-created annotations are not
+removed. <code>"offtarget"</code> remains accepted as an alias for <code>"comparison"</code>.</p>
+<h2 id="stepper">Stepper<a class="headerlink" href="#stepper" title="Permanent link">&para;</a></h2>
 
 
 <div class="doc doc-object doc-module">
