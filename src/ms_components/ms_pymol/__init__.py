@@ -1,4 +1,5 @@
 from .widget import (
+    COMPARISON_COLORS,
     PymolControlBar,
     PymolDockWidget,
     PymolPresetSpec,
@@ -6,6 +7,7 @@ from .widget import (
 )
 
 __all__ = [
+    "COMPARISON_COLORS",
     "PymolControlBar",
     "PymolDockWidget",
     "PymolPresetSpec",
