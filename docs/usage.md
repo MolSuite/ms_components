@@ -178,6 +178,19 @@ panel.show()
 
 ## Projects, settings, and PyMOL
 
+Applications embedding PyMOL should call
+`ms_components.opengl.prepare_pymol_opengl()` **before creating `QApplication`**.
+It requests desktop OpenGL and shared contexts, then checks the actual context
+and compiles legacy GLSL shaders in an isolated process. A failed native check
+can select `xcb` on Linux only when an X11 display passes the same check and
+`QT_QPA_PLATFORM` was not explicitly set. Windows and macOS retain their native
+platforms. If no tested backend works, it raises `RuntimeError` before the
+application starts. Skip this call when PyMOL is disabled or running headlessly.
+
+`PymolDockWidget` also requests desktop OpenGL on its own widget and validates
+the actual context before drawing. An incompatible context displays an error
+in the viewer instead of passing it to PyMOL.
+
 - `ProjectsMenuWidget(app_id=...)` and `ProjectBrowserWindow(app_id=...)` list
   and create projects through the public `ms_flow` project catalog. Connect
   `project_requested` to open the chosen project; do not read the MolSuite
