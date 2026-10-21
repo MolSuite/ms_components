@@ -234,11 +234,13 @@ class QueryBuilder:
         attr = self._resolve_attr(sort.field)
         if attr is None:
             return pk > pk_value
+        # SQLite puts NULLs first ascending and last descending.
+        rest_of_nulls = and_(attr.is_(None), pk > pk_value)
         if sort_value is None:
-            # NULLs come first in ascending SQLite: past the null block, anything goes.
-            return attr.is_not(None) if not sort.descending else and_(attr.is_(None), pk > pk_value)
-        ahead = attr < sort_value if sort.descending else attr > sort_value
-        return or_(ahead, and_(attr == sort_value, pk > pk_value))
+            return or_(attr.is_not(None), rest_of_nulls) if not sort.descending else rest_of_nulls
+        if sort.descending:
+            return or_(attr < sort_value, and_(attr == sort_value, pk > pk_value), attr.is_(None))
+        return or_(attr > sort_value, and_(attr == sort_value, pk > pk_value))
 
     def fetch(self) -> tuple[list[dict], int]:
         """Run the query and return (rows_as_dicts, total_count)."""

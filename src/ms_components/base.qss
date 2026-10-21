@@ -64,6 +64,19 @@ QProgressBar#ToolProgress::chunk {
     background: palette(highlight);
 }
 
+/* ms_table: a PROGRESS cell, a filled bar with its text on top. The fill color is
+   the `tone` property, from the theme accents (theme.tone_qss). The track is the
+   header tone: it keeps text contrast and stands out from the rows. */
+QProgressBar#CellProgress {
+    border: none;
+    border-radius: 3px;
+    background: palette(dark);
+}
+
+QProgressBar#CellProgress::chunk {
+    border-radius: 3px;
+}
+
 
 /* Left gap for the first tab: `tab-bar { left }` shifts the whole bar.
    Do NOT use margins on ::tab -- Qt places the close button flush to the full
@@ -152,6 +165,14 @@ QToolButton[popupMode="MenuButtonPopup"] {
 QToolButton[popupMode="MenuButtonPopup"]::menu-button {
     border-left: 1px solid palette(mid);
     width: 18px;
+}
+
+/* Qt's own tooltip colours are a pale grey that dark themes leave unreadable. */
+QToolTip {
+    background: palette(window);
+    color: palette(text);
+    border: 1px solid palette(highlight);
+    padding: 4px;
 }
 
 /* Card = content surface. Nav trees/lists stay flat unless opted in. */

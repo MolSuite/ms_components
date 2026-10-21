@@ -58,10 +58,10 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional
 
-from PySide6.QtCore import QModelIndex, QRect, QRectF, QSize, Qt
-from PySide6.QtGui import QImage, QPainter, QPalette, QPixmap
+from PySide6.QtCore import QModelIndex, QPoint, QRect, QRectF, QSize, Qt
+from PySide6.QtGui import QImage, QPainter, QPixmap, QRegion
 from PySide6.QtWidgets import (
-    QApplication, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
+    QApplication, QProgressBar, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
     QWidget,
 )
 
@@ -159,6 +159,8 @@ class CellWidgetDelegate(QStyledItemDelegate):
         # Persistent widget cache: row → QWidget
         # Invalidated when the page changes (load_data)
         self._persistent_widgets: dict[int, QWidget] = {}
+        # PROGRESS cells: one hidden bar per tone, so the tone property is set once.
+        self._progress_bars: dict[str, QProgressBar] = {}
 
     # ── Invalidate the cache on page change ───────────────────────────────
 
@@ -185,30 +187,40 @@ class CellWidgetDelegate(QStyledItemDelegate):
 
         row_data = self._get_row_data(index)
 
-        # ── progress mode: a fraction 0..1 as the style's own progress bar ──
+        # ── progress mode: a fraction 0..1 (or value/max) as the style's own progress bar ──
         if col_def.kind == ColumnKind.PROGRESS:
             try:
-                fraction = min(max(float(row_data.get(col_def.display_key) or 0.0), 0.0), 1.0)
+                value = float(row_data.get(col_def.display_key) or 0.0)
+                maximum = float(row_data.get(col_def.progress_max) or 0.0) if col_def.progress_max else 1.0
+                fraction = min(max(value / maximum, 0.0), 1.0) if maximum > 0 else 0.0
             except (TypeError, ValueError):
-                fraction = 0.0
-            # ponytail: painted by hand: CE_ProgressBar under an app stylesheet draws the
-            # table's rules, not QProgressBar's, and a partial chunk came out as a line.
-            rect, pal = QRectF(option.rect.adjusted(4, 5, -4, -5)), option.palette
-            painter.save()
-            painter.setRenderHint(QPainter.Antialiasing)
-            # A selected row is Highlight already: the track goes Base so the fill still shows.
-            track = pal.color(QPalette.Base) if option.state & QStyle.State_Selected else pal.color(QPalette.Text)
-            if not option.state & QStyle.State_Selected:
-                track.setAlpha(40)
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(track)
-            painter.drawRoundedRect(rect, 3, 3)
-            if fraction > 0:
-                painter.setBrush(pal.color(QPalette.Highlight))
-                painter.drawRoundedRect(QRectF(rect.x(), rect.y(), rect.width() * fraction, rect.height()), 3, 3)
-            painter.setPen(pal.color(QPalette.Text))
-            painter.drawText(rect, Qt.AlignCenter, f"{int(fraction * 100)}%")  # floored: 99.9% is not "100%"
-            painter.restore()
+                value, maximum, fraction = 0.0, 0.0, 0.0
+            text = f"{int(fraction * 100)}%"  # floored: 99.9% is not "100%"
+            if col_def.progress_max:
+                text = f"{int(value):,}/{int(maximum):,} ({text})"
+            tone = col_def.progress_tone(row_data) if col_def.progress_tone else "green"
+            # A hidden QProgressBar paints the cell, so the bar is the native one and its look is
+            # QSS (`QProgressBar#CellProgress`, `[tone=...]`). render(), not drawControl(): under a
+            # stylesheet drawControl lays the chunk out from the widget, not from the option. Into a
+            # pixmap: rendered on the view's painter it ignores the viewport offset and lands under
+            # the headers.
+            bar = self._progress_bars.get(tone)
+            if bar is None:
+                bar = self._progress_bars[tone] = QProgressBar()
+                bar.setObjectName("CellProgress")
+                bar.setProperty("tone", tone)
+                bar.setRange(0, 1000)
+                bar.setAlignment(Qt.AlignCenter)
+            bar.setValue(int(fraction * 1000))
+            bar.setFormat(text)
+            rect = option.rect.adjusted(4, 5, -4, -5)
+            bar.resize(rect.size())
+            ratio = painter.device().devicePixelRatioF()
+            pixmap = QPixmap(rect.size() * ratio)
+            pixmap.setDevicePixelRatio(ratio)
+            pixmap.fill(Qt.transparent)
+            bar.render(pixmap, QPoint(), QRegion(), QWidget.DrawChildren)
+            painter.drawPixmap(rect.topLeft(), pixmap)
             return
 
         # ── paint_factory mode (SVG / image) ───────────────────────────────

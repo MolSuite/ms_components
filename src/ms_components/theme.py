@@ -276,6 +276,25 @@ def resolve(name: str) -> str:
     return DEFAULT_DARK if scheme == Qt.ColorScheme.Dark else DEFAULT_LIGHT
 
 
+#: The accents a widget can wear through `setProperty("tone", name)`.
+TONES = ("green", "red")
+
+
+def tone_qss(theme: dict[str, str] | None = None) -> str:
+    """`QProgressBar[tone="green"]` and siblings, from the live theme.
+
+    QSS has no palette role for the accents, so these rules are written per theme.
+    Translucent, so the bar's text stays readable on dark and light themes alike.
+    """
+    theme = theme or _current
+    rules = []
+    for tone in TONES:
+        accent = QColor(theme[tone])
+        rgba = f"rgba({accent.red()}, {accent.green()}, {accent.blue()}, 150)"
+        rules.append(f'QProgressBar[tone="{tone}"]::chunk {{ background: {rgba}; }}')
+    return "\n".join(rules) + "\n"
+
+
 def base_qss() -> str:
     """The shared geometry stylesheet (colors resolved from the live palette)."""
     return files(__package__).joinpath("base.qss").read_text(encoding="utf-8")
@@ -297,7 +316,7 @@ def apply_theme(name: str, app: QApplication | None = None, *,
         set_base_font(base_font_pt, app=app)
     app.setStyle("Fusion")  # Fusion honors QPalette ColorRoles most faithfully
     app.setPalette(build_palette(_current))
-    app.setStyleSheet(base_qss())
+    app.setStyleSheet(base_qss() + tone_qss())
 
 
 if __name__ == "__main__":

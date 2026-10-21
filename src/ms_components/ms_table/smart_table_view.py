@@ -154,6 +154,15 @@ class SmartTableView(QWidget):
             self._infinite_total_hint = total
             self._infinite_total_exact = True
             self._infinite_has_more = self._infinite_loaded_end < total
+            tail = self._infinite_pages.get(self._infinite_frontier_page)
+            if tail is not None and len(tail) < self._builder.page_size and self._infinite_has_more:
+                # The last page came back short and rows were added since: forget it, so the
+                # autofill set_total() triggers fetches it again once it is in view. Kept, its
+                # rows past the old end would stay blank forever.
+                del self._infinite_pages[self._infinite_frontier_page]
+                # The next page's cursor is the short page's last row: wrong now, so it is
+                # found by offset instead.
+                self._infinite_page_cursors.pop(self._infinite_frontier_page + 1, None)
         self._model.set_total(total)
         return True
 
@@ -749,8 +758,9 @@ class SmartTableView(QWidget):
         self.load_next_page()
 
     def _on_refresh_clicked(self):
-        # Reload this table, then let the host (e.g. DockingStudio) refresh surrounding state.
-        self.refresh()
+        # Reload this table where the user is looking (scroll and selection kept), then let
+        # the host (e.g. DockingStudio) refresh surrounding state.
+        self.refresh_preserving_view()
         self.refresh_clicked.emit()
 
     # ──────────────────────────────────────────
