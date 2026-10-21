@@ -169,3 +169,57 @@ def test_refresh_while_scrolled_loads_the_rows_on_screen(db):
         # and the right row, not a neighbouring page's: the window is one contiguous run
         assert view._model.get_raw_object(row).id == row + 1
     view.close()
+
+
+def test_rows_added_after_a_short_last_page_get_fetched_not_left_blank():
+    """A running job: the first load brought 3 rows, refresh_counts() then says 30. The
+    short page must be fetched again, or rows 3..29 show as blank rows forever."""
+    app = QApplication.instance() or QApplication(["ms-table-tail-test"])
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=None)
+    SQLModel.metadata.create_all(engine, tables=[Hit.__table__])
+    add = lambda ids: (lambda s: (s.add_all([Hit(id=i, name=f"l{i}") for i in ids]), s.commit()))(Session(engine))
+    add(range(1, 4))
+    view = SmartTableView(_Db(engine), _config())
+    view.resize(600, 900)
+    view.show()
+    app.processEvents()
+    assert view._model.loaded_count == 3
+
+    for end in (11, 31):  # the job keeps going: every tick, more rows
+        add(range(view._model.rowCount() + 1, end))
+        assert view.refresh_counts()
+        for _ in range(5):
+            app.processEvents()
+        assert view._model.rowCount() == end - 1
+        assert [view._model.get_raw_object(row).id for row in range(end - 1)] == list(range(1, end))
+    view.close()
+
+
+
+class Gap(SQLModel, table=True):
+    __tablename__ = "gap"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    score: Optional[float] = None
+
+
+@pytest.mark.parametrize("descending", [False, True])
+def test_keyset_walks_a_null_block_longer_than_a_page(descending):
+    """A ΔΔG column is NULL for every ligand without that off-target: the walk must keep
+    the whole null block (ascending: first; descending: last), not drop it after page 1."""
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=None)
+    SQLModel.metadata.create_all(engine, tables=[Gap.__table__])
+    with Session(engine) as session:
+        session.add_all([Gap(id=i, score=None if i % 3 else float(i)) for i in range(1, 351)])
+        session.commit()
+    config = TableConfig(model_class=Gap, columns=[ColumnDef("score")], page_size=PAGE,
+                         load_mode=TableLoadMode.INFINITE,
+                         default_sort=[SortSpec("score", descending=descending)])
+    builder = QueryBuilder(_Db(engine), config)
+    seen, cursor = [], None
+    while True:
+        rows, has_more = builder.fetch_window_after(cursor)
+        seen += [row["__raw__"].id for row in rows]
+        if not has_more:
+            break
+        cursor = builder.cursor_of(rows[-1])
+    assert sorted(seen) == list(range(1, 351))

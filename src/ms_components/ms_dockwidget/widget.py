@@ -734,7 +734,10 @@ class VerticalToolbar(QWidget):
                 yield w
 
     def _layout_has_buttons(self, layout: QVBoxLayout) -> bool:
-        return any(True for _ in self._iter_buttons(layout))
+        # Action buttons (no dock_id) count too: a section holding only those is not empty.
+        return any(
+            isinstance(layout.itemAt(i).widget(), QToolButton) for i in range(layout.count())
+        )
 
     def _update_separator_visibility(self):
         self._separator.setVisible(

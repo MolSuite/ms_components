@@ -70,7 +70,7 @@ class ColumnKind(str, Enum):
     NUMBER  = "number"
     INTEGER = "integer"
     CHOICE  = "choice"
-    # A fraction 0..1 drawn as a progress bar with its percentage (no formatter: the bar needs the number).
+    # A fraction 0..1 (or a count, with `progress_max`) drawn as a progress bar with its percentage.
     PROGRESS = "progress"
 
 
@@ -109,6 +109,11 @@ class ColumnDef:
         expr:       SQLAlchemy expression producing the column value, for anything
                     that is not a model attribute (JSON_EXTRACT, CASE, func.*).
                     When set, `field` is only the key/label.
+        progress_max: PROGRESS columns only: the row key holding the maximum. Set, the
+                    value is a count and the bar reads "value/max (pct%)", as
+                    QProgressBar's "%v/%m (%p%)"; unset, the value is a 0..1 fraction.
+        progress_tone: PROGRESS columns only: callable(row_data) → a theme accent
+                    ("green", "red"), the bar's `tone` property. Unset, "green".
     """
     field:      str
     label:      Optional[str]          = None
@@ -130,6 +135,8 @@ class ColumnDef:
     tooltip:    Any                    = None   # str | Callable
     db_column:  Optional[str]          = None
     expr:       Any                    = None   # SQLAlchemy ColumnElement
+    progress_max: Optional[str]        = None
+    progress_tone: Optional[Callable]  = None
 
     # ── Fields for rendering widgets inside a cell ──────────────────────
     #
