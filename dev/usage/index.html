@@ -756,6 +756,17 @@ Both widgets go through the <code>Workspace</code>, which refuses what cannot be
 <span class="n">panel</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </code></pre></div>
 <h2 id="projects-settings-and-pymol">Projects, settings, and PyMOL<a class="headerlink" href="#projects-settings-and-pymol" title="Permanent link">&para;</a></h2>
+<p>Applications embedding PyMOL should call
+<code>ms_components.opengl.prepare_pymol_opengl()</code> <strong>before creating <code>QApplication</code></strong>.
+It requests desktop OpenGL and shared contexts, then checks the actual context
+and compiles legacy GLSL shaders in an isolated process. A failed native check
+can select <code>xcb</code> on Linux only when an X11 display passes the same check and
+<code>QT_QPA_PLATFORM</code> was not explicitly set. Windows and macOS retain their native
+platforms. If no tested backend works, it raises <code>RuntimeError</code> before the
+application starts. Skip this call when PyMOL is disabled or running headlessly.</p>
+<p><code>PymolDockWidget</code> also requests desktop OpenGL on its own widget and validates
+the actual context before drawing. An incompatible context displays an error
+in the viewer instead of passing it to PyMOL.</p>
 <ul>
 <li><code>ProjectsMenuWidget(app_id=...)</code> and <code>ProjectBrowserWindow(app_id=...)</code> list
   and create projects through the public <code>ms_flow</code> project catalog. Connect
