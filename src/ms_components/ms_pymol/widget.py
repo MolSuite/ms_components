@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
@@ -7,11 +8,12 @@ from pathlib import Path
 from typing import Any
 
 from ms_components.ms_dockwidget.widget import MSDockWidget
+from ms_components.opengl import pymol_context_error, pymol_surface_format
 
 os.environ.setdefault("QT_API", "pyside6")
 
 from PySide6.QtCore import QByteArray, QEvent, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QActionGroup, QIcon, QPainter, QPixmap
+from PySide6.QtGui import QAction, QActionGroup, QGuiApplication, QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QFrame,
@@ -34,6 +36,44 @@ except ImportError:
 
 # Ensure helper commands like cmd.draw_box are registered on the embedded PyMOL cmd.
 from . import plugins as _pymol_plugins  # noqa: F401
+
+
+class _PymolGLWidget(PyMOLGLWidget):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self._opengl_error: str | None = None
+        self._opengl_error_label: QLabel | None = None
+        if hasattr(self, "setFormat"):
+            self.setFormat(pymol_surface_format(self.format()))
+
+    def initializeGL(self):
+        context = self.context()
+        self._opengl_error = pymol_context_error(context)
+        if self._opengl_error_label is not None:
+            self._opengl_error_label.hide()
+        if self._opengl_error:
+            logging.getLogger(__name__).error(self._opengl_error)
+            if self._opengl_error_label is None:
+                self._opengl_error_label = QLabel(self)
+                self._opengl_error_label.setWordWrap(True)
+                QVBoxLayout(self).addWidget(self._opengl_error_label)
+            self._opengl_error_label.setText(f"PyMOL viewer unavailable.\n{self._opengl_error}")
+            self._opengl_error_label.show()
+            return
+        fmt = context.format()
+        logging.getLogger(__name__).info(
+            "PyMOL context: %s, OpenGL %s.%s %s",
+            QGuiApplication.platformName(), *fmt.version(), fmt.profile().name,
+        )
+        super().initializeGL()
+
+    def paintGL(self):
+        if self._opengl_error is None:
+            super().paintGL()
+
+    def resizeGL(self, width, height):
+        if self._opengl_error is None:
+            super().resizeGL(width, height)
 
 
 SELECTION_MODES = (
@@ -736,7 +776,7 @@ class PymolDockWidget(MSDockWidget):
 
     def __init__(self, title: str, manager, parent=None):
         super().__init__(title, manager, parent)
-        self.pymol_widget = PyMOLGLWidget(self)
+        self.pymol_widget = _PymolGLWidget(self)
         if self.cmd is not None:
             self.cmd.set("internal_gui", False)
 
