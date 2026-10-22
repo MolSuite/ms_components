@@ -311,8 +311,8 @@ class AppSettingsPanel(QWidget):
                 font-weight: 700;
             }
             QLabel#sourceDefault { color: palette(text); background: rgba(128, 128, 128, 0.18); }
-            QLabel#sourceGlobal { color: #4c9be8; background: rgba(76, 155, 232, 0.16); }
-            QLabel#sourceProject { color: #34c88a; background: rgba(52, 200, 138, 0.16); }
+            QLabel#sourceGlobal { background: rgba(76, 155, 232, 0.16); }
+            QLabel#sourceProject { background: rgba(52, 200, 138, 0.16); }
             """
         )
 
@@ -743,6 +743,7 @@ class AppSettingsPanel(QWidget):
         normalized = source if source in _SOURCE_LABELS else "default"
         label.setText(_SOURCE_LABELS[normalized])
         label.setObjectName(f"source{normalized.title()}")
+        label.setProperty("tone", {"global": "blue", "project": "green"}.get(normalized, ""))  # theme text hue
         label.style().unpolish(label)
         label.style().polish(label)
 

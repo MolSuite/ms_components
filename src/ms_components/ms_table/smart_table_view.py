@@ -57,7 +57,6 @@ from PySide6.QtWidgets import (
     QHeaderView, QLabel, QMenu, QPushButton, QSizePolicy, QFrame,
     QTableView, QToolBar, QToolButton, QVBoxLayout, QWidget
 )
-from ..theme import color
 from .action_header import ActionHeader, FilterPopup, SearchPopup
 from .cell_delegate import CellWidgetDelegate
 from .column_panel import ColumnConfigDialog
@@ -849,14 +848,14 @@ class SmartTableView(QWidget):
     def _apply_toolbar_chrome(self) -> None:
         """Paint the toolbar as a band so the actions read as chrome, not as content.
 
-        `surface0` and not a palette role: window/base/alternate-base are within a couple
-        of steps of each other in the flat light themes, so a role-based fill separates
-        nothing. Re-applied on PaletteChange, so it still follows a live theme switch.
+        The header's tone (`dark`): window/base/alternate-base are within a couple of steps
+        of each other in the flat light themes, so they separate nothing. Re-applied on
+        PaletteChange, so it still follows a live theme switch.
         """
         if self._toolbar_row is None:
             return
         self._toolbar_row.setStyleSheet(
-            f"#SmartTableToolbar {{ background: {color('surface0').name()};"
+            "#SmartTableToolbar { background: palette(dark);"
             " border-bottom: 1px solid palette(mid); }"
             " QToolBar { background: transparent; border: 0; }"
         )
