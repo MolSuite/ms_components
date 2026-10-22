@@ -377,6 +377,8 @@ class TableConfig:
     # action (import, create), a button that triggers it is more useful than
     # `empty_message`. When set it replaces the text. `on_click` receives [].
     empty_action:           Optional["ToolbarAction"]  = None
+    # Faint illustration under the empty state (a QIcon; see ms_components.backdrop).
+    empty_backdrop:         Optional[Any]              = None
     # (row_data: dict) -> QColor | None. Tints a whole row from host state that is not a
     # column (a marked/selected set, a validation flag). None = leave the default painting.
     row_background:         Optional[Callable]         = None

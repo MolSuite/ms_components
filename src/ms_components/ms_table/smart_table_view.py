@@ -57,6 +57,7 @@ from PySide6.QtWidgets import (
     QHeaderView, QLabel, QMenu, QPushButton, QSizePolicy, QFrame,
     QTableView, QToolBar, QToolButton, QVBoxLayout, QWidget
 )
+from ..backdrop import Backdrop
 from .action_header import ActionHeader, FilterPopup, SearchPopup
 from .cell_delegate import CellWidgetDelegate
 from .column_panel import ColumnConfigDialog
@@ -334,21 +335,26 @@ class SmartTableView(QWidget):
         self._empty_label.setObjectName("EmptyLabel")
         self._empty_label.setAlignment(Qt.AlignCenter)
         action = self._config.empty_action
-        if action is None:
+        if action is None and self._config.empty_backdrop is None:
             self._empty_widget = self._empty_label
         else:
-            self._empty_widget = QWidget()
+            self._empty_widget = Backdrop(self._config.empty_backdrop, opacity=0.08)
             empty_layout = QVBoxLayout(self._empty_widget)
             empty_layout.setAlignment(Qt.AlignCenter)
             empty_layout.setSpacing(12)
+            self._empty_label.setStyleSheet("font-size: 16px;")
+            empty_layout.addWidget(self._empty_label)
+        if action is not None:
             button = QPushButton(action.label)
             button.setObjectName("EmptyActionButton")
             if action.icon is not None:
                 button.setIcon(action.icon)
             button.setToolTip(action.tooltip or action.label)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setStyleSheet("font-size: 15px; padding: 8px 24px;")
             if action.on_click is not None:
                 button.clicked.connect(lambda _=False, cb=action.on_click: cb([]))
-            empty_layout.addWidget(self._empty_label)
+            empty_layout.addSpacing(16)
             empty_layout.addWidget(button, alignment=Qt.AlignCenter)
         self._empty_widget.setVisible(False)
         root.addWidget(self._empty_widget, stretch=1)
