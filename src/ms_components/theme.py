@@ -1,7 +1,6 @@
 """Color themes for every MolSuite Qt app (QPalette-based).
 
-Palette data and the QPalette role mapping are derived from **qt-themes** by
-Beat Reichenbach, MIT-licensed:
+Palette data is derived from **qt-themes** by Beat Reichenbach, MIT-licensed:
 
     https://github.com/beatreichenbach/qt-themes
     Copyright (c) 2024 Beat Reichenbach
@@ -25,12 +24,38 @@ from __future__ import annotations
 
 from importlib.resources import files
 
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette, QPen
+from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle
 
 from ms_components.palettes import DEFAULT_DARK, DEFAULT_LIGHT, THEMES
 
 _current: dict[str, str] = THEMES[DEFAULT_DARK]
+
+#: theme key -> QPalette role (the keys are the roles in snake_case).
+_ROLES = {
+    "window": QPalette.ColorRole.Window,
+    "window_text": QPalette.ColorRole.WindowText,
+    "base": QPalette.ColorRole.Base,
+    "alternate_base": QPalette.ColorRole.AlternateBase,
+    "tooltip_base": QPalette.ColorRole.ToolTipBase,
+    "tooltip_text": QPalette.ColorRole.ToolTipText,
+    "placeholder_text": QPalette.ColorRole.PlaceholderText,
+    "text": QPalette.ColorRole.Text,
+    "button": QPalette.ColorRole.Button,
+    "button_text": QPalette.ColorRole.ButtonText,
+    "bright_text": QPalette.ColorRole.BrightText,
+    "light": QPalette.ColorRole.Light,
+    "midlight": QPalette.ColorRole.Midlight,
+    "mid": QPalette.ColorRole.Mid,
+    "dark": QPalette.ColorRole.Dark,
+    "shadow": QPalette.ColorRole.Shadow,
+    "highlight": QPalette.ColorRole.Highlight,
+    "highlighted_text": QPalette.ColorRole.HighlightedText,
+    "link": QPalette.ColorRole.Link,
+    "link_visited": QPalette.ColorRole.LinkVisited,
+    "accent": QPalette.ColorRole.Accent,
+}
 
 _REMOVED_THEME_FALLBACKS = {
     "atom_one": "one_dark_two",
@@ -39,9 +64,9 @@ _REMOVED_THEME_FALLBACKS = {
 
 
 def is_dark(theme: dict[str, str] | None = None) -> bool:
-    """A theme is dark when its text is brighter than its base background."""
+    """A theme is dark when its text is brighter than its window."""
     theme = theme or _current
-    return QColor(theme["text"]).value() > QColor(theme["base"]).value()
+    return QColor(theme["window_text"]).value() > QColor(theme["window"]).value()
 
 
 def current_theme() -> dict[str, str]:
@@ -72,48 +97,6 @@ def contrast_ratio(left: QColor, right: QColor) -> float:
     """WCAG contrast ratio used to keep generated palette states readable."""
     lighter, darker = sorted((_luminance(left), _luminance(right)), reverse=True)
     return (lighter + 0.05) / (darker + 0.05)
-
-
-def _mix(left: QColor, right: QColor, amount: float) -> QColor:
-    return QColor.fromRgbF(*(
-        a + (b - a) * amount
-        for a, b in zip(left.getRgbF(), right.getRgbF())
-    ))
-
-
-def _surface_with_contrast(
-    source: QColor,
-    *,
-    foreground: QColor,
-    adjacent: QColor | tuple[QColor, ...],
-    text_minimum: float,
-    separation_minimum: float,
-) -> QColor:
-    """Closest tint/shade satisfying both readable text and visible separation."""
-    adjacent_colors = adjacent if isinstance(adjacent, tuple) else (adjacent,)
-    targets = (QColor("#000000"), QColor("#ffffff"))
-    for step in range(101):
-        amount = step / 100
-        for target in targets:
-            candidate = _mix(source, target, amount)
-            if (contrast_ratio(foreground, candidate) >= text_minimum
-                    and all(
-                        contrast_ratio(candidate, background) >= separation_minimum
-                        for background in adjacent_colors
-                    )):
-                return candidate
-    return source
-
-
-def _contrasting_text(background: QColor, theme: dict[str, str]) -> QColor:
-    themed = [QColor(theme[key]) for key in ("text", "base", "mantle", "crust")]
-    best = max(themed, key=lambda candidate: contrast_ratio(candidate, background))
-    if contrast_ratio(best, background) >= 4.5:
-        return best
-    return max(
-        (QColor("#000000"), QColor("#ffffff")),
-        key=lambda candidate: contrast_ratio(candidate, background),
-    )
 
 
 #: role -> (scale over the app font, bold). Relative on purpose: the base size is
@@ -175,92 +158,19 @@ def set_base_font(points: float = DEFAULT_FONT_PT, *, family: str | None = None,
 
 
 def build_palette(theme: dict[str, str]) -> QPalette:
-    """Build a QPalette from a theme dict.
-
-    Port of qt-themes' `update_palette` (MIT, Beat Reichenbach), adapted to read
-    from a flat dict instead of a dataclass.
-    """
-    c = lambda role: QColor(theme[role])  # noqa: E731
+    """Build a QPalette from a theme dict: one key per role, plus the Disabled text."""
     Role = QPalette.ColorRole
     Group = QPalette.ColorGroup
     pal = QPalette()
-
-    dark_theme = is_dark(theme)
-    table_base = c("mantle") if dark_theme else c("crust")
-    table_alternate = c("base") if dark_theme else c("mantle")
-    highlight = _surface_with_contrast(
-        c("primary"),
-        foreground=_contrasting_text(c("primary"), theme),
-        adjacent=(table_base, table_alternate),
-        text_minimum=4.5,
-        separation_minimum=3.0,
-    )
-    highlight_text = _contrasting_text(highlight, theme)
-    header = _surface_with_contrast(
-        c("surface1"),
-        foreground=c("text"),
-        adjacent=(table_base, table_alternate),
-        text_minimum=4.5,
-        separation_minimum=1.45,
-    )
-
-    h, s, v, a = c("text").getHsvF()
-    bright_text = QColor.fromHsvF(h, s, 1 - v, a)
-
-    # Active/Normal group
-    if is_dark(theme):
-        pal.setColor(Role.Base, c("mantle"))
-        pal.setColor(Role.AlternateBase, c("base"))
-    else:
-        pal.setColor(Role.Base, c("crust"))
-        pal.setColor(Role.AlternateBase, c("mantle"))
-    pal.setColor(Role.Window, c("base"))
-    pal.setColor(Role.WindowText, c("text"))
-    pal.setColor(Role.PlaceholderText, c("overlay1"))
-    pal.setColor(Role.Text, c("text"))
-    pal.setColor(Role.Button, c("base"))
-    pal.setColor(Role.ButtonText, c("text"))
-    pal.setColor(Role.BrightText, bright_text)
-    pal.setColor(Role.ToolTipBase, c("mantle"))
-    pal.setColor(Role.ToolTipText, c("overlay2"))
-
-    pal.setColor(Role.Highlight, highlight)
-    pal.setColor(Role.HighlightedText, highlight_text)
-    pal.setColor(Role.Link, c("secondary"))
-    pal.setColor(Role.LinkVisited, c("secondary"))
-
-    pal.setColor(Role.Light, c("crust"))
-    pal.setColor(Role.Midlight, c("mantle"))
-    # Mid is *the* border tone: `palette(mid)` is what every stylesheet uses for
-    # hairlines, so it must be the conventional Catppuccin-style separator.
-    pal.setColor(Role.Mid, c("surface2"))
-    pal.setColor(Role.Dark, header)
-    pal.setColor(Role.Shadow, c("overlay0"))
-
-    # Inactive group
-    pal.setColor(Group.Inactive, Role.Highlight, highlight)
-    pal.setColor(Group.Inactive, Role.HighlightedText, highlight_text)
-    pal.setColor(Group.Inactive, Role.Link, c("surface1"))
-    pal.setColor(Group.Inactive, Role.LinkVisited, c("surface1"))
-
-    # Disabled group
-    pal.setColor(Group.Disabled, Role.WindowText, c("overlay1"))
-    pal.setColor(Group.Disabled, Role.Base, c("base"))
-    pal.setColor(Group.Disabled, Role.AlternateBase, c("base"))
-    pal.setColor(Group.Disabled, Role.Text, c("overlay1"))
-    pal.setColor(Group.Disabled, Role.PlaceholderText, c("overlay1"))
-    pal.setColor(Group.Disabled, Role.Button, c("base"))
-    pal.setColor(Group.Disabled, Role.ButtonText, c("overlay1"))
-    pal.setColor(Group.Disabled, Role.BrightText, c("mantle"))
-    pal.setColor(Group.Disabled, Role.Highlight, c("surface2"))
-    pal.setColor(Group.Disabled, Role.HighlightedText, _contrasting_text(c("surface2"), theme))
-    pal.setColor(Group.Disabled, Role.Link, c("surface0"))
-    pal.setColor(Group.Disabled, Role.LinkVisited, c("surface0"))
-
-    pal.setColor(Role.Accent, c("secondary"))
-    pal.setColor(Group.Inactive, Role.Accent, c("surface1"))
-    pal.setColor(Group.Disabled, Role.Accent, c("surface2"))
-
+    for key, role in _ROLES.items():
+        pal.setColor(role, QColor(theme[key]))  # all groups; Disabled is overridden below
+    disabled = QColor(theme["disabled_text"])
+    for role in (Role.WindowText, Role.Text, Role.ButtonText, Role.PlaceholderText, Role.BrightText,
+                 Role.HighlightedText, Role.Link, Role.LinkVisited, Role.Accent):
+        pal.setColor(Group.Disabled, role, disabled)
+    for role in (Role.Base, Role.AlternateBase, Role.Button):
+        pal.setColor(Group.Disabled, role, QColor(theme["window"]))
+    pal.setColor(Group.Disabled, Role.Highlight, QColor(theme["mid"]))
     return pal
 
 
@@ -278,13 +188,15 @@ def resolve(name: str) -> str:
 
 #: The accents a widget can wear through `setProperty("tone", name)`.
 TONES = ("green", "red")
+HUES = ("red", "orange", "yellow", "green", "cyan", "blue", "magenta")
 
 
 def tone_qss(theme: dict[str, str] | None = None) -> str:
-    """`QProgressBar[tone="green"]` and siblings, from the live theme.
+    """`QProgressBar[tone="green"]`, `QLabel[tone="blue"]` and siblings, from the live theme.
 
     QSS has no palette role for the accents, so these rules are written per theme.
-    Translucent, so the bar's text stays readable on dark and light themes alike.
+    Bars are translucent, so their text stays readable on dark and light themes alike;
+    labels take the hue as text (every hue is >= 4.5:1 on the theme's surfaces).
     """
     theme = theme or _current
     rules = []
@@ -292,12 +204,44 @@ def tone_qss(theme: dict[str, str] | None = None) -> str:
         accent = QColor(theme[tone])
         rgba = f"rgba({accent.red()}, {accent.green()}, {accent.blue()}, 150)"
         rules.append(f'QProgressBar[tone="{tone}"]::chunk {{ background: {rgba}; }}')
+    rules += [f'QLabel[tone="{hue}"] {{ color: {theme[hue]}; }}' for hue in HUES]
     return "\n".join(rules) + "\n"
 
 
 def base_qss() -> str:
     """The shared geometry stylesheet (colors resolved from the live palette)."""
     return files(__package__).joinpath("base.qss").read_text(encoding="utf-8")
+
+
+class _EdgedFusion(QProxyStyle):
+    """Fusion with checkbox/radio outlines in `shadow`.
+
+    Fusion draws them as `window.darker(140)`, which no palette role reaches and which
+    sits near 1.5:1 in most themes. A QSS `::indicator` rule would replace the check mark
+    too, so the outline is redrawn on top of Fusion's own indicator instead.
+    """
+
+    def __init__(self):
+        super().__init__("Fusion")
+
+    def drawPrimitive(self, element, option, painter, widget=None):
+        super().drawPrimitive(element, option, painter, widget)
+        if element not in (QStyle.PrimitiveElement.PE_IndicatorCheckBox,
+                           QStyle.PrimitiveElement.PE_IndicatorRadioButton):
+            return
+        if not option.state & QStyle.StateFlag.State_Enabled:
+            return  # disabled keeps Fusion's faint edge: it should read as "off"
+        painter.save()
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        edge = option.palette.color(QPalette.ColorRole.Shadow)
+        if element == QStyle.PrimitiveElement.PE_IndicatorCheckBox:
+            painter.setPen(QPen(edge, 1))
+            painter.drawRect(option.rect.adjusted(0, 0, -1, -1))
+        else:  # 1.5 px antialiased: a 1 px ring blurs to ~2.7:1
+            painter.setRenderHint(painter.RenderHint.Antialiasing)
+            painter.setPen(QPen(edge, 1.5))
+            painter.drawEllipse(option.rect.toRectF().adjusted(1.5, 1.5, -1.5, -1.5))
+        painter.restore()
 
 
 def apply_theme(name: str, app: QApplication | None = None, *,
@@ -314,7 +258,8 @@ def apply_theme(name: str, app: QApplication | None = None, *,
     _current = THEMES[resolve(name)]
     if base_font_pt is not None:  # optional: omit it and the system font stays
         set_base_font(base_font_pt, app=app)
-    app.setStyle("Fusion")  # Fusion honors QPalette ColorRoles most faithfully
+    if not isinstance(app.style(), _EdgedFusion):
+        app.setStyle(_EdgedFusion())  # Fusion honors QPalette ColorRoles most faithfully
     app.setPalette(build_palette(_current))
     app.setStyleSheet(base_qss() + tone_qss())
 
@@ -322,7 +267,7 @@ def apply_theme(name: str, app: QApplication | None = None, *,
 if __name__ == "__main__":
     # Self-check: every theme builds a palette; light/dark classification holds.
     for _name, _t in THEMES.items():
-        assert set(_t) >= {"text", "base", "primary", "mantle", "surface2"}, _name
+        assert set(_t) >= set(_ROLES) | {"disabled_text", *HUES}, _name
         assert build_palette(_t).color(QPalette.ColorRole.Window).isValid(), _name
     assert is_dark(THEMES["dracula"]) is True
     assert is_dark(THEMES["catppuccin_latte"]) is False

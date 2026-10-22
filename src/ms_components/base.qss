@@ -111,7 +111,8 @@ QTextEdit,
 QSpinBox,
 QDoubleSpinBox,
 QComboBox {
-    border: 1px solid palette(mid);
+    /* shadow = the control edge (3:1 on every surface); mid stays for hairlines */
+    border: 1px solid palette(shadow);
     border-radius: 4px;
     padding: 3px 6px;
 }
@@ -136,7 +137,7 @@ QComboBox:focus {
 }
 
 QPushButton {
-    border: 1px solid palette(mid);
+    border: 1px solid palette(shadow);
     border-radius: 4px;
     padding: 5px 14px;
 }
@@ -154,16 +155,27 @@ QPushButton:default {
     border-color: palette(highlight);
 }
 
+QLineEdit:disabled,
+QPlainTextEdit:disabled,
+QTextEdit:disabled,
+QSpinBox:disabled,
+QDoubleSpinBox:disabled,
+QComboBox:disabled,
+QPushButton:disabled,
+QToolButton[popupMode="MenuButtonPopup"]:disabled {
+    border-color: palette(mid);
+}
+
 /* A split button (QToolButton with a menu arrow) is an action button, not a toolbar icon:
    framed like QPushButton, the arrow in its own segment. */
 QToolButton[popupMode="MenuButtonPopup"] {
-    border: 1px solid palette(mid);
+    border: 1px solid palette(shadow);
     padding: 5px 14px;
     padding-right: 24px;
 }
 
 QToolButton[popupMode="MenuButtonPopup"]::menu-button {
-    border-left: 1px solid palette(mid);
+    border-left: 1px solid palette(shadow);
     width: 18px;
 }
 
