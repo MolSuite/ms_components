@@ -47,8 +47,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 from PySide6.QtCore import (
-    QByteArray, QEvent, QItemSelectionModel, QSize, QSortFilterProxyModel,
-    Qt, QTimer, Signal,
+    QByteArray, QEvent, QItemSelectionModel, QObject, QRunnable, QSize,
+    QSortFilterProxyModel, Qt, QThreadPool, QTimer, Signal,
 )
 from PySide6.QtGui import QAction, QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
@@ -68,6 +68,24 @@ from .table_config import ColumnDef, ColumnKind, FilterOperator, FilterSpec, Sor
 from .table_model import RAW_OBJECT_ROLE, SmartTableModel
 
 _TOOLBAR_ICONS = Path(__file__).parent / "icons"
+
+
+class _Delivery(QObject):
+    """Carries a worker's result back to the GUI thread (queued signal)."""
+    done = Signal(object, object)
+
+
+class _Query(QRunnable):
+    def __init__(self, fn, finish, delivery: _Delivery):
+        super().__init__()
+        self._fn, self._finish, self._delivery = fn, finish, delivery
+
+    def run(self) -> None:
+        try:
+            result = self._fn()
+        except Exception as exc:  # re-raised on the GUI thread, like a synchronous query
+            result = exc
+        self._delivery.done.emit(self._finish, result)
 
 
 class SmartTableView(QWidget):
@@ -113,6 +131,11 @@ class SmartTableView(QWidget):
         # How far the scroll has reached, in rows. Not `loaded_count`: the window drops
         # pages behind the cursor, so that one shrinks while this keeps growing.
         self._infinite_loaded_end = 0
+        # Bumped whenever the query changes: a worker's result from an older one is dropped.
+        self._generation = 0
+        self._jumps_in_flight = 0
+        self._delivery = _Delivery(self)
+        self._delivery.done.connect(lambda finish, result: finish(result))
         self._active_popup: QWidget | None = None
 
         self._setup_ui()
@@ -149,7 +172,10 @@ class SmartTableView(QWidget):
         """
         if self._model.loaded_count == 0:
             return False
-        total = self._builder.count()
+        self._run_async(self._builder.count, self._apply_count)
+        return True
+
+    def _apply_count(self, total: int) -> None:
         if self._is_infinite_mode():
             self._infinite_total_hint = total
             self._infinite_total_exact = True
@@ -164,7 +190,6 @@ class SmartTableView(QWidget):
                 # found by offset instead.
                 self._infinite_page_cursors.pop(self._infinite_frontier_page + 1, None)
         self._model.set_total(total)
-        return True
 
     def _viewport_row_capacity(self) -> int:
         """How many rows fit in the visible viewport (minimum 1)."""
@@ -200,28 +225,37 @@ class SmartTableView(QWidget):
         selected_ids = self._selected_object_ids()
         if self._is_infinite_mode():
             page_index = max(0, vertical_scroll // self._builder.page_size)
-            rows, has_more = self._builder.fetch_window_at(page_index)
-            self._infinite_pages = {page_index: rows}
-            self._infinite_page_cursors = {0: None} if page_index == 0 else {}
-            if rows:
-                self._infinite_page_cursors[page_index + 1] = self._builder.cursor_of(rows[-1])
-            end = page_index * self._builder.page_size + len(rows)
-            total = self._builder.count()
-            self._infinite_frontier_page = page_index
-            self._infinite_loaded_end = end
-            self._infinite_has_more = bool(rows) and end < total
-            self._infinite_total_hint = total
-            self._infinite_total_exact = True
-            self._model.load_data(
-                rows,
-                self._infinite_total_hint,
-                page_index + 1,
-                window_start=page_index * self._builder.page_size,
-                total_is_exact=self._infinite_total_exact,
-            )
-            self._restore_selected_object_ids(selected_ids)
-            self._table.verticalScrollBar().setValue(vertical_scroll)
-            self._table.horizontalScrollBar().setValue(horizontal_scroll)
+            cursor = self._infinite_page_cursors.get(page_index, False)
+            self._new_generation()
+
+            def show(result) -> None:
+                rows, has_more = result
+                self._infinite_pages = {page_index: rows}
+                self._infinite_page_cursors = {page_index: cursor} if cursor is not False else {}
+                self._infinite_page_cursors.setdefault(0, None)
+                if rows:
+                    self._infinite_page_cursors[page_index + 1] = self._builder.cursor_of(rows[-1])
+                end = page_index * self._builder.page_size + len(rows)
+                self._infinite_frontier_page = page_index
+                self._infinite_loaded_end = end
+                self._infinite_has_more = has_more
+                self._infinite_total_hint = max(self._infinite_total_hint, end + int(has_more))
+                self._model.load_data(
+                    rows,
+                    self._infinite_total_hint,
+                    page_index + 1,
+                    window_start=page_index * self._builder.page_size,
+                    total_is_exact=self._infinite_total_exact,
+                )
+                self._restore_selected_object_ids(selected_ids)
+                self._table.verticalScrollBar().setValue(vertical_scroll)
+                self._table.horizontalScrollBar().setValue(horizontal_scroll)
+
+            if cursor is not False:  # the page's own cursor: a keyset seek, cheap enough here
+                show(self._builder.fetch_window_after(cursor))
+            else:
+                self._jump(lambda: self._builder.fetch_window_at(page_index), show)
+            self._run_async(self._builder.count, self._apply_count)
             return
         current_page = self._builder.current_page
 
@@ -326,6 +360,10 @@ class SmartTableView(QWidget):
         self._install_delegates()
 
         root.addWidget(self._table, stretch=1)
+        self._loading_overlay = QLabel("Loading…", self._table.viewport())
+        self._loading_overlay.setAlignment(Qt.AlignCenter)
+        self._loading_overlay.setAutoFillBackground(True)
+        self._loading_overlay.hide()
 
         # ── Empty state overlay ──────────────
         # With `empty_action`, a button sits under the message and triggers the
@@ -710,7 +748,6 @@ class SmartTableView(QWidget):
 
     def _on_row_clicked(self, index):
         raw = self._model.data(index, RAW_OBJECT_ROLE)
-        print(f"{raw = }")
         if raw is not None:
             self.row_clicked.emit(raw)
 
@@ -1157,26 +1194,31 @@ class SmartTableView(QWidget):
         """Reload data from the DB with the current filter/sort/page state."""
         if self._is_infinite_mode():
             self._builder.set_page(1)
-            rows, _has_more = self._builder.fetch_window_after(None)
+            self._new_generation()
+            # The first page stays on this thread (hosts select it right after refresh());
+            # it is a keyset seek. The COUNT is what costs at millions of rows.
+            rows, has_more = self._builder.fetch_window_after(None)
             self._infinite_pages = {0: rows}
             self._infinite_page_cursors = {0: None}
             if rows:
                 self._infinite_page_cursors[1] = self._builder.cursor_of(rows[-1])
-            # ponytail: one COUNT per refresh (not per scrolled page). "100+ records" is not
-            # an answer to "how many are there"; move this off-thread if it ever profiles hot.
-            total = self._builder.count()
             self._infinite_frontier_page = 0
             self._infinite_loaded_end = len(rows)
-            self._infinite_has_more = bool(rows) and len(rows) < total
-            self._infinite_total_hint = total
-            self._infinite_total_exact = True
+            self._infinite_has_more = has_more
+            self._infinite_total_hint = len(rows) + int(has_more)
+            self._infinite_total_exact = not has_more
             self._model.load_data(
                 rows,
-                total,
+                self._infinite_total_hint,
                 1,
                 window_start=0,
-                total_is_exact=True,
+                total_is_exact=self._infinite_total_exact,
             )
+            # New rows from the top: a scrollbar left deep down would jump to a page of a
+            # query that no longer exists.
+            self._table.verticalScrollBar().setValue(0)
+            if has_more:
+                self._run_async(self._builder.count, self._apply_count)
             return
         if reset_page:
             self._builder.set_page(1)
@@ -1241,27 +1283,69 @@ class SmartTableView(QWidget):
     def _load_infinite_page(self, page_index: int) -> None:
         if page_index < 0 or self._loading_more or page_index in self._infinite_pages:
             return
-        cursor_known = page_index in self._infinite_page_cursors
-        self._loading_more = True
-        try:
-            if cursor_known:
-                rows, has_more = self._builder.fetch_window_after(
-                    self._infinite_page_cursors[page_index]
-                )
-            else:
-                rows, has_more = self._builder.fetch_window_at(page_index)
-            self._infinite_pages[page_index] = rows
-            if rows:
-                self._infinite_page_cursors[page_index + 1] = self._builder.cursor_of(rows[-1])
-            if page_index >= self._infinite_frontier_page:
-                self._infinite_frontier_page = page_index
-                end = page_index * self._builder.page_size + len(rows)
-                self._infinite_loaded_end = end
-                # `not rows` also stops the autofill loop when rows vanished under us.
+        if page_index in self._infinite_page_cursors:
+            # Keyset from a known cursor: an index seek, stays on this thread.
+            self._store_infinite_page(
+                page_index, self._builder.fetch_window_after(self._infinite_page_cursors[page_index]))
+            return
+        # A scrollbar jump: walk from the nearest known cursor before it, on a worker.
+        anchor_page = max((page for page in self._infinite_page_cursors if page < page_index), default=0)
+        anchor = self._infinite_page_cursors.get(anchor_page)
+        self._jump(lambda: self._builder.fetch_window_at(page_index, anchor, anchor_page),
+                   lambda result: self._store_infinite_page(page_index, result))
+
+    def _store_infinite_page(self, page_index: int, result: tuple[list[dict], bool]) -> None:
+        rows, _has_more = result
+        self._infinite_pages[page_index] = rows
+        if rows:
+            self._infinite_page_cursors[page_index + 1] = self._builder.cursor_of(rows[-1])
+        if page_index >= self._infinite_frontier_page:
+            self._infinite_frontier_page = page_index
+            end = page_index * self._builder.page_size + len(rows)
+            self._infinite_loaded_end = end
+            # `not rows` also stops the autofill loop when rows vanished under us.
+            if self._infinite_total_exact:
                 self._infinite_has_more = bool(rows) and end < self._infinite_total_hint
-            self._replace_infinite_window(page_index)
-        finally:
-            self._loading_more = False
+            else:  # the COUNT has not landed yet: grow the hint with what the pages say
+                self._infinite_has_more = bool(rows) and _has_more
+                self._infinite_total_hint = max(self._infinite_total_hint, end + int(_has_more))
+        self._replace_infinite_window(page_index)
+
+    # ── Queries off the GUI thread ───────────────────────────────────────
+
+    def _new_generation(self) -> None:
+        self._generation += 1
+        self._loading_more = False
+        self._jumps_in_flight = 0
+        self._loading_overlay.hide()
+
+    def _run_async(self, fn, done, *, jump: bool = False) -> None:
+        """`fn()` on the thread pool, `done(result)` back here unless the query changed."""
+        generation = self._generation
+
+        def finish(result) -> None:
+            if generation != self._generation:
+                return
+            if jump:
+                self._jumps_in_flight -= 1
+                self._loading_more = self._jumps_in_flight > 0
+                self._loading_overlay.setVisible(self._loading_more)
+            if isinstance(result, Exception):
+                raise result
+            done(result)
+
+        if jump:
+            self._jumps_in_flight += 1
+            self._loading_more = True
+            self._loading_overlay.setGeometry(self._table.viewport().rect())
+            self._loading_overlay.show()
+        QThreadPool.globalInstance().start(_Query(fn, finish, self._delivery))
+
+    def _jump(self, fn, done) -> None:
+        """A page load the user waits for: overlay on, and while it runs `_loading_more`
+        swallows further scrollbar moves. When it lands the autofill loads wherever the
+        scrollbar ended up, so a fast drag costs one query in flight, not one per tick."""
+        self._run_async(fn, done, jump=True)
 
     def _replace_infinite_window(self, focus_page: int) -> None:
         cache_pages = max(

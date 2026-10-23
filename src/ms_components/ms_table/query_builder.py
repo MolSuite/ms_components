@@ -24,6 +24,10 @@ from .table_config import (
 )
 
 
+# Past this many rows a DuckDB seek numbers the rows instead of an ORDER BY + OFFSET.
+DUCKDB_RANK_FROM = 100_000
+
+
 class QueryBuilder:
     """Builds and runs paginated queries from a TableConfig.
 
@@ -205,19 +209,51 @@ class QueryBuilder:
         has_more = len(raw) > self._page_size
         return [self._row_to_dict(row) for row in raw[:self._page_size]], has_more
 
-    def fetch_window_at(self, page_index: int) -> tuple[list[dict], bool]:
+    def fetch_window_at(self, page_index: int, anchor: tuple[Any, Any] | None = None,
+                        anchor_page: int = 0) -> tuple[list[dict], bool]:
         """Direct load for a scrollbar jump to a page that has not been walked yet.
 
-        The normal path is still keyset via :meth:`fetch_window_after`. OFFSET only
-        shows up when the user drags the scrollbar to a position with no known
-        cursor.
+        `anchor` is the keyset cursor that starts `anchor_page` (None = the top). The
+        walk from it to the target reads only (sort value, pk) - never whole rows -
+        and then the page itself is a keyset seek, so jumping to the end of a 4M-row
+        table no longer materializes 4M rows.
         """
-        offset = max(0, int(page_index)) * self._page_size
-        stmt = self._build_base_statement().offset(offset).limit(self._page_size + 1)
+        offset = max(0, int(page_index) - int(anchor_page)) * self._page_size
+        if self._get_pk_attr() is None:  # no keyset possible: plain OFFSET
+            stmt = self._build_base_statement().offset(int(page_index) * self._page_size)
+            with self._db.get_session() as session:
+                raw = session.exec(stmt.limit(self._page_size + 1)).all()
+            return [self._row_to_dict(row) for row in raw[:self._page_size]], len(raw) > self._page_size
+        cursor = self._seek(anchor, offset) if offset else anchor
+        if offset and cursor is None:
+            return [], False  # past the end (rows vanished under the scrollbar)
+        return self.fetch_window_after(cursor)
+
+    def _seek(self, anchor: tuple[Any, Any] | None, offset: int) -> tuple[Any, Any] | None:
+        """Cursor of the `offset`-th row after `anchor`, reading only the key columns."""
+        pk = self._get_pk_attr()
+        attr = self._resolve_attr(self._sorts[0].field) if self._sorts else None
+        keys = [attr.label("_seek_sort") if attr is not None else None, pk.label("_seek_pk")]
+        stmt = self._build_base_statement()
+        clause = self._keyset_clause(anchor)
+        if clause is not None:
+            stmt = stmt.where(clause)
         with self._db.get_session() as session:
-            raw = session.exec(stmt).all()
-        has_more = len(raw) > self._page_size
-        return [self._row_to_dict(row) for row in raw[:self._page_size]], has_more
+            if offset > DUCKDB_RANK_FROM and session.get_bind().dialect.name == "duckdb":
+                # DuckDB turns ORDER BY + OFFSET into a top-N heap the size of the offset
+                # (2.3 s at 3.85M rows); numbering the rows sorts once (0.2-0.7 s), which
+                # loses to the heap on short walks. SQLite: OFFSET 0.3 s, row_number() 2 s.
+                rank = func.row_number().over(order_by=self._order_clauses()).label("_seek_rank")
+                inner = stmt.with_only_columns(*[k for k in keys if k is not None], rank) \
+                    .order_by(None).subquery()
+                row = session.execute(select(*[c for c in inner.c if c.name != "_seek_rank"])
+                                   .where(inner.c._seek_rank == offset)).first()
+            else:
+                row = session.execute(stmt.with_only_columns(*[k for k in keys if k is not None])
+                                   .offset(offset - 1).limit(1)).first()
+        if row is None:
+            return None
+        return (row[0], row[1]) if attr is not None else (None, row[0])
 
     def _keyset_clause(self, cursor: tuple[Any, Any] | None):
         if cursor is None:
@@ -240,20 +276,19 @@ class QueryBuilder:
             return or_(attr.is_not(None), rest_of_nulls) if not sort.descending else rest_of_nulls
         if sort.descending:
             return or_(attr < sort_value, and_(attr == sort_value, pk > pk_value), attr.is_(None))
-        return or_(attr > sort_value, and_(attr == sort_value, pk > pk_value))
+        # The redundant `attr >= value` is what lets SQLite seek the index when the values
+        # are bound parameters (without it: a SCAN, 0.2 s per page at 3.85M rows) and
+        # DuckDB prune row groups by zone map.
+        # ponytail: descending keeps its `IS NULL` arm and so its scan; same fix needs the
+        # null tail fetched as a second query.
+        return and_(attr >= sort_value, or_(attr > sort_value, and_(attr == sort_value, pk > pk_value)))
 
     def fetch(self) -> tuple[list[dict], int]:
         """Run the query and return (rows_as_dicts, total_count)."""
-        stmt      = self._build_base_statement()
-        count_stmt = self._build_count_statement()
         with self._db.get_session() as session:
-            total: int = session.exec(count_stmt).one()  # type: ignore[arg-type]
+            total: int = session.exec(self._build_count_statement()).one()  # type: ignore[arg-type]
 
-            offset = (self._page - 1) * self._page_size
-            stmt   = stmt.offset(offset).limit(self._page_size)
-
-            raw_rows = session.exec(stmt).all()
-            rows     = [self._row_to_dict(r) for r in raw_rows]
+        rows, _has_more = self.fetch_window_at(self._page - 1)
         return rows, total
 
     # ──────────────────────────────────────────
@@ -302,24 +337,20 @@ class QueryBuilder:
         if search_clause is not None:
             stmt = stmt.where(search_clause)
 
-        # ORDER BY
-        if self._sorts:
-            for sort in self._sorts:
-                attr = self._resolve_attr(sort.field)
-                if attr is not None:
-                    stmt = stmt.order_by(attr.desc() if sort.descending else attr.asc())
-            # PK tie-break: without it two rows with the same score have undefined
-            # order and the keyset cursor skips or repeats rows across pages.
-            pk = self._get_pk_attr()
-            if pk is not None:
-                stmt = stmt.order_by(pk)
-        else:
-            # Default order: primary key of the main table
-            pk = self._get_pk_attr()
-            if pk is not None:
-                stmt = stmt.order_by(pk)
+        return stmt.order_by(*self._order_clauses())
 
-        return stmt
+    def _order_clauses(self) -> list:
+        clauses = []
+        for sort in self._sorts:
+            attr = self._resolve_attr(sort.field)
+            if attr is not None:
+                clauses.append(attr.desc() if sort.descending else attr.asc())
+        # PK tie-break (and default order): without it two rows with the same score have
+        # undefined order and the keyset cursor skips or repeats rows across pages.
+        pk = self._get_pk_attr()
+        if pk is not None:
+            clauses.append(pk)
+        return clauses
 
     def _build_count_statement(self):
         model = self._config.model_class
