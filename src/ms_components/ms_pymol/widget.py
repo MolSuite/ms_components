@@ -126,6 +126,7 @@ class PymolPresetSpec:
     callback: Callable[[Any, PymolSceneContext], None]
     contexts: frozenset[str] = field(default_factory=frozenset)
     tooltip: str = ""
+    per_grid_slot: bool = False
 
     def supports(self, context_kind: str) -> bool:
         return not self.contexts or str(context_kind) in self.contexts
@@ -141,6 +142,14 @@ def _builtin_preset(method_name: str):
     return apply
 
 
+def associate_scene_objects(cmd, objects, *, reference: str) -> None:
+    """Keep generated interactions/geometry in their structure's comparison panel."""
+    slot = cmd.get_setting_int("grid_slot", reference)
+    for obj in objects:
+        if cmd.get_type(obj) != "object:group":
+            cmd.set("grid_slot", slot, obj)
+
+
 class PymolControlBar(QFrame):
     """Compact, reusable controls for an embedded PyMOL scene."""
 
@@ -153,6 +162,7 @@ class PymolControlBar(QFrame):
         self._cmd = cmd
         self._context = PymolSceneContext()
         self._grid_label_objects: set[str] = set()
+        self._preset_objects: set[str] = set()
         self._comparison_layout = "grid"
         self._hydrogen_mode = "none"
         self._presets: dict[str, PymolPresetSpec] = {}
@@ -487,7 +497,7 @@ class PymolControlBar(QFrame):
             self._cmd.set("grid_mode", int(self._comparison_layout == "grid"))
             slot_names: dict[int, list[str]] = {}
             for obj in self._cmd.get_object_list(self._context.target):
-                if obj in self._grid_label_objects:
+                if obj in self._grid_label_objects or obj in self._preset_objects:
                     continue
                 slot = self._cmd.get_setting_int("grid_slot", obj)
                 if slot > 0:
@@ -569,6 +579,10 @@ class PymolControlBar(QFrame):
                 self._cmd.color(color, f"({temporary}) and elem C")
                 self._cmd.delete(name)
                 self._cmd.set_name(temporary, name)
+                for obj in self._preset_objects & set(self._cmd.get_names("objects")):
+                    if self._cmd.get_setting_int("grid_slot", obj) == slot:
+                        self._cmd.delete(obj)
+                        self._preset_objects.discard(obj)
                 self._context = replace(
                     self._context, grid_labels={**self._context.grid_labels, slot: label},
                 )
@@ -745,7 +759,37 @@ class PymolControlBar(QFrame):
             )
 
         def apply() -> None:
-            spec.callback(self._cmd, self._context)
+            existing = set(self._cmd.get_names("objects"))
+            for obj in self._preset_objects & existing:
+                self._cmd.delete(obj)
+            self._preset_objects.clear()
+            if self._context.is_comparison and spec.per_grid_slot:
+                slots: dict[int, list[str]] = {}
+                source = " or ".join(f"({s})" for s in self._context.selections.values() if s) or self._context.target
+                for obj in self._cmd.get_object_list(source):
+                    if obj not in self._grid_label_objects:
+                        slot = self._cmd.get_setting_int("grid_slot", obj)
+                        if slot > 0:
+                            slots.setdefault(slot, []).append(obj)
+                if not slots:
+                    spec.callback(self._cmd, self._context)
+                for slot, objects in sorted(slots.items()):
+                    target = " or ".join(objects)
+                    context = replace(
+                        self._context, target=target,
+                        selections={role: f"({selection}) and ({target})"
+                                    for role, selection in self._context.selections.items()},
+                    )
+                    before = set(self._cmd.get_names("objects"))
+                    spec.callback(self._cmd, context)
+                    for obj in set(self._cmd.get_names("objects")) - before:
+                        # PyMOL reuses names such as polar_contacts on its next preset call.
+                        name = self._cmd.get_unused_name(f"{obj}_slot{slot}")
+                        self._cmd.set_name(obj, name)
+                        self._preset_objects.add(name)
+                        associate_scene_objects(self._cmd, [name], reference=objects[0])
+            else:
+                spec.callback(self._cmd, self._context)
             self.apply_hydrogen_visibility()
             if self._context.is_comparison:
                 self._sync_grid_labels()
@@ -765,6 +809,7 @@ class PymolControlBar(QFrame):
                 key=key,
                 label=label,
                 callback=_builtin_preset(method),
+                per_grid_slot=True,
             )
 
     def _sync_selection_mode(self) -> None:
@@ -951,6 +996,7 @@ class PymolDockWidget(MSDockWidget):
 
 __all__ = [
     "COMPARISON_COLORS",
+    "associate_scene_objects",
     "PymolControlBar",
     "PymolDockWidget",
     "PymolPresetSpec",
