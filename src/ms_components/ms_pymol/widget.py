@@ -246,6 +246,12 @@ class PymolControlBar(QFrame):
             menu=hide_menu,
         )
 
+        self.hydrogens_action = self._add_toolbar_action(
+            "Hydrogens", "hydrogens.svg",
+            "Show hydrogens as sticks or hide them in the current selection or scene target.",
+            self.toggle_hydrogens,
+        )
+
         self.preset_menu = QMenu("Presets", bar)
         self.preset_action = self._add_toolbar_action(
             "Presets", "presets.svg",
@@ -635,6 +641,17 @@ class PymolControlBar(QFrame):
             f"Hide {normalized}",
             lambda: self._cmd.hide(normalized, self.active_target()),
         )
+
+    def toggle_hydrogens(self) -> None:
+        target = f"({self.active_target()}) and hydro"
+
+        def apply() -> None:
+            if self._cmd.count_atoms(f"({target}) and visible"):
+                self._cmd.hide("everything", target)
+            else:
+                self._cmd.show("sticks", target)
+
+        self._run_command("Hydrogens", apply)
 
     def clear_selection(self) -> None:
         if self._run_command("Clear selection", self._cmd.deselect):
