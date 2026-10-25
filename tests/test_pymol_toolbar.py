@@ -27,6 +27,9 @@ class FakeCmd:
         assert name == "mouse_selection_mode"
         return self.selection_mode
 
+    def get_names(self, _kind):
+        return []
+
     def count_atoms(self, selection):
         if "hydro" in selection and selection.endswith("and visible"):
             return int(self.hydrogens_visible)

@@ -12,6 +12,39 @@ from PySide6.QtWidgets import QApplication
 from ms_components.ms_pymol import COMPARISON_COLORS, PymolControlBar, PymolPresetSpec, PymolSceneContext
 
 
+def test_preset_interactions_stay_in_each_complex_panel(grid_scene):
+    from pymol import preset
+
+    bar, cmd = grid_scene
+    cmd.delete("all")
+    for slot in range(1, 5):
+        cmd.fragment("ala", f"rec_{slot}")
+        cmd.fragment("gly", f"lig_{slot}")
+        cmd.alter(f"lig_{slot}", "resn='LIG';hetatm=1")
+        cmd.sort(f"lig_{slot}")
+        for name in (f"rec_{slot}", f"lig_{slot}"):
+            cmd.set("grid_slot", slot, name)
+    bar.set_scene_context("comparison")
+    bar.register_preset(PymolPresetSpec(
+        key="test.ligand_sites", label="Ligand sites", per_grid_slot=True,
+        callback=lambda cmd, context: preset.ligand_cartoon(context.target, _self=cmd),
+    ))
+    for _ in range(2):
+        bar.apply_preset("test.ligand_sites")
+        distances = [obj for obj in cmd.get_names("objects") if cmd.get_type(obj) == "object:measurement"]
+        assert len(distances) == 4
+        assert {cmd.get_setting_int("grid_slot", obj) for obj in distances} == {1, 2, 3, 4}
+        for obj in cmd.get_names("objects"):
+            assert 1 <= cmd.get_setting_int("grid_slot", obj) <= 4
+    assert bar.replace_comparison_object(
+        "lig_1", cmd.get_pdbstr("lig_1").encode(), "pdb", reference="rec_1", label="New pose"
+    )
+    remaining = [obj for obj in cmd.get_names("objects") if cmd.get_type(obj) == "object:measurement"]
+    assert {cmd.get_setting_int("grid_slot", obj) for obj in remaining} == {2, 3, 4}
+    bar.apply_preset("pymol.simple")
+    assert not any(cmd.get_type(obj) == "object:measurement" for obj in cmd.get_names("objects"))
+
+
 @pytest.fixture
 def grid_scene():
     app = QApplication.instance() or QApplication(["molsuite-pymol-grid-test"])
