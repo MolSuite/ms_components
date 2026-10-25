@@ -96,22 +96,30 @@ def test_pymol_toolbar_controls_selection_camera_and_representation():
     assert ("show", "sticks", "sele") in cmd.calls
 
 
-def test_hydrogen_action_toggles_the_scene_target_and_current_selection():
+def test_hydrogen_action_cycles_global_modes_despite_a_selection():
     _app()
     cmd = FakeCmd()
     bar = PymolControlBar(cmd)
     bar.set_scene_context("ligand", target="ligand_7")
 
-    bar.hydrogens_action.trigger()
-    bar.hydrogens_action.trigger()
-    assert cmd.calls[-2:] == [
-        ("hide", "everything", "(ligand_7) and hydro"),
-        ("show", "sticks", "(ligand_7) and hydro"),
-    ]
-
     cmd.selected_atoms = 4
+    assert bar.hydrogens_action.isCheckable()
+    assert not bar.hydrogens_action.isChecked()
     bar.hydrogens_action.trigger()
-    assert cmd.calls[-1] == ("hide", "everything", "(sele) and hydro")
+    assert bar.hydrogens_action.isChecked()
+    assert bar.hydrogens_action.data() == "all"
+    assert cmd.calls[-1] == ("show", "sticks", "hydro")
+    all_icon = bar._toolbar_action_icons[bar.hydrogens_action]
+    bar.hydrogens_action.trigger()
+    assert bar.hydrogens_action.isChecked()
+    assert bar.hydrogens_action.data() == "polar"
+    assert "polar" in bar.hydrogens_action.toolTip()
+    assert bar._toolbar_action_icons[bar.hydrogens_action] != all_icon
+    assert cmd.calls[-1] == ("show", "sticks", "hydro and neighbor (elem N+O+S)")
+    bar.hydrogens_action.trigger()
+    assert not bar.hydrogens_action.isChecked()
+    assert bar.hydrogens_action.data() == "none"
+    assert cmd.calls[-1] == ("hide", "everything", "hydro")
     bar.close()
 
 
@@ -126,8 +134,11 @@ def test_hydrogen_action_reports_pymol_errors():
         raise RuntimeError("test failure")
 
     cmd.hide = fail
+    cmd.show = fail
     bar.hydrogens_action.trigger()
     assert failures == ["Hydrogens: test failure"]
+    assert not bar.hydrogens_action.isChecked()
+    assert bar.hydrogens_action.data() == "none"
     bar.close()
 
 
