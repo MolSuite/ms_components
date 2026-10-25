@@ -151,7 +151,8 @@ class QueryBuilder:
             return []
         stmt = self._build_base_statement().with_only_columns(pk)
         with self._db.get_session() as session:
-            return [int(value) for value in session.exec(stmt).all() if value is not None]
+            # scalars(): with expr columns the base select has several entities and exec() yields Rows.
+            return [int(value) for value in session.scalars(stmt).all() if value is not None]
 
     def count(self) -> int:
         """Row total under the current filters/search, without fetching any row.
