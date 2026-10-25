@@ -146,6 +146,7 @@ def test_viewer_blocks_pymol_drawing_on_es_and_recovers_on_a_compatible_context(
     widget._opengl_error = None
     widget._opengl_error_label = None
     callbacks = []
+    widget.before_render.connect(lambda: callbacks.append("before_render"))
     for name in ("initializeGL", "paintGL", "resizeGL"):
         monkeypatch.setattr(PyMOLGLWidget, name, lambda *args, name=name: callbacks.append(name))
     monkeypatch.setattr(_PymolGLWidget, "context", lambda self: _context(es=True))
@@ -160,7 +161,7 @@ def test_viewer_blocks_pymol_drawing_on_es_and_recovers_on_a_compatible_context(
         widget.initializeGL()
         widget.resizeGL(100, 100)
         widget.paintGL()
-        assert callbacks == ["initializeGL", "resizeGL", "paintGL"]
+        assert callbacks == ["initializeGL", "resizeGL", "before_render", "paintGL"]
         assert widget._opengl_error_label.isHidden()
     finally:
         delete(widget)
