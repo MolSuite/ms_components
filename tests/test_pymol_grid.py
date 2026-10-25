@@ -32,6 +32,28 @@ def grid_scene():
         app.processEvents()
 
 
+def test_hydrogen_action_preserves_heavy_atoms_and_other_objects(grid_scene):
+    bar, cmd = grid_scene
+    cmd.fragment("gly", "ligand")
+    cmd.fragment("gly", "other_ligand")
+    cmd.show("sticks", "ligand or other_ligand")
+    cmd.deselect()
+    bar.set_scene_context("ligand", target="ligand")
+    atom_count = cmd.count_atoms("all")
+    heavy_count = cmd.count_atoms("ligand and not hydro and rep sticks")
+    other_hydrogens = cmd.count_atoms("other_ligand and hydro and visible")
+
+    bar.hydrogens_action.trigger()
+    assert cmd.count_atoms("ligand and hydro and visible") == 0
+    assert cmd.count_atoms("ligand and not hydro and rep sticks") == heavy_count
+    assert cmd.count_atoms("other_ligand and hydro and visible") == other_hydrogens
+
+    bar.hydrogens_action.trigger()
+    assert cmd.count_atoms("ligand and hydro and visible") == cmd.count_atoms("ligand and hydro")
+    assert cmd.count_atoms("ligand and not hydro and rep sticks") == heavy_count
+    assert cmd.count_atoms("all") == atom_count
+
+
 def _labels(cmd, obj):
     labels = []
     cmd.iterate(obj, "labels.append(label)", space={"labels": labels})

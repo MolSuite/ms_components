@@ -19,6 +19,7 @@ class FakeCmd:
     def __init__(self):
         self.selection_mode = 1
         self.selected_atoms = 0
+        self.hydrogens_visible = True
         self.selected_residues: set[tuple[str, str, str]] = set()
         self.calls: list[tuple] = []
 
@@ -27,6 +28,8 @@ class FakeCmd:
         return self.selection_mode
 
     def count_atoms(self, selection):
+        if "hydro" in selection and selection.endswith("and visible"):
+            return int(self.hydrogens_visible)
         return self.selected_atoms if selection == "sele" else 1
 
     def set(self, name, value, **kwargs):
@@ -54,9 +57,13 @@ class FakeCmd:
 
     def hide(self, representation, target):
         self.calls.append(("hide", representation, target))
+        if "hydro" in target:
+            self.hydrogens_visible = False
 
     def show(self, representation, target):
         self.calls.append(("show", representation, target))
+        if "hydro" in target:
+            self.hydrogens_visible = True
 
 
 def _app():
@@ -87,6 +94,41 @@ def test_pymol_toolbar_controls_selection_camera_and_representation():
     cmd.selected_atoms = 4
     bar.apply_representation("sticks")
     assert ("show", "sticks", "sele") in cmd.calls
+
+
+def test_hydrogen_action_toggles_the_scene_target_and_current_selection():
+    _app()
+    cmd = FakeCmd()
+    bar = PymolControlBar(cmd)
+    bar.set_scene_context("ligand", target="ligand_7")
+
+    bar.hydrogens_action.trigger()
+    bar.hydrogens_action.trigger()
+    assert cmd.calls[-2:] == [
+        ("hide", "everything", "(ligand_7) and hydro"),
+        ("show", "sticks", "(ligand_7) and hydro"),
+    ]
+
+    cmd.selected_atoms = 4
+    bar.hydrogens_action.trigger()
+    assert cmd.calls[-1] == ("hide", "everything", "(sele) and hydro")
+    bar.close()
+
+
+def test_hydrogen_action_reports_pymol_errors():
+    _app()
+    cmd = FakeCmd()
+    bar = PymolControlBar(cmd)
+    failures = []
+    bar.command_failed.connect(failures.append)
+
+    def fail(*_args):
+        raise RuntimeError("test failure")
+
+    cmd.hide = fail
+    bar.hydrogens_action.trigger()
+    assert failures == ["Hydrogens: test failure"]
+    bar.close()
 
 
 def test_pymol_toolbar_filters_and_applies_registered_presets():
@@ -156,7 +198,7 @@ def test_pymol_toolbar_uses_menu_actions_and_hover_overflow():
     assert bar.toolbar.toolButtonStyle() == Qt.ToolButtonIconOnly
     actions = bar.toolbar.actions()
     assert [action.text() for action in actions] == [
-        "Selection", "Actions", "Display", "Hide", "Presets",
+        "Selection", "Actions", "Display", "Hide", "Hydrogens", "Presets",
     ]
     assert all(action.text() and not action.icon().isNull() for action in actions)
     assert bar.selection_mode_action.menu() is not None
