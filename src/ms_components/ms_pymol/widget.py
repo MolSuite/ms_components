@@ -39,6 +39,8 @@ from . import plugins as _pymol_plugins  # noqa: F401
 
 
 class _PymolGLWidget(PyMOLGLWidget):
+    before_render = Signal()
+
     def __init__(self, parent):
         super().__init__(parent)
         self._opengl_error: str | None = None
@@ -69,6 +71,7 @@ class _PymolGLWidget(PyMOLGLWidget):
 
     def paintGL(self):
         if self._opengl_error is None:
+            self.before_render.emit()
             super().paintGL()
 
     def resizeGL(self, width, height):
@@ -151,6 +154,7 @@ class PymolControlBar(QFrame):
         self._context = PymolSceneContext()
         self._grid_label_objects: set[str] = set()
         self._comparison_layout = "grid"
+        self._hydrogen_mode = "none"
         self._presets: dict[str, PymolPresetSpec] = {}
         self.setObjectName("PymolControlBar")
 
@@ -248,9 +252,11 @@ class PymolControlBar(QFrame):
 
         self.hydrogens_action = self._add_toolbar_action(
             "Hydrogens", "hydrogens.svg",
-            "Show hydrogens as sticks or hide them in the current selection or scene target.",
+            "Hydrogens: hidden. Click to show all H in this PyMOL session.",
             self.toggle_hydrogens,
+            checkable=True,
         )
+        self.hydrogens_action.setData("none")
 
         self.preset_menu = QMenu("Presets", bar)
         self.preset_action = self._add_toolbar_action(
@@ -270,6 +276,7 @@ class PymolControlBar(QFrame):
         self._sync_selection_mode()
         self.refresh_context_label()
         self._refresh_preset_menu()
+        self.apply_hydrogen_visibility()
         self._configure_overflow_button()
         if self._cmd is None:
             self.setEnabled(False)
@@ -449,6 +456,7 @@ class PymolControlBar(QFrame):
         self.comparison_menu.menuAction().setVisible(normalized.is_comparison)
         if was_comparison or normalized.is_comparison:
             self._run_command("Grid labels", self._sync_grid_labels)
+        self.apply_hydrogen_visibility()
         self.refresh_context_label()
         self._refresh_preset_menu()
 
@@ -629,6 +637,7 @@ class PymolControlBar(QFrame):
         def apply() -> None:
             self._cmd.hide("everything", target)
             self._cmd.show(normalized, target)
+            self.apply_hydrogen_visibility()
 
         self._run_command(f"Display {normalized}", apply)
 
@@ -643,15 +652,39 @@ class PymolControlBar(QFrame):
         )
 
     def toggle_hydrogens(self) -> None:
-        target = f"({self.active_target()}) and hydro"
+        previous = self._hydrogen_mode
+        modes = ("none", "all", "polar")
+        self._hydrogen_mode = modes[(modes.index(previous) + 1) % len(modes)]
+        if not self.apply_hydrogen_visibility():
+            self._hydrogen_mode = previous
+        mode = self._hydrogen_mode
+        icon = "hydrogens-polar.svg" if mode == "polar" else "hydrogens.svg"
+        self._toolbar_action_icons[self.hydrogens_action] = icon
+        self.hydrogens_action.setIcon(self._toolbar_icon(icon))
+        self.hydrogens_action.setChecked(mode != "none")
+        self.hydrogens_action.setData(mode)
+        state, next_state = {
+            "none": ("hidden", "show all H"),
+            "all": ("all H", "show only polar H"),
+            "polar": ("polar H only (bonded to N, O or S)", "hide all H"),
+        }[mode]
+        self.hydrogens_action.setToolTip(
+            f"Hydrogens: {state}. Click to {next_state} in this PyMOL session."
+        )
+
+    def apply_hydrogen_visibility(self) -> bool:
+        # Enforce the session policy before drawing, including externally loaded objects.
+        polar = "hydro and neighbor (elem N+O+S)"
+        shown = {"none": "", "all": "hydro", "polar": polar}[self._hydrogen_mode]
+        hidden = {"none": "hydro", "all": "", "polar": f"hydro and not ({polar})"}[self._hydrogen_mode]
 
         def apply() -> None:
-            if self._cmd.count_atoms(f"({target}) and visible"):
-                self._cmd.hide("everything", target)
-            else:
-                self._cmd.show("sticks", target)
+            if hidden and self._cmd.count_atoms(f"({hidden}) and visible"):
+                self._cmd.hide("everything", hidden)
+            if shown and self._cmd.count_atoms(f"({shown}) and not rep sticks"):
+                self._cmd.show("sticks", shown)
 
-        self._run_command("Hydrogens", apply)
+        return self._run_command("Hydrogens", apply)
 
     def clear_selection(self) -> None:
         if self._run_command("Clear selection", self._cmd.deselect):
@@ -713,6 +746,7 @@ class PymolControlBar(QFrame):
 
         def apply() -> None:
             spec.callback(self._cmd, self._context)
+            self.apply_hydrogen_visibility()
             if self._context.is_comparison:
                 self._sync_grid_labels()
 
@@ -798,6 +832,7 @@ class PymolDockWidget(MSDockWidget):
             self.cmd.set("internal_gui", False)
 
         self.control_bar = PymolControlBar(self.cmd, self)
+        self.pymol_widget.before_render.connect(self.control_bar.apply_hydrogen_visibility)
         self.toolbar = self.control_bar
         self.pymol_widget.installEventFilter(self)
 

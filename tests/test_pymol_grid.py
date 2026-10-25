@@ -32,26 +32,49 @@ def grid_scene():
         app.processEvents()
 
 
-def test_hydrogen_action_preserves_heavy_atoms_and_other_objects(grid_scene):
+@pytest.mark.parametrize("clicks", [0, 1, 2])
+def test_hydrogen_modes_apply_globally_and_to_new_systems(grid_scene, clicks, monkeypatch):
     bar, cmd = grid_scene
     cmd.fragment("gly", "ligand")
     cmd.fragment("gly", "other_ligand")
     cmd.show("sticks", "ligand or other_ligand")
-    cmd.deselect()
+    cmd.select("sele", "ligand and elem C")
     bar.set_scene_context("ligand", target="ligand")
     atom_count = cmd.count_atoms("all")
-    heavy_count = cmd.count_atoms("ligand and not hydro and rep sticks")
-    other_hydrogens = cmd.count_atoms("other_ligand and hydro and visible")
+    heavy_count = cmd.count_atoms("not hydro and rep sticks")
+    for _ in range(clicks):
+        bar.hydrogens_action.trigger()
 
-    bar.hydrogens_action.trigger()
-    assert cmd.count_atoms("ligand and hydro and visible") == 0
-    assert cmd.count_atoms("ligand and not hydro and rep sticks") == heavy_count
-    assert cmd.count_atoms("other_ligand and hydro and visible") == other_hydrogens
+    def check(obj):
+        expected = (0 if clicks == 0 else cmd.count_atoms(
+            f"{obj} and hydro" + (" and neighbor (elem N+O+S)" if clicks == 2 else "")
+        ))
+        assert cmd.count_atoms(f"{obj} and hydro and visible") == expected
+        if clicks == 2:
+            assert 0 < expected < cmd.count_atoms(f"{obj} and hydro")
 
-    bar.hydrogens_action.trigger()
-    assert cmd.count_atoms("ligand and hydro and visible") == cmd.count_atoms("ligand and hydro")
-    assert cmd.count_atoms("ligand and not hydro and rep sticks") == heavy_count
+    check("ligand")
+    check("other_ligand")
+    assert cmd.count_atoms("not hydro and rep sticks") == heavy_count
     assert cmd.count_atoms("all") == atom_count
+    cmd.fragment("cys", "new_system")
+    cmd.show("spheres", "new_system")
+    bar.apply_hydrogen_visibility()  # Same hook used immediately before the viewer draws.
+    check("new_system")
+    bar.set_scene_context("ligand", target="new_system")
+    bar.apply_representation("sticks")
+    check("new_system")
+    bar.register_preset(PymolPresetSpec(
+        key="test.show_all", label="Show all", callback=lambda cmd, _: cmd.show("lines", "all")
+    ))
+    bar.apply_preset("test.show_all")
+    check("ligand")
+    check("new_system")
+    calls = []
+    monkeypatch.setattr(cmd, "hide", lambda *args: calls.append(args))
+    monkeypatch.setattr(cmd, "show", lambda *args: calls.append(args))
+    assert bar.apply_hydrogen_visibility()
+    assert calls == []  # Repeated renders must not invalidate PyMOL's scene again.
 
 
 def _labels(cmd, obj):
