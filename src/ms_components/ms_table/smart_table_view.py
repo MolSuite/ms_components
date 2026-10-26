@@ -65,7 +65,8 @@ from .pagination_control import PaginationControl
 from .query_builder import QueryBuilder
 from .session_provider import SessionProvider
 from .table_config import ColumnDef, ColumnKind, FilterOperator, FilterSpec, SortSpec, TableConfig, TableLoadMode, ToolbarAction
-from .table_model import RAW_OBJECT_ROLE, SmartTableModel
+from .table_model import COLUMN_DEF_ROLE, RAW_OBJECT_ROLE, SmartTableModel
+from .table_interaction import TableInteraction
 
 _TOOLBAR_ICONS = Path(__file__).parent / "icons"
 
@@ -93,7 +94,10 @@ class SmartTableView(QWidget):
     Smart table with pagination, filtering, sorting and column configuration.
 
     Signals:
+        cell_pressed(object, str, Qt.KeyboardModifiers):
+            (raw_obj, field, modifiers) before a left press changes the selection.
         row_clicked(object):          SQLModel object for the clicked row.
+        row_reselected(object):       An already selected row was clicked again.
         row_double_clicked(object):   SQLModel object for the double-clicked row.
         selection_changed(list):      List of selected objects.
         edit_committed(object, str, object):
@@ -101,7 +105,9 @@ class SmartTableView(QWidget):
         data_refreshed(int):          Total item count after each load.
     """
 
+    cell_pressed        = Signal(object, str, Qt.KeyboardModifiers)
     row_clicked         = Signal(object)
+    row_reselected      = Signal(object)
     row_double_clicked  = Signal(object)
     selection_changed   = Signal(list)
     edit_committed      = Signal(object, str, object)
@@ -321,6 +327,9 @@ class SmartTableView(QWidget):
         # ── Table View ───────────────────────
         self._table = QTableView()
         self._table.setModel(self._model)
+        self._input = TableInteraction(self._table)
+        self._input.pressed.connect(self._on_cell_pressed)
+        self._input.reselected.connect(lambda _view, index, _mods: self.row_reselected.emit(index.data(RAW_OBJECT_ROLE)))
         self._table.setObjectName("SmartTable")
 
         sel_mode = (QAbstractItemView.ExtendedSelection
@@ -745,6 +754,11 @@ class SmartTableView(QWidget):
         # Place persistent widgets in the new cells
         self._refresh_persistent_widgets()
         self._schedule_infinite_autofill()
+
+    def _on_cell_pressed(self, _view, index, modifiers):
+        raw, column = index.data(RAW_OBJECT_ROLE), index.data(COLUMN_DEF_ROLE)
+        if raw is not None and column is not None:
+            self.cell_pressed.emit(raw, column.field, modifiers)
 
     def _on_row_clicked(self, index):
         raw = self._model.data(index, RAW_OBJECT_ROLE)
