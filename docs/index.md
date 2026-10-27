@@ -35,6 +35,7 @@ the installation command.
 | [`ms_components.ms_projects`](project_form_events.md) | Project browser, project menu, and form lifecycle events |
 | `ms_components.ms_settings` | Typed editor for application settings |
 | `ms_components.ms_pymol` | PyMOL dock and control bar |
+| `ms_components.ketcher` | Ketcher molecule editor dialog |
 | `ms_components.ms_stepper` | Step-by-step wizard widget |
 | [`ms_components.ms_tutorial`](ms_tutorial.md) | Informative and interactive tours, with Python bindings and optional TOML content |
 | `ms_components.tool_panel` | Configure-then-run frame shared by tools |

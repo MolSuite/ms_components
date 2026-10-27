@@ -81,6 +81,10 @@ the scene context when leaving their off-target view, even without loading a
 new structure. Unrelated grid scenes and user-created annotations are not
 removed. `"offtarget"` remains accepted as an alias for `"comparison"`.
 
+## Ketcher
+
+::: ms_components.ketcher
+
 ## Stepper
 
 ::: ms_components.ms_stepper
