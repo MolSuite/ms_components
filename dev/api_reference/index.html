@@ -24,7 +24,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="zensical-0.0.72">
+      <meta name="generator" content="zensical-0.0.73">
     
     
       
@@ -1548,6 +1548,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;stop
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ms_components.ms_tutorial.TutorialController.refresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;refresh
       </span>
     </span>
   </a>
@@ -3192,6 +3203,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;stop
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ms_components.ms_tutorial.TutorialController.refresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;refresh
       </span>
     </span>
   </a>
@@ -11292,7 +11314,7 @@ validation_failed(QStep)    a step blocked advancing during validation</p>
 
 
 <a href="#ms_components.ms_tutorial.TutorialController" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">TutorialController</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">targets</span><span class="p">:</span> <span class="n"><span title="collections.abc.Mapping">Mapping</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="ms_components.ms_tutorial.bindings.TutorialTarget">TutorialTarget</span></span><span class="p">],</span> <span class="n">events</span><span class="p">:</span> <span class="n"><span title="collections.abc.Mapping">Mapping</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="ms_components.ms_tutorial.bindings.TutorialEvent">TutorialEvent</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n"><span title="PySide6.QtCore.QObject">QObject</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">TutorialController</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">targets</span><span class="p">:</span> <span class="n"><span title="collections.abc.Mapping">Mapping</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="ms_components.ms_tutorial.bindings.TutorialTarget">TutorialTarget</span></span><span class="p">],</span> <span class="n">events</span><span class="p">:</span> <span class="n"><span title="collections.abc.Mapping">Mapping</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="ms_components.ms_tutorial.bindings.TutorialEvent">TutorialEvent</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">instruction_provider</span><span class="p">:</span> <span class="n"><span title="collections.abc.Callable">Callable</span></span><span class="p">[[</span><span class="n"><span title="ms_components.ms_tutorial.models.TutorialStep">TutorialStep</span></span><span class="p">],</span> <span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">dim_background</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n"><span title="PySide6.QtCore.QObject">QObject</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -11338,6 +11360,14 @@ the relevant UI; the component never submits jobs or invokes business actions.</
               <td>
                 <div class="doc-md-description">
                   <p>Cancel and disconnect only the tutorial's own signal subscription.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            refresh (ms_components.ms_tutorial.TutorialController.refresh)" href="./#ms_components.ms_tutorial.TutorialController.refresh">refresh</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Resolve the current target and instructions after an application UI change.</p>
                 </div>
               </td>
             </tr>
@@ -11393,12 +11423,20 @@ the relevant UI; the component never submits jobs or invokes business actions.</
 <span class="normal">67</span>
 <span class="normal">68</span>
 <span class="normal">69</span>
-<span class="normal">70</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">targets</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">TutorialTarget</span><span class="p">],</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">targets</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">TutorialTarget</span><span class="p">],</span>
              <span class="n">events</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">TutorialEvent</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+             <span class="n">instruction_provider</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">TutorialStep</span><span class="p">],</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+             <span class="n">dim_background</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
              <span class="n">parent</span><span class="p">:</span> <span class="n">QObject</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">targets</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">targets</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">events</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">events</span> <span class="ow">or</span> <span class="p">{})</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">instruction_provider</span> <span class="o">=</span> <span class="n">instruction_provider</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">dim_background</span> <span class="o">=</span> <span class="n">dim_background</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_tutorial</span><span class="p">:</span> <span class="n">Tutorial</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_index</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_completed</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
@@ -11408,7 +11446,7 @@ the relevant UI; the component never submits jobs or invokes business actions.</
     <span class="bp">self</span><span class="o">.</span><span class="n">_previous_focus</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_tracker</span> <span class="o">=</span> <span class="n">QTimer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_tracker</span><span class="o">.</span><span class="n">setInterval</span><span class="p">(</span><span class="mi">80</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_tracker</span><span class="o">.</span><span class="n">timeout</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_refresh</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_tracker</span><span class="o">.</span><span class="n">timeout</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">refresh</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
                   </details>
 
@@ -11467,11 +11505,7 @@ the relevant UI; the component never submits jobs or invokes business actions.</
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_tutorial/controller.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 93</span>
 <span class="normal"> 94</span>
 <span class="normal"> 95</span>
 <span class="normal"> 96</span>
@@ -11486,7 +11520,11 @@ the relevant UI; the component never submits jobs or invokes business actions.</
 <span class="normal">105</span>
 <span class="normal">106</span>
 <span class="normal">107</span>
-<span class="normal">108</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tutorial</span><span class="p">:</span> <span class="n">Tutorial</span><span class="p">):</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tutorial</span><span class="p">:</span> <span class="n">Tutorial</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Validate bindings before replacing the active tour. Must run in the UI thread."""</span>
     <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="n">tutorial</span><span class="o">.</span><span class="n">steps</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">targets</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">target</span><span class="p">),</span> <span class="n">TutorialTarget</span><span class="p">):</span>
@@ -11530,17 +11568,116 @@ the relevant UI; the component never submits jobs or invokes business actions.</
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_tutorial/controller.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@Slot</span><span class="p">()</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@Slot</span><span class="p">()</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Cancel and disconnect only the tutorial's own signal subscription."""</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_active</span><span class="p">:</span>
         <span class="n">tutorial_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cleanup</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cancelled</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">tutorial_id</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="ms_components.ms_tutorial.TutorialController.refresh" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">refresh</span>
+
+
+<a href="#ms_components.ms_tutorial.TutorialController.refresh" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">refresh</span><span class="p">()</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Resolve the current target and instructions after an application UI change.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/ms_components/ms_tutorial/controller.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@Slot</span><span class="p">()</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">refresh</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Resolve the current target and instructions after an application UI change."""</span>
+    <span class="n">step</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">current_step</span>
+    <span class="k">if</span> <span class="n">step</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="n">step</span><span class="o">.</span><span class="n">target</span><span class="p">]</span><span class="o">.</span><span class="n">widget</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">source</span><span class="p">()</span> <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">source</span><span class="p">)</span> <span class="k">else</span> <span class="n">source</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">QWidget</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">isValid</span><span class="p">(</span><span class="n">target</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Target '</span><span class="si">{</span><span class="n">step</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">' is unavailable"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_target</span> <span class="o">=</span> <span class="n">target</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">target</span><span class="o">.</span><span class="n">isVisible</span><span class="p">():</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlay</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">overlay</span><span class="o">.</span><span class="n">hide</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Target '</span><span class="si">{</span><span class="n">step</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">' is hidden; provide a prepare callback"</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="n">target</span><span class="o">.</span><span class="n">window</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlay</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlay</span><span class="o">.</span><span class="n">parentWidget</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">host</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlay</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">overlay</span><span class="o">.</span><span class="n">hide</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">overlay</span><span class="o">.</span><span class="n">deleteLater</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_overlay</span> <span class="o">=</span> <span class="n">TutorialOverlay</span><span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">dim_background</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dim_background</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_overlay</span><span class="o">.</span><span class="n">next_requested</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">next</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_overlay</span><span class="o">.</span><span class="n">back_requested</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">back</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_overlay</span><span class="o">.</span><span class="n">exit_requested</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stop</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">destroyed</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_overlay</span><span class="o">.</span><span class="n">deleteLater</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">overlay</span><span class="o">.</span><span class="n">step</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">step</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">overlay</span><span class="o">.</span><span class="n">set_step</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tutorial</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="n">step</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tutorial</span><span class="o">.</span><span class="n">steps</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">instruction_provider</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">overlay</span><span class="o">.</span><span class="n">set_text</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">instruction_provider</span><span class="p">(</span><span class="n">step</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">overlay</span><span class="o">.</span><span class="n">next_button</span><span class="o">.</span><span class="n">setEnabled</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">advance_on</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">step</span><span class="o">.</span><span class="n">id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_completed</span><span class="p">)</span>
+        <span class="n">region</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="n">step</span><span class="o">.</span><span class="n">target</span><span class="p">]</span><span class="o">.</span><span class="n">rect</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">overlay</span><span class="o">.</span><span class="n">reposition</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">interactive</span><span class="o">=</span><span class="n">step</span><span class="o">.</span><span class="n">advance_on</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span>
+                                <span class="n">rect</span><span class="o">=</span><span class="n">region</span><span class="p">()</span> <span class="k">if</span> <span class="n">region</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fail</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot resolve tutorial step '</span><span class="si">{</span><span class="n">step</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">': </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -13673,7 +13810,7 @@ do not observe this and must be pushed separately.</p>
       <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.code.copy","navigation.footer","navigation.path","navigation.sections","navigation.top","search.highlight","search.suggest"],"redirect":null,"search":"../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.10ee5ab6.min.js"></script>
+      <script src="../assets/javascripts/bundle.77dd0ce9.min.js"></script>
       
     
   </body>
