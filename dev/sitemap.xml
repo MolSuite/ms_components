@@ -10,6 +10,15 @@
         <loc>https://molsuite.github.io/ms_components/latest/examples/</loc>
       </url>
       <url>
+        <loc>https://molsuite.github.io/ms_components/latest/ms_monitor_baseline/</loc>
+      </url>
+      <url>
+        <loc>https://molsuite.github.io/ms_components/latest/ms_monitor_operator_actions/</loc>
+      </url>
+      <url>
+        <loc>https://molsuite.github.io/ms_components/latest/ms_monitor_state_contract/</loc>
+      </url>
+      <url>
         <loc>https://molsuite.github.io/ms_components/latest/ms_tutorial/</loc>
       </url>
       <url>
