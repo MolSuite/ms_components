@@ -56,12 +56,14 @@ class TutorialController(QObject):
                  events: Mapping[str, TutorialEvent] | None = None,
                  instruction_provider: Callable[[TutorialStep], str] | None = None,
                  dim_background: bool = True,
+                 close_only: bool = False,
                  parent: QObject | None = None):
         super().__init__(parent)
         self.targets = dict(targets)
         self.events = dict(events or {})
         self.instruction_provider = instruction_provider
         self.dim_background = dim_background
+        self.close_only = close_only
         self._tutorial: Tutorial | None = None
         self._index = -1
         self._completed: set[str] = set()
@@ -93,6 +95,8 @@ class TutorialController(QObject):
     def start(self, tutorial: Tutorial):
         """Validate bindings before replacing the active tour. Must run in the UI thread."""
         for step in tutorial.steps:
+            if self.close_only and step.advance_on is None:
+                raise ValueError("Close-only tutorials require an event for every step")
             if not isinstance(self.targets.get(step.target), TutorialTarget):
                 raise ValueError(f"Unregistered tutorial target: {step.target}")
             if step.advance_on is not None and not isinstance(self.events.get(step.advance_on), TutorialEvent):
@@ -217,7 +221,7 @@ class TutorialController(QObject):
                 if self.overlay is not None:
                     self.overlay.hide()
                     self.overlay.deleteLater()
-                self._overlay = TutorialOverlay(host, dim_background=self.dim_background)
+                self._overlay = TutorialOverlay(host, dim_background=self.dim_background, close_only=self.close_only)
                 self._overlay.next_requested.connect(self.next)
                 self._overlay.back_requested.connect(self.back)
                 self._overlay.exit_requested.connect(self.stop)

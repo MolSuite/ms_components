@@ -157,6 +157,22 @@ def test_outline_only_presentation_preserves_the_background(ui):
     assert QApplication.widgetAt(button.mapToGlobal(button.rect().center())) is button
 
 
+def test_guide_outline_changes_with_theme_and_keeps_target_clickable(ui):
+    app, window, button, other, controller = ui
+    controller.dim_background = False
+    controller.start(tour(interactive=True))
+    for theme, expected in (("github_light", "#8c4b00"), ("github_dark", "#ffd166")):
+        apply_theme(theme, app)
+        app.processEvents()
+        image = window.grab().toImage()
+        rect = controller.overlay.hole.adjusted(-9, -9, 9, 9).intersected(window.rect())
+        colors = {image.pixelColor(x, y).name()
+                  for x in range(rect.left(), rect.right() + 1)
+                  for y in range(rect.top(), rect.bottom() + 1)}
+        assert expected in colors
+        assert QApplication.widgetAt(button.mapToGlobal(button.rect().center())) is button
+
+
 def test_accepting_a_dialog_keeps_the_tutorial_active_but_closing_cancels(ui):
     app, window, button, other, controller = ui
     dialog = QDialog(window)
@@ -458,3 +474,55 @@ def test_a_still_tour_does_not_repaint_on_every_tracker_tick(ui):
     QTest.qWait(800)  # ten tracker ticks
     controller.overlay.removeEventFilter(counter)
     assert len(paints) <= 1
+
+
+def test_close_only_mode_has_accessible_close_control_and_escape(ui):
+    app, _window, button, _other, controller = ui
+    controller.close_only = True
+    tutorial = Tutorial("interactive", "Interactive", (
+        TutorialStep("action", "run", "Action", "Click the action.", "clicked"),
+    ))
+    controller.start(tutorial)
+    overlay = controller.overlay
+    assert overlay.exit_button.text() == "×"
+    assert overlay.exit_button.accessibleName() == "Close tutorial"
+    assert overlay.exit_button.isVisible()
+    assert not overlay.back_button.isVisible() and not overlay.next_button.isVisible()
+    assert overlay.exit_button.geometry().right() > overlay.counter.geometry().right()
+    assert overlay.panel.rect().contains(overlay.exit_button.geometry())
+    QTest.mouseClick(overlay.exit_button, Qt.LeftButton)
+    assert not controller.is_active
+    controller.start(tutorial)
+    QTest.keyClick(controller.overlay.exit_button, Qt.Key_Escape)
+    assert not controller.is_active
+
+
+def test_close_only_rejects_steps_that_need_next_button(ui):
+    _app, _window, _button, _other, controller = ui
+    controller.close_only = True
+    with pytest.raises(ValueError, match="require an event"):
+        controller.start(tour())
+    assert not controller.is_active
+
+
+def test_close_only_follows_target_into_another_window(ui):
+    app, window, button, _other, controller = ui
+    dialog = QDialog(window)
+    action = QPushButton("Finish", dialog)
+    button.clicked.connect(dialog.show)
+    controller.targets["dialog"] = TutorialTarget(action)
+    controller.events["finish"] = TutorialEvent(action.clicked)
+    controller.close_only = True
+    controller.start(Tutorial("dialog", "Dialog", (
+        TutorialStep("open", "run", "Open", "Open dialog.", "clicked"),
+        TutorialStep("finish", "dialog", "Finish", "Finish the task.", "finish"),
+    )))
+    QTest.mouseClick(button, Qt.LeftButton)
+    app.processEvents()
+    overlay = controller.overlay
+    assert overlay.parentWidget() is dialog
+    assert overlay.exit_button.isVisible() and overlay.exit_button.text() == "×"
+    assert overlay.panel.rect().contains(overlay.exit_button.geometry())
+    QTest.mouseClick(overlay.exit_button, Qt.LeftButton)
+    assert not controller.is_active
+    dialog.close()
