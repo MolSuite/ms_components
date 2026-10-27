@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -16,8 +16,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ms_flow.core.project.catalog import ProjectCatalogBackend
+from ms_components.ms_projects.backend import create_catalog_backend
 from ms_components.ms_projects.browser import ProjectFormDialog, ProjectItem, ProjectTreeWidget
+
+if TYPE_CHECKING:
+    from ms_flow.core.project.catalog import ProjectCatalogBackend
 
 _PROJECT_MENU_COLORS = [
     "#4e95ff",
@@ -56,7 +59,7 @@ class ProjectsMenuWidget(QFrame):
     ):
         super().__init__(parent)
         self.app_id = (app_id or "").strip() or None
-        self.backend = backend or ProjectCatalogBackend(app_id_filter=self.app_id)
+        self.backend = backend if backend is not None else create_catalog_backend(app_id_filter=self.app_id)
         self.title = title
         self.hint_text = hint_text
         self.allow_create = allow_create

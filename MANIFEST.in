@@ -1,0 +1,3 @@
+# setuptools-scm puts every git-tracked file in the sdist; docs/ is repo
+# working material.  licenses/ stays -- it is third-party attribution.
+prune docs

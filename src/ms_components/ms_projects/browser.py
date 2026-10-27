@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
 
 from PySide6.QtCore import (
     Qt, Signal, QRect, QSize, QAbstractTableModel, QModelIndex, QEvent,
@@ -21,10 +21,13 @@ from PySide6.QtWidgets import (
     QTreeView, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
-from ms_flow.core.project.catalog import ProjectCatalogBackend
-from ms_flow.core.settings.manager import SettingsManager
-from ms_flow.core.settings.models import Settings
+from ms_components.ms_projects.backend import create_catalog_backend
 from ms_components.theme import color as theme_color
+
+if TYPE_CHECKING:
+    from ms_flow.core.project.catalog import ProjectCatalogBackend
+    from ms_flow.core.settings.manager import SettingsManager
+    from ms_flow.core.settings.models import Settings
 
 
 # ── Palette ───────────────────────────────────────────────────────────────────
@@ -1108,7 +1111,7 @@ class ProjectBrowserPanel(QWidget):
                  _backend: ProjectCatalogBackend | None = None, parent=None):
         super().__init__(parent)
         self.app_id              = (app_id or "").strip() or None
-        self.backend             = _backend or ProjectCatalogBackend(app_id_filter=None)
+        self.backend             = _backend if _backend is not None else create_catalog_backend()
         self.header_title        = header_title
         self.hint_text           = hint_text
         self.allow_app_selection = (
@@ -2002,7 +2005,7 @@ class ProjectBrowserWindow(QMainWindow):
                  close_on_launch: bool = True, _backend: ProjectCatalogBackend | None = None):
         super().__init__()
         self.app_id          = (app_id or "").strip() or None
-        self.backend         = _backend or ProjectCatalogBackend(app_id_filter=None)
+        self.backend         = _backend if _backend is not None else create_catalog_backend()
         self.window_title    = window_title or "MolSuite Control Center"
         self.close_on_launch = close_on_launch
         eff_header = header_title or (self.app_id or "MolSuite Projects")
@@ -2082,7 +2085,6 @@ class ProjectBrowserWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv[1:])
-    w = ProjectBrowserWindow()
-    w.show()
-    sys.exit(app.exec())
+    from ms_components.ms_projects.app import main
+
+    sys.exit(main())
