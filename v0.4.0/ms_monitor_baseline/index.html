@@ -1,0 +1,930 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Reusable PySide6 components for MolSuite applications.">
+      
+      
+        <meta name="author" content="MolSuite authors">
+      
+      
+        <link rel="canonical" href="https://molsuite.github.io/ms_components/latest/ms_monitor_baseline/">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.73">
+    
+    
+      
+        <title>Baseline de ms_monitor - ms_components</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.4ab2de0c.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.b60ce83d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
+    <div data-md-component="skip">
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="ms_components" class="md-header__button md-logo" aria-label="ms_components" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ms_components
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Baseline de ms_monitor
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <span class="md-visually-hidden">Search</span>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/MolSuite/ms_components" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    MolSuite/ms_components
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="ms_components" class="md-nav__button md-logo" aria-label="ms_components" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    ms_components
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/MolSuite/ms_components" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    MolSuite/ms_components
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Examples
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#alcance-del-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Alcance del baseline
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#estructura-actual" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Estructura actual
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fuentes-de-datos-actuales" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fuentes de datos actuales
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fuentes de datos actuales">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fuente-primaria" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fuente primaria
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fuente-secundaria" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fuente secundaria
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fuente-de-acciones" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fuente de acciones
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#superficie-publica-actual-del-monitor" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Superficie pública actual del monitor
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#modelos-actuales" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Modelos actuales
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acoplamientos-principales" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Acoplamientos principales
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Acoplamientos principales">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#acoplamientos-aceptables" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Acoplamientos aceptables
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#acoplamientos-a-reducir" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Acoplamientos a reducir
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sintoma-practico" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Síntoma práctico
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uso-actual-de-datos-crudos" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Uso actual de datos crudos
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#estado-funcional-actual" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Estado funcional actual
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#matriz-de-capacidades-actual" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Matriz de capacidades actual
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cobertura-actual" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Cobertura actual
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#riesgos-actuales" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Riesgos actuales
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Conclusión
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+              
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+  
+  
+
+
+<h1 id="baseline-de-ms_monitor">Baseline de <code>ms_monitor</code><a class="headerlink" href="#baseline-de-ms_monitor" title="Permanent link">&para;</a></h1>
+<h2 id="alcance-del-baseline">Alcance del baseline<a class="headerlink" href="#alcance-del-baseline" title="Permanent link">&para;</a></h2>
+<p>Este baseline describe el estado real de <code>src/molsuite_components/ms_monitor/</code> en el código actual, con foco en:</p>
+<ul>
+<li>fuentes de datos</li>
+<li>acoplamientos</li>
+<li>superficie pública del bridge</li>
+<li>capacidades realmente disponibles</li>
+<li>riesgos estructurales inmediatos</li>
+</ul>
+<p>No describe el objetivo futuro del monitor. Describe lo que hoy existe.</p>
+<h2 id="estructura-actual">Estructura actual<a class="headerlink" href="#estructura-actual" title="Permanent link">&para;</a></h2>
+<p><code>ms_monitor</code> tiene <code>1307</code> líneas en <code>12</code> módulos Python.</p>
+<p>Distribución principal:</p>
+<ul>
+<li><code>polling.py</code>: <code>354</code> líneas</li>
+<li><code>widget.py</code>: <code>288</code> líneas</li>
+<li><code>bridge.py</code>: <code>116</code> líneas</li>
+<li><code>models.py</code>: <code>113</code> líneas</li>
+<li>resto de módulos: <code>12</code> a <code>96</code> líneas</li>
+</ul>
+<p>Lectura pragmática:</p>
+<ul>
+<li>la estructura de archivos es razonable</li>
+<li>la complejidad real está concentrada en <code>polling.py</code> y <code>widget.py</code></li>
+<li>el problema actual no es monolito por tamaño, sino contrato y acoplamiento</li>
+</ul>
+<h2 id="fuentes-de-datos-actuales">Fuentes de datos actuales<a class="headerlink" href="#fuentes-de-datos-actuales" title="Permanent link">&para;</a></h2>
+<h3 id="fuente-primaria">Fuente primaria<a class="headerlink" href="#fuente-primaria" title="Permanent link">&para;</a></h3>
+<p>El poller usa principalmente una instancia de <code>MolSuite</code>:</p>
+<ul>
+<li><code>molsuite.get_project_activity()</code></li>
+<li><code>molsuite.get_runtime_healthcheck()</code></li>
+<li><code>molsuite.executor_manager.get_status()</code></li>
+<li><code>molsuite.executor_manager.list_jobs()</code></li>
+<li><code>molsuite.executor_manager.get_job(job_id)</code></li>
+</ul>
+<h3 id="fuente-secundaria">Fuente secundaria<a class="headerlink" href="#fuente-secundaria" title="Permanent link">&para;</a></h3>
+<p>El bridge usa rutas auxiliares para outputs:</p>
+<ul>
+<li><code>molsuite.executor_access.list_job_outputs(...)</code> si existe</li>
+<li><code>molsuite.get_job_outputs(job_id)</code> como fallback</li>
+</ul>
+<h3 id="fuente-de-acciones">Fuente de acciones<a class="headerlink" href="#fuente-de-acciones" title="Permanent link">&para;</a></h3>
+<p>La cancelación actual va directa al manager:</p>
+<ul>
+<li><code>molsuite.executor_manager.cancel_job(job_id)</code></li>
+</ul>
+<h2 id="superficie-publica-actual-del-monitor">Superficie pública actual del monitor<a class="headerlink" href="#superficie-publica-actual-del-monitor" title="Permanent link">&para;</a></h2>
+<p><code>MolSuiteMonitorBridge</code> expone hoy:</p>
+<ul>
+<li><code>start()</code></li>
+<li><code>stop()</code></li>
+<li><code>refresh_now()</code></li>
+<li><code>get_recent_events(job_id=None)</code></li>
+<li><code>get_recent_outputs(job_id, limit=...)</code></li>
+<li><code>cancel_job(job_id)</code></li>
+</ul>
+<p>Señales Qt:</p>
+<ul>
+<li><code>project_changed</code></li>
+<li><code>project_cleared</code></li>
+<li><code>project_snapshot_updated</code></li>
+<li><code>job_upserted</code></li>
+<li><code>job_removed</code></li>
+<li><code>job_finished</code></li>
+<li><code>executors_updated</code></li>
+<li><code>health_updated</code></li>
+<li><code>events_updated</code></li>
+<li><code>bridge_error</code></li>
+</ul>
+<h2 id="modelos-actuales">Modelos actuales<a class="headerlink" href="#modelos-actuales" title="Permanent link">&para;</a></h2>
+<p>El monitor ya tiene modelos dataclass tipados:</p>
+<ul>
+<li><code>ProjectMonitorState</code></li>
+<li><code>JobMonitorState</code></li>
+<li><code>ChunkMonitorState</code></li>
+<li><code>EventMonitorState</code></li>
+<li><code>ExecutorMonitorState</code></li>
+<li><code>RuntimeHealthState</code></li>
+</ul>
+<p>Eso es una buena base. El problema no es falta de modelos, sino que gran parte del poller sigue normalizando desde <code>dict</code> crudos del runtime en línea.</p>
+<h2 id="acoplamientos-principales">Acoplamientos principales<a class="headerlink" href="#acoplamientos-principales" title="Permanent link">&para;</a></h2>
+<h3 id="acoplamientos-aceptables">Acoplamientos aceptables<a class="headerlink" href="#acoplamientos-aceptables" title="Permanent link">&para;</a></h3>
+<ul>
+<li>dependencia del monitor en <code>MolSuite</code></li>
+<li>dependencia del widget en el bridge y en modelos tipados</li>
+<li>uso de señales Qt para desacoplar polling y UI</li>
+</ul>
+<h3 id="acoplamientos-a-reducir">Acoplamientos a reducir<a class="headerlink" href="#acoplamientos-a-reducir" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>polling.py</code> depende directo de <code>executor_manager</code></li>
+<li><code>polling.py</code> depende de shapes crudos de <code>get_status()</code>, <code>list_jobs()</code> y <code>get_job()</code></li>
+<li><code>bridge.cancel_job()</code> depende directo de <code>executor_manager</code></li>
+<li><code>bridge.get_recent_outputs()</code> mezcla dos rutas de acceso sin contrato formal del orden de preferencia</li>
+</ul>
+<h3 id="sintoma-practico">Síntoma práctico<a class="headerlink" href="#sintoma-practico" title="Permanent link">&para;</a></h3>
+<p>El monitor ya no está acoplado a SQL crudo, pero todavía depende demasiado de shapes del runtime que no están formalizados como contrato específico para monitor.</p>
+<h2 id="uso-actual-de-datos-crudos">Uso actual de datos crudos<a class="headerlink" href="#uso-actual-de-datos-crudos" title="Permanent link">&para;</a></h2>
+<p>Hoy el monitor trata respuestas crudas de dict en varios puntos:</p>
+<ul>
+<li><code>health_raw.get(...)</code></li>
+<li><code>status_raw.get(...)</code></li>
+<li><code>item.get(...)</code> para executors</li>
+<li><code>summary.get(...)</code> para jobs resumidos</li>
+<li><code>raw.get(...)</code> para detalle de job</li>
+</ul>
+<p>Eso no rompe funcionalidad, pero vuelve frágil la evolución del monitor porque el contrato efectivo vive implícito dentro de <code>polling.py</code>.</p>
+<h2 id="estado-funcional-actual">Estado funcional actual<a class="headerlink" href="#estado-funcional-actual" title="Permanent link">&para;</a></h2>
+<p>Lo que sí funciona hoy:</p>
+<ul>
+<li>detectar ausencia de proyecto activo</li>
+<li>detectar cambio de proyecto</li>
+<li>construir snapshot del proyecto activo</li>
+<li>mostrar jobs del proyecto activo</li>
+<li>mostrar health del runtime</li>
+<li>mostrar resumen de executors</li>
+<li>mostrar chunks vivos</li>
+<li>mostrar eventos recientes</li>
+<li>mostrar outputs recientes</li>
+<li>refresco manual</li>
+<li>cancelación básica desde UI</li>
+</ul>
+<h2 id="matriz-de-capacidades-actual">Matriz de capacidades actual<a class="headerlink" href="#matriz-de-capacidades-actual" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Capacidad</th>
+<th>Estado</th>
+<th>Observación</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Monitoreo de proyecto activo</td>
+<td>soportada</td>
+<td><code>refresh_now()</code> y polling funcionales</td>
+</tr>
+<tr>
+<td>Listado de jobs</td>
+<td>soportada</td>
+<td>activos + recientes, con retención acotada</td>
+</tr>
+<tr>
+<td>Detalle básico por job</td>
+<td>soportada</td>
+<td>vía snapshot, chunks, eventos y outputs recientes</td>
+</tr>
+<tr>
+<td>Healthcheck runtime</td>
+<td>soportada</td>
+<td>vía <code>get_runtime_healthcheck()</code></td>
+</tr>
+<tr>
+<td>Resumen por executor</td>
+<td>soportada</td>
+<td>vía <code>manager.get_status()</code></td>
+</tr>
+<tr>
+<td>Eventos recientes</td>
+<td>soportada</td>
+<td>disponibles desde el snapshot actual</td>
+</tr>
+<tr>
+<td>Outputs recientes</td>
+<td>parcial</td>
+<td>dos rutas backend, sin contrato único explícito</td>
+</tr>
+<tr>
+<td>Refresh manual</td>
+<td>soportada</td>
+<td>expuesto en bridge y widget</td>
+</tr>
+<tr>
+<td>Cancelación</td>
+<td>parcial</td>
+<td>funciona, pero depende de <code>executor_manager</code> directo</td>
+</tr>
+<tr>
+<td>Historial reciente</td>
+<td>parcial</td>
+<td>existe retención de jobs terminales recientes, pero no hay política formal de historial</td>
+</tr>
+<tr>
+<td>Logs de job</td>
+<td>parcial</td>
+<td>hoy se aproximan con eventos/outputs; no hay contrato explícito de logs</td>
+</tr>
+<tr>
+<td>Borrado de jobs</td>
+<td>no soportada</td>
+<td>no hay ruta canónica en el bridge</td>
+</tr>
+<tr>
+<td>Edición de jobs</td>
+<td>no soportada</td>
+<td>no hay semántica pública definida</td>
+</tr>
+<tr>
+<td>Resubmit/retry desde monitor</td>
+<td>requiere API</td>
+<td>no debe inventarse desde UI</td>
+</tr>
+</tbody>
+</table>
+<h2 id="cobertura-actual">Cobertura actual<a class="headerlink" href="#cobertura-actual" title="Permanent link">&para;</a></h2>
+<p>La suite <code>tests/test_molsuite_monitor_bridge.py</code> ya cubre lo esencial:</p>
+<ul>
+<li>sin proyecto activo</li>
+<li>proyecto activo y cambio de proyecto</li>
+<li>staging y chunks vivos</li>
+<li>cancelación observada</li>
+<li>orden de jobs activos y terminales recientes</li>
+<li>eventos recientes por job</li>
+<li>outputs recientes</li>
+</ul>
+<p>Lectura pragmática:</p>
+<ul>
+<li>la base funcional existe</li>
+<li>la deuda está más en el contrato y en las acciones de operador que en la ausencia total de comportamiento</li>
+</ul>
+<h2 id="riesgos-actuales">Riesgos actuales<a class="headerlink" href="#riesgos-actuales" title="Permanent link">&para;</a></h2>
+<ul>
+<li>que cambios en shapes internos del runtime rompan <code>polling.py</code></li>
+<li>que la cancelación siga atada a internals en vez de una ruta soportada</li>
+<li>que outputs, eventos y logs se mezclen semánticamente</li>
+<li>que el historial crezca sin política explícita</li>
+<li>que AMDock termine consumiendo detalles no canónicos del bridge</li>
+</ul>
+<h2 id="conclusion">Conclusión<a class="headerlink" href="#conclusion" title="Permanent link">&para;</a></h2>
+<p><code>ms_monitor</code> ya es usable como monitor básico. No está “roto” en lo esencial.</p>
+<p>Lo que falta no es rehacerlo desde cero, sino formalizarlo:</p>
+<ul>
+<li>contrato de datos del monitor</li>
+<li>contrato de capacidades soportadas</li>
+<li>reducción del acoplamiento a <code>executor_manager</code></li>
+<li>separación más clara entre observar, diagnosticar y actuar</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 MolSuite authors
+    </div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.code.copy","navigation.footer","navigation.path","navigation.sections","navigation.top","search.highlight","search.suggest"],"redirect":null,"search":"../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.77dd0ce9.min.js"></script>
+      
+    
+  </body>
+</html>
