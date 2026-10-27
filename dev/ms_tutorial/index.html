@@ -573,6 +573,12 @@ or deleted targets and callback failures stop the tour and emit <code>failed</co
 spotlight should update immediately. Normal tracking continues automatically.
 Accepting a host <code>QDialog</code> preserves the tutorial so its target can move back to
 the parent window; closing or rejecting the host still cancels the tutorial.</p>
+<p>For tutorials where every step advances through an application event,
+<code>TutorialController(close_only=True)</code> replaces the Back, Next and Exit buttons
+with a compact close button in the callout header. Escape still cancels. Every
+step must provide <code>advance_on</code>; starting a close-only tutorial with an
+informational step raises <code>ValueError</code>, since there would be no way to advance.
+The default controls remain available for informative tours.</p>
 <p><code>TutorialController(dim_background=False)</code> preserves the application's background
 colors and draws only the target outline. Input gating remains the same.
 <code>instruction_provider=lambda step: current_instruction</code> supplies dynamic plain-text
