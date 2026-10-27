@@ -83,7 +83,7 @@ removed. `"offtarget"` remains accepted as an alias for `"comparison"`.
 
 ## Ketcher
 
-::: ms_components.ms_ketcher
+::: ms_components.ketcher
 
 ## Stepper
 

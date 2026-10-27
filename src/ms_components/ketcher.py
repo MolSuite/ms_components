@@ -4,7 +4,7 @@
 application installs it. Ketcher's JS API answers with Promises, which runJavaScript cannot
 await: the settled value is parked in a window variable and polled from here.
 
-`run_editor` opens the dialog in its own process (`python -m ms_components.ms_ketcher`): in an
+`run_editor` opens the dialog in its own process (`python -m ms_components.ketcher`): in an
 application's process, PySide 6.10 segfaults as soon as the pointer hovers a QWebEngineView
 while any Python application-wide event filter is installed. It also keeps Chromium's memory
 and GPU use away from the rest of the application (an embedded PyMOL, for one)."""
@@ -47,7 +47,7 @@ class KetcherDialog(QDialog):
         self._poll = QTimer(self, interval=100)
         # As JSON: a JS object comes back to Python empty, a string intact.
         self._poll.timeout.connect(
-            lambda: self._view.page().runJavaScript("JSON.stringify(window.__ms_ketcher ?? null)", 0, self._polled)
+            lambda: self._view.page().runJavaScript("JSON.stringify(window.__ketcher ?? null)", 0, self._polled)
         )
 
         self._view = QWebEngineView(self)
@@ -74,9 +74,9 @@ class KetcherDialog(QDialog):
         """Evaluate a JS Promise; `done({"ok": value} | {"error": text})` once it settles."""
         self._done = done
         self._view.page().runJavaScript(
-            "window.__ms_ketcher = undefined;"
-            f"Promise.resolve({promise}).then(v => window.__ms_ketcher = {{ok: v ?? ''}},"
-            " e => window.__ms_ketcher = {error: String(e)});"
+            "window.__ketcher = undefined;"
+            f"Promise.resolve({promise}).then(v => window.__ketcher = {{ok: v ?? ''}},"
+            " e => window.__ketcher = {error: String(e)});"
         )
         self._poll.start()
 
