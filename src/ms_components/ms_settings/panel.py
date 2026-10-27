@@ -5,7 +5,7 @@ import json
 from decimal import Decimal
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, get_origin
+from typing import TYPE_CHECKING, Any, get_origin
 
 from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtGui import QFontDatabase, QPalette
@@ -35,7 +35,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ms_flow.api import ConfigurationEntry
+if TYPE_CHECKING:
+    from ms_flow.api import ConfigurationEntry
 
 
 _SOURCE_LABELS = {

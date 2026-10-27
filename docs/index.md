@@ -6,13 +6,24 @@ dock, steppers, tool panels, and the shared theme.
 
 ## Install
 
-`ms_components` requires Python 3.12. PyMOL comes from the
-`pymol-open-source` alpha wheels on PyPI and is installed automatically as a
-dependency, together with `ms_flow`; no conda environment is needed:
+`ms_components` requires Python 3.12. The base installation requires Qt;
+integrations are selected with extras:
 
 ```bash
 pip install ms_components
+pip install "ms_components[table,pymol]"
+pip install "ms_components[all]"
 ```
+
+The extras are `table` (SQLModel), `monitor` (Pydantic), `projects` (`ms_flow`),
+`pymol` (`pymol-open-source` alpha wheels), and `steps` (`ms_env`). `dev` adds
+all integrations and pytest. Extras change which dependencies are installed,
+not which component files are shipped.
+
+Project widgets can use a supplied backend without `ms_flow`. The default catalog
+and `python -m ms_components.ms_projects.app` require the `projects` extra.
+The catalog creates its database on first use; a missing backend is reported with
+the installation command.
 
 ## Components
 
