@@ -4,7 +4,7 @@ from __future__ import annotations
 from math import ceil
 
 from PySide6.QtCore import QPoint, QRect, QRectF, Qt, Signal
-from PySide6.QtGui import QPainter, QPainterPath, QPalette, QPen
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPalette, QPen
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QTextBrowser,
     QVBoxLayout, QWidget,
@@ -184,5 +184,14 @@ class TutorialOverlay(QWidget):
             opening = QPainterPath()
             opening.addRect(QRectF(self.hole))
             painter.fillPath(path.subtracted(opening), shade)
-        painter.setPen(QPen(self.palette().color(QPalette.ColorRole.Highlight), 3))
-        painter.drawRoundedRect(QRectF(self.hole.adjusted(-3, -3, 3, 3)), 6, 6)
+        # A two-tone ring distinguishes the guide from the theme's selection and
+        # button colors. The contrasting outer stroke keeps it visible over mixed
+        # surfaces, including selected controls and application artwork.
+        dark = self.palette().color(QPalette.ColorRole.Window).lightness() < 128
+        halo = QColor("#141a22" if dark else "#ffffff")
+        guide = QColor("#ffd166" if dark else "#8c4b00")
+        rect = QRectF(self.hole.adjusted(-5, -5, 5, 5))
+        painter.setPen(QPen(halo, 7))
+        painter.drawRoundedRect(rect, 7, 7)
+        painter.setPen(QPen(guide, 3))
+        painter.drawRoundedRect(rect, 7, 7)

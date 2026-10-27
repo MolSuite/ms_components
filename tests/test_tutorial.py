@@ -157,6 +157,22 @@ def test_outline_only_presentation_preserves_the_background(ui):
     assert QApplication.widgetAt(button.mapToGlobal(button.rect().center())) is button
 
 
+def test_guide_outline_changes_with_theme_and_keeps_target_clickable(ui):
+    app, window, button, other, controller = ui
+    controller.dim_background = False
+    controller.start(tour(interactive=True))
+    for theme, expected in (("github_light", "#8c4b00"), ("github_dark", "#ffd166")):
+        apply_theme(theme, app)
+        app.processEvents()
+        image = window.grab().toImage()
+        rect = controller.overlay.hole.adjusted(-9, -9, 9, 9).intersected(window.rect())
+        colors = {image.pixelColor(x, y).name()
+                  for x in range(rect.left(), rect.right() + 1)
+                  for y in range(rect.top(), rect.bottom() + 1)}
+        assert expected in colors
+        assert QApplication.widgetAt(button.mapToGlobal(button.rect().center())) is button
+
+
 def test_accepting_a_dialog_keeps_the_tutorial_active_but_closing_cancels(ui):
     app, window, button, other, controller = ui
     dialog = QDialog(window)
