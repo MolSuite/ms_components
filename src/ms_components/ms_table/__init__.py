@@ -40,9 +40,11 @@ from .table_config import (
     DEFAULT_PAGE_SIZES,
 )
 from .table_model import SmartTableModel
+from .table_interaction import TableInteraction
 
 __all__ = [
     "SmartTableView",
+    "TableInteraction",
     "SessionProvider",
     "TableConfig",
     "ToolbarAction",
