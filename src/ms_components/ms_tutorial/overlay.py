@@ -19,9 +19,10 @@ class TutorialOverlay(QWidget):
     back_requested = Signal()
     exit_requested = Signal()
 
-    def __init__(self, host: QWidget, *, dim_background: bool = True):
+    def __init__(self, host: QWidget, *, dim_background: bool = True, close_only: bool = False):
         super().__init__(host)
         self.dim_background = dim_background
+        self.close_only = close_only
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
         self.hole = QRect()
         self.step: TutorialStep | None = None
@@ -48,17 +49,40 @@ class TutorialOverlay(QWidget):
         self.body.setFrameShape(QFrame.Shape.NoFrame)
         self.body.setOpenExternalLinks(False)
         self.body.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        for widget in (self.counter, self.title, self.body):
-            layout.addWidget(widget)
+        if close_only:
+            self.counter.setMinimumWidth(0)
+            self.counter.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            header = QHBoxLayout()
+            header.setContentsMargins(0, 0, 0, 0)
+            header.addWidget(self.counter, 1)
+            layout.addLayout(header)
+        else:
+            layout.addWidget(self.counter)
+        layout.addWidget(self.title)
+        layout.addWidget(self.body)
         actions = QHBoxLayout()
         self.exit_button = QPushButton(self.tr("Exit · Esc"))
         self.back_button = QPushButton(self.tr("Back"))
         self.next_button = QPushButton(self.tr("Next"))
-        for button in (self.exit_button, self.back_button, self.next_button):
-            button.setMinimumWidth(0)
-            button.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
-            actions.addWidget(button)
-        layout.addLayout(actions)
+        if close_only:
+            self.exit_button.setText("×")
+            self.exit_button.setAccessibleName(self.tr("Close tutorial"))
+            self.exit_button.setToolTip(self.tr("Close tutorial (Esc)"))
+            self.exit_button.setFlat(True)
+            self.exit_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            self.exit_button.setFixedSize(28, 28)
+            self.exit_button.setStyleSheet("font-size: 20px; padding: 0;")
+            header.addWidget(self.exit_button, 0, Qt.AlignmentFlag.AlignTop)
+            self.back_button.setParent(self.panel)
+            self.next_button.setParent(self.panel)
+            self.back_button.hide()
+            self.next_button.hide()
+        else:
+            for button in (self.exit_button, self.back_button, self.next_button):
+                button.setMinimumWidth(0)
+                button.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+                actions.addWidget(button)
+            layout.addLayout(actions)
         self.exit_button.clicked.connect(self.exit_requested)
         self.back_button.clicked.connect(self.back_requested)
         self.next_button.clicked.connect(self.next_requested)
@@ -147,7 +171,7 @@ class TutorialOverlay(QWidget):
         self.update()
 
     def focus_guide(self):
-        (self.next_button if self.next_button.isEnabled() else self.exit_button).setFocus()
+        (self.next_button if not self.close_only and self.next_button.isEnabled() else self.exit_button).setFocus()
 
     def paintEvent(self, event):
         painter = QPainter(self)

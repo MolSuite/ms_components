@@ -131,6 +131,13 @@ spotlight should update immediately. Normal tracking continues automatically.
 Accepting a host `QDialog` preserves the tutorial so its target can move back to
 the parent window; closing or rejecting the host still cancels the tutorial.
 
+For tutorials where every step advances through an application event,
+`TutorialController(close_only=True)` replaces the Back, Next and Exit buttons
+with a compact close button in the callout header. Escape still cancels. Every
+step must provide `advance_on`; starting a close-only tutorial with an
+informational step raises `ValueError`, since there would be no way to advance.
+The default controls remain available for informative tours.
+
 `TutorialController(dim_background=False)` preserves the application's background
 colors and draws only the target outline. Input gating remains the same.
 `instruction_provider=lambda step: current_instruction` supplies dynamic plain-text
