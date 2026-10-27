@@ -19,3 +19,4 @@ class TutorialTarget:
 class TutorialEvent:
     signal: SignalInstance | Callable[[], SignalInstance]
     accept: Callable[..., bool] | None = None
+    is_complete: Callable[[], bool] | None = None

@@ -988,6 +988,9 @@ class StatsDialog(QDialog):
 
 
 class ProjectFormDialog(QDialog):
+    name_committed = Signal(str)
+    path_selected = Signal(str)
+
     def __init__(self, *, apps: list, mode: str,
                  initial_data: dict | None = None,
                  allow_app_selection: bool = True, parent=None):
@@ -1005,6 +1008,7 @@ class ProjectFormDialog(QDialog):
         layout = QVBoxLayout(self)
         form = QFormLayout()
         self.name_input        = QLineEdit(self.initial_data.get("name", ""))
+        self.name_input.editingFinished.connect(lambda: self.name_committed.emit(self.name_input.text().strip()))
         self.path_input        = QLineEdit(str(self.initial_data.get("path", "")))
         self.path_input.setReadOnly(True)
         self.description_input = QTextEdit(self.initial_data.get("description", ""))
@@ -1022,11 +1026,11 @@ class ProjectFormDialog(QDialog):
             idx = self.app_combo.findData(cid)
             if idx >= 0: self.app_combo.setCurrentIndex(idx)
         self.app_combo.setEnabled(self.allow_app_selection and not is_edit)
-        path_row = QWidget()
+        path_row = self.path_row = QWidget()
         pl = QHBoxLayout(path_row)
         pl.setContentsMargins(0,0,0,0)
         pl.addWidget(self.path_input)
-        browse_btn = QPushButton("Browse...")
+        browse_btn = self.browse_button = QPushButton("Browse...")
         browse_btn.clicked.connect(self._on_browse)
         browse_btn.setEnabled(not is_edit)
         pl.addWidget(browse_btn)
@@ -1037,6 +1041,7 @@ class ProjectFormDialog(QDialog):
         form.addRow("Description:", self.description_input)
         layout.addLayout(form)
         btns = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        self.save_button = btns.button(QDialogButtonBox.Save)
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
@@ -1045,7 +1050,9 @@ class ProjectFormDialog(QDialog):
         folder = QFileDialog.getExistingDirectory(
             self, "Select folder",
             self.path_input.text().strip() or str(Path.home()))
-        if folder: self.path_input.setText(folder)
+        if folder:
+            self.path_input.setText(folder)
+            self.path_selected.emit(folder)
 
     def accept(self):
         if not self.name_input.text().strip():
@@ -1091,6 +1098,7 @@ class StatTile(QFrame):
 class ProjectBrowserPanel(QWidget):
     project_requested = Signal(str)
     project_created   = Signal(str)
+    project_form_opened = Signal(object)
     projects_changed  = Signal()
 
     def __init__(self, *, app_id: str | None = None, header_title: str,
@@ -1288,6 +1296,7 @@ class ProjectBrowserPanel(QWidget):
                           "description": raw.description, "tags": raw.tags,
                           "app_id": raw.app_id},
             allow_app_selection=self._dialog_allows_app_selection(), parent=self)
+        self.project_form_opened.emit(dlg)
         if dlg.exec() != QDialog.Accepted:
             return
         data = dlg.get_data()
@@ -1355,6 +1364,7 @@ class ProjectBrowserPanel(QWidget):
             initial_data={"path": str(Path.home()/"molsuite_projects"),
                           "app_id": self._active_tool_app_id or apps[0].app_id},
             allow_app_selection=self._dialog_allows_app_selection(), parent=self)
+        self.project_form_opened.emit(dlg)
         if dlg.exec() != QDialog.Accepted:
             return
         fd = dlg.get_data()

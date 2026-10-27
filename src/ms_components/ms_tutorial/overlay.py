@@ -19,8 +19,9 @@ class TutorialOverlay(QWidget):
     back_requested = Signal()
     exit_requested = Signal()
 
-    def __init__(self, host: QWidget):
+    def __init__(self, host: QWidget, *, dim_background: bool = True):
         super().__init__(host)
+        self.dim_background = dim_background
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
         self.hole = QRect()
         self.step: TutorialStep | None = None
@@ -73,6 +74,14 @@ class TutorialOverlay(QWidget):
         self.next_button.setText(self.tr("Finish") if index == count - 1 else self.tr("Next"))
         self.setAccessibleName(tutorial_title)
         self.setAccessibleDescription(f"{step.title}. {step.text}")
+
+    def set_text(self, text: str):
+        """Update instructions without resetting their layout or scroll position each tick."""
+        if self.body.toPlainText() != text:
+            self.body.setPlainText(text)
+            self._size_key = None
+            self._place_key = None
+            self.setAccessibleDescription(f"{self.step.title}. {text}")
 
     def reposition(self, target: QWidget, *, interactive: bool, rect: QRect | None = None):
         host = self.parentWidget()
@@ -143,12 +152,13 @@ class TutorialOverlay(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        shade = self.palette().color(QPalette.ColorRole.Shadow)
-        shade.setAlpha(170)
-        path = QPainterPath()
-        path.addRect(QRectF(self.rect()))
-        opening = QPainterPath()
-        opening.addRect(QRectF(self.hole))
-        painter.fillPath(path.subtracted(opening), shade)
+        if self.dim_background:
+            shade = self.palette().color(QPalette.ColorRole.Shadow)
+            shade.setAlpha(170)
+            path = QPainterPath()
+            path.addRect(QRectF(self.rect()))
+            opening = QPainterPath()
+            opening.addRect(QRectF(self.hole))
+            painter.fillPath(path.subtracted(opening), shade)
         painter.setPen(QPen(self.palette().color(QPalette.ColorRole.Highlight), 3))
         painter.drawRoundedRect(QRectF(self.hole.adjusted(-3, -3, 3, 3)), 6, 6)
