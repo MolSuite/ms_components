@@ -21,7 +21,7 @@ pip install ms_components
 | `ms_components.ms_table` | Declarative, paginated table over SQLModel |
 | `ms_components.ms_monitor` | Job monitor for an `ms_flow` workspace: cancel, resume, move |
 | `ms_components.ms_executors` | Hosts and executors: Settings pages and the panel that starts them |
-| `ms_components.ms_projects` | Project browser and project menu |
+| [`ms_components.ms_projects`](project_form_events.md) | Project browser, project menu, and form lifecycle events |
 | `ms_components.ms_settings` | Typed editor for application settings |
 | `ms_components.ms_pymol` | PyMOL dock and control bar |
 | `ms_components.ms_stepper` | Step-by-step wizard widget |

@@ -90,6 +90,14 @@ window.tutorials.start(overview)
   without resetting application data. Multiple queued copies of an old event do
   not complete a later step, even if both steps use the same signal.
 
+For asynchronous operations that may finish while the user has gone Back, supply
+`TutorialEvent(signal, accept=..., is_complete=lambda: cached_result_is_ready)`.
+The controller checks `is_complete` when entering an unfinished step and advances
+if it returns true. The application records successful completion before emitting
+its signal; the callback reads that state, without blocking or querying a database.
+`accept` validates incoming signal arguments; `is_complete` independently checks
+the operation and result that the step requires.
+
 `TutorialEvent.signal` also accepts a zero-argument resolver for signals belonging
 to dialogs or controls that are recreated. It is resolved when entering the step.
 
@@ -117,6 +125,18 @@ Use `prepare` to scroll offscreen controls into view; the component does not scr
 the application automatically. Hidden targets temporarily hide the overlay; an
 initial hidden target without an existing overlay fails with a diagnostic. Missing
 or deleted targets and callback failures stop the tour and emit `failed`.
+
+Call the public `controller.refresh()` after an application UI change when the
+spotlight should update immediately. Normal tracking continues automatically.
+Accepting a host `QDialog` preserves the tutorial so its target can move back to
+the parent window; closing or rejecting the host still cancels the tutorial.
+
+`TutorialController(dim_background=False)` preserves the application's background
+colors and draws only the target outline. Input gating remains the same.
+`instruction_provider=lambda step: current_instruction` supplies dynamic plain-text
+instructions. They are measured again only when their text changes, without
+resetting the reader's scroll position on every tracking tick. These options do not
+depend on any application or project package.
 
 Lifecycle signals:
 

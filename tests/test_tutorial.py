@@ -100,6 +100,82 @@ class Emitter(QObject):
     done = Signal(str, str)
 
 
+def test_completion_while_on_another_step_is_checked_on_return(ui):
+    app, window, button, other, controller = ui
+    emitter = Emitter()
+    completed = set()
+    controller.events["job.done"] = TutorialEvent(
+        emitter.done, accept=lambda job, status: job == "expected" and status == "completed",
+        is_complete=lambda: "expected" in completed,
+    )
+    controller.start(Tutorial("jobs", "Jobs", (
+        TutorialStep("first", "run", "Input", "Review input."),
+        TutorialStep("job", "run", "Run", "Wait.", "job.done"),
+        TutorialStep("last", "other", "Output", "Review output."),
+    )))
+    controller.next()
+    assert controller.index == 1 and not controller.overlay.next_button.isEnabled()
+    controller.back()
+    completed.add("expected")
+    emitter.done.emit("expected", "completed")
+    app.processEvents()
+    assert controller.index == 0
+    controller.next()
+    assert controller.index == 2
+    controller.back()
+    assert controller.index == 1 and controller.overlay.next_button.isEnabled()
+
+
+def test_dynamic_instructions_refresh_without_reflowing_unchanged_text(ui):
+    app, window, button, other, controller = ui
+    instructions = ["Wait for the operation."]
+    controller.instruction_provider = lambda step: instructions[0]
+    controller.start(tour())
+    assert controller.overlay.body.toPlainText() == instructions[0]
+    instructions[0] = "The operation is ready. " * 100
+    controller.refresh()
+    assert controller.overlay.body.toPlainText() == instructions[0]
+    assert instructions[0] in controller.overlay.accessibleDescription()
+    controller.overlay.body.verticalScrollBar().setValue(20)
+    controller.refresh()
+    assert controller.overlay.body.verticalScrollBar().value() == 20
+
+
+def test_outline_only_presentation_preserves_the_background(ui):
+    app, window, button, other, controller = ui
+    before = window.grab().toImage()
+    controller.dim_background = False
+    controller.start(tour(interactive=True))
+    overlay = controller.overlay
+    sample = next(QPoint(x, y) for x in range(10, window.width(), 20)
+                  for y in range(10, window.height(), 20)
+                  if not overlay.panel.geometry().contains(x, y)
+                  and not overlay.hole.adjusted(-5, -5, 5, 5).contains(x, y))
+    after = window.grab().toImage()
+    assert after.pixelColor(sample) == before.pixelColor(sample)
+    assert overlay.hole.size() == button.size()
+    assert QApplication.widgetAt(button.mapToGlobal(button.rect().center())) is button
+
+
+def test_accepting_a_dialog_keeps_the_tutorial_active_but_closing_cancels(ui):
+    app, window, button, other, controller = ui
+    dialog = QDialog(window)
+    action = QPushButton("Save", dialog)
+    dialog.show()
+    app.processEvents()
+    controller.targets["dialog"] = TutorialTarget(lambda: action if dialog.isVisible() else button)
+    controller.start(Tutorial("dialog", "Dialog", (
+        TutorialStep("save", "dialog", "Save", "Save the form."),
+    )))
+    dialog.accept()
+    app.processEvents()
+    assert controller.is_active and controller.overlay.parentWidget() is window
+    dialog.show()
+    controller.refresh()
+    dialog.close()
+    assert not controller.is_active
+
+
 def test_job_predicate_runs_in_ui_thread_and_ignores_stale_duplicate_events(ui):
     app, window, button, other, controller = ui
     emitter = Emitter()
@@ -184,13 +260,13 @@ def test_resize_and_long_text_keep_callout_visible_and_scrollable(ui):
     controller.start(definition)
     window.resize(480, 400)
     app.processEvents()
-    controller._refresh()
+    controller.refresh()
     overlay = controller.overlay
     assert overlay.rect().contains(overlay.panel.geometry())
     assert not overlay.panel.geometry().intersects(overlay.hole)
     assert overlay.body.verticalScrollBar().maximum() > 0
     overlay.body.verticalScrollBar().setValue(20)
-    controller._refresh()
+    controller.refresh()
     assert overlay.body.verticalScrollBar().value() == 20
     assert overlay.hole.contains(overlay.mapFromGlobal(button.mapToGlobal(QPoint(2, 2))))
 
@@ -217,7 +293,7 @@ def test_menu_target_region_follows_the_action_geometry(ui):
     previous = controller.overlay.hole
     file_menu.menuAction().setText("Projects and input files")
     app.processEvents()
-    controller._refresh()
+    controller.refresh()
     assert controller.overlay.hole == expected_region()
     assert controller.overlay.hole.left() > previous.left()
 
@@ -263,7 +339,7 @@ def test_deleted_target_and_prepare_errors_fail_with_cleanup(ui):
     controller.start(tour())
     button.deleteLater()
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-    controller._refresh()
+    controller.refresh()
     assert failures and "unavailable" in failures[-1]
     assert not controller.is_active and controller.overlay is None
 

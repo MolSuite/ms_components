@@ -1,11 +1,11 @@
 """Attach a tour to existing widgets/signals without changing their slots."""
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 import weakref
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal, SignalInstance, Slot
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QApplication, QDialog, QWidget
 from shiboken6 import isValid
 
 from .bindings import TutorialEvent, TutorialTarget
@@ -54,10 +54,14 @@ class TutorialController(QObject):
 
     def __init__(self, *, targets: Mapping[str, TutorialTarget],
                  events: Mapping[str, TutorialEvent] | None = None,
+                 instruction_provider: Callable[[TutorialStep], str] | None = None,
+                 dim_background: bool = True,
                  parent: QObject | None = None):
         super().__init__(parent)
         self.targets = dict(targets)
         self.events = dict(events or {})
+        self.instruction_provider = instruction_provider
+        self.dim_background = dim_background
         self._tutorial: Tutorial | None = None
         self._index = -1
         self._completed: set[str] = set()
@@ -67,7 +71,7 @@ class TutorialController(QObject):
         self._previous_focus = None
         self._tracker = QTimer(self)
         self._tracker.setInterval(80)
-        self._tracker.timeout.connect(self._refresh)
+        self._tracker.timeout.connect(self.refresh)
 
     @property
     def is_active(self) -> bool:
@@ -170,7 +174,7 @@ class TutorialController(QObject):
             # overlay (and comes back). Otherwise the tour would stay active, unseen, eating Escape.
             if isinstance(target, QWidget) and isValid(target) and not target.isVisible():
                 raise ValueError(f"Target '{step.target}' is hidden; provide a prepare callback")
-            self._refresh()
+            self.refresh()
             if not self.is_active:
                 return
             if step.advance_on is not None:
@@ -181,12 +185,18 @@ class TutorialController(QObject):
                     self._target.setFocus()
                 else:
                     self.overlay.focus_guide()
+            if step.advance_on is not None and step.id not in self._completed:
+                check = self.events[step.advance_on].is_complete
+                if check is not None and check():
+                    self._completed.add(step.id)
+                    self.next()
         except Exception as exc:
             if self.is_active:
                 self._fail(f"Cannot show tutorial step '{step.id}': {exc}")
 
     @Slot()
-    def _refresh(self):
+    def refresh(self):
+        """Resolve the current target and instructions after an application UI change."""
         step = self.current_step
         if step is None:
             return
@@ -207,13 +217,15 @@ class TutorialController(QObject):
                 if self.overlay is not None:
                     self.overlay.hide()
                     self.overlay.deleteLater()
-                self._overlay = TutorialOverlay(host)
+                self._overlay = TutorialOverlay(host, dim_background=self.dim_background)
                 self._overlay.next_requested.connect(self.next)
                 self._overlay.back_requested.connect(self.back)
                 self._overlay.exit_requested.connect(self.stop)
                 self.destroyed.connect(self._overlay.deleteLater)
             if self.overlay.step is not step:
                 self.overlay.set_step(self._tutorial.title, step, self._index, len(self._tutorial.steps))
+            if self.instruction_provider is not None:
+                self.overlay.set_text(self.instruction_provider(step))
             self.overlay.next_button.setEnabled(step.advance_on is None or step.id in self._completed)
             region = self.targets[step.target].rect
             self.overlay.reposition(target, interactive=step.advance_on is not None,
@@ -233,6 +245,14 @@ class TutorialController(QObject):
         self._completed.add(self.current_step.id)
         self.next()
 
+    @Slot(int)
+    def _on_dialog_finished(self, result: int):
+        if self.is_active:
+            if result == QDialog.DialogCode.Accepted:
+                self.refresh()
+            else:
+                self.stop()
+
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if not self.is_active or not isinstance(watched, QWidget) or self.overlay is None:
             return False
@@ -242,6 +262,10 @@ class TutorialController(QObject):
             self.stop()
             return True
         if event.type() == QEvent.Type.Close and watched is self.overlay.parentWidget():
+            if isinstance(watched, QDialog):
+                self.overlay.hide()
+                watched.finished.connect(self._on_dialog_finished, Qt.ConnectionType.SingleShotConnection)
+                return False
             self.stop()
             return False
         if not self.overlay.isVisible():

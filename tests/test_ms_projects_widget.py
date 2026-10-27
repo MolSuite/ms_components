@@ -9,6 +9,51 @@ from PySide6.QtWidgets import QDialog, QMessageBox
 
 from ms_flow.core.apps import AppManifest
 from ms_components.ms_projects import ProjectsMenuWidget
+from ms_components.ms_projects import ProjectFormDialog
+
+
+def test_folder_selection_emits_only_when_confirmed_including_the_same_folder(monkeypatch, tmp_path):
+    QApplication.instance() or QApplication([])
+    backend = _FakeBackend()
+    form = ProjectFormDialog(apps=backend.list_apps(), mode="create",
+                             initial_data={"path": str(tmp_path)})
+    selected, names = [], []
+    form.path_selected.connect(selected.append)
+    form.name_committed.connect(names.append)
+    try:
+        form.name_input.setText("Practice")
+        form.name_input.editingFinished.emit()
+        assert names == ["Practice"]
+        monkeypatch.setattr("ms_components.ms_projects.browser.QFileDialog.getExistingDirectory", lambda *a: "")
+        form.browse_button.click()
+        assert selected == [] and form.path_input.text() == str(tmp_path)
+        monkeypatch.setattr("ms_components.ms_projects.browser.QFileDialog.getExistingDirectory",
+                            lambda *a: str(tmp_path))
+        form.browse_button.click()
+        assert selected == [str(tmp_path)]
+        assert form.path_row.isAncestorOf(form.browse_button)
+        assert form.save_button.text()
+    finally:
+        form.deleteLater()
+
+
+def test_project_form_is_announced_before_its_modal_loop_and_cancel_does_not_create(monkeypatch):
+    QApplication.instance() or QApplication([])
+    widget = ProjectsMenuWidget(app_id="amdockvs", backend=_FakeBackend())
+    opened, created = [], []
+    widget.project_form_opened.connect(opened.append)
+    widget.project_created.connect(created.append)
+
+    def cancel(form):
+        assert opened == [form] and form.mode == "create"
+        return QDialog.Rejected
+
+    monkeypatch.setattr(ProjectFormDialog, "exec", cancel)
+    try:
+        widget.on_create_project()
+        assert len(opened) == 1 and created == []
+    finally:
+        widget.deleteLater()
 
 
 class _FakeBackend:

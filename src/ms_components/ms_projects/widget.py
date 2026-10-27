@@ -38,6 +38,7 @@ def _project_color(index: int) -> str:
 class ProjectsMenuWidget(QFrame):
     project_requested = Signal(str)
     project_created = Signal(str)
+    project_form_opened = Signal(object)
     # The host app's open project was confirmed for deletion: the host closes it, then deletes it.
     active_project_delete_requested = Signal(str)
 
@@ -173,6 +174,7 @@ class ProjectsMenuWidget(QFrame):
             allow_app_selection=self.allow_app_selection,
             parent=self,
         )
+        self.project_form_opened.emit(dialog)
         if dialog.exec() != ProjectFormDialog.Accepted:
             return
         data = dialog.get_data()
@@ -224,6 +226,7 @@ class ProjectsMenuWidget(QFrame):
             allow_app_selection=False,
             parent=self,
         )
+        self.project_form_opened.emit(dialog)
         if dialog.exec() != ProjectFormDialog.Accepted:
             return
         data = dialog.get_data()
