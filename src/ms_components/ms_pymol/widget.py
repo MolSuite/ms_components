@@ -804,6 +804,14 @@ class PymolControlBar(QFrame):
             ("pymol.ball_and_stick", "PyMOL · Ball and stick", "ball_and_stick"),
             ("pymol.pretty", "PyMOL · Pretty", "pretty"),
             ("pymol.publication", "PyMOL · Publication", "publication"),
+            # The rest of PyMOL's Actions > Preset menu.
+            ("pymol.simple_no_solvent", "PyMOL · Simple (no solvent)", "simple_no_solvent"),
+            ("pymol.b_factor_putty", "PyMOL · B-factor Putty", "b_factor_putty"),
+            ("pymol.technical", "PyMOL · Technical", "technical"),
+            ("pymol.ligand_cartoon", "PyMOL · Ligand Sites (cartoon)", "ligand_cartoon"),
+            ("pymol.ligands", "PyMOL · Ligand Sites (surface)", "ligands"),
+            ("pymol.pretty_solv", "PyMOL · Pretty (solvent)", "pretty_solv"),
+            ("pymol.protein_interface", "PyMOL · Protein Interface", "protein_interface"),
         ):
             self._presets[key] = PymolPresetSpec(
                 key=key,
