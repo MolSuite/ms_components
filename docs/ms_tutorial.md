@@ -140,6 +140,9 @@ The default controls remain available for informative tours.
 Set `click_only_close=True` to keep the close control out of keyboard focus,
 disable its keyboard activation, and prevent Escape from cancelling the tutorial.
 Closing or rejecting a host dialog still cancels as described above.
+Set `block_tab=True` to suppress Tab and Shift+Tab throughout the active tour,
+including in dialogs. The default is false, and normal behavior returns when the
+tour ends.
 
 `TutorialController(dim_background=False)` preserves the application's background
 colors and draws only the target outline. Input gating remains the same.

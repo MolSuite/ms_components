@@ -58,6 +58,7 @@ class TutorialController(QObject):
                  dim_background: bool = True,
                  close_only: bool = False,
                  click_only_close: bool = False,
+                 block_tab: bool = False,
                  parent: QObject | None = None):
         super().__init__(parent)
         self.targets = dict(targets)
@@ -66,6 +67,7 @@ class TutorialController(QObject):
         self.dim_background = dim_background
         self.close_only = close_only
         self.click_only_close = click_only_close
+        self.block_tab = block_tab
         self._tutorial: Tutorial | None = None
         self._index = -1
         self._completed: set[str] = set()
@@ -261,6 +263,10 @@ class TutorialController(QObject):
                 self.stop()
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if (self.is_active and self.block_tab and isinstance(watched, QWidget)
+                and event.type() in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease)
+                and event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab)):
+            return True
         if not self.is_active or not isinstance(watched, QWidget) or self.overlay is None:
             return False
         if watched.window() is not self.overlay.window():

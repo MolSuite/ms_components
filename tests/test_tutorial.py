@@ -534,6 +534,41 @@ def test_click_only_close_does_not_take_keyboard_focus_or_close_on_keys(ui):
     dialog.close()
 
 
+def test_tab_blocking_is_opt_in_and_ends_with_tour(ui):
+    app, window, button, other, controller = ui
+    dialog = QDialog(window)
+    action = QPushButton("Dialog action", dialog)
+    dialog.show()
+    app.processEvents()
+
+    class Observer(QObject):
+        def __init__(self):
+            super().__init__()
+            self.keys = []
+
+        def eventFilter(self, watched, event):
+            if event.type() == QEvent.Type.KeyPress:
+                self.keys.append(event.key())
+            return False
+
+    observer = Observer()
+    action.installEventFilter(observer)
+    controller.start(tour(interactive=True))
+    QTest.keyClick(action, Qt.Key_Tab)
+    assert observer.keys
+    controller.stop()
+    observer.keys.clear()
+    controller.block_tab = True
+    controller.start(tour(interactive=True))
+    QTest.keyClick(action, Qt.Key_Tab)
+    QTest.keyClick(action, Qt.Key_Backtab)
+    assert not observer.keys
+    controller.stop()
+    QTest.keyClick(action, Qt.Key_Tab)
+    assert observer.keys
+    dialog.close()
+
+
 def test_close_only_follows_target_into_another_window(ui):
     app, window, button, _other, controller = ui
     dialog = QDialog(window)
