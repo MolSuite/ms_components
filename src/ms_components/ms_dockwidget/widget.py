@@ -779,6 +779,7 @@ class DockManager:
         # Standalone action buttons (no dock): a click runs a callback instead of toggling a dock.
         # action_id -> {"region", "order", "button"}. Re-added on every _build_toolbars().
         self.action_buttons: Dict[str, dict] = {}
+        self.action_separators: Dict[str, dict] = {}  # same shape; "button" is a ToolbarSeparator
         self.region_states: Dict[Region, RegionState] = {
             region: RegionState(order=[], visible=[]) for region in Region
         }
@@ -884,6 +885,14 @@ class DockManager:
         self.action_buttons[action_id] = {"region": region, "order": int(order), "button": button}
         self._build_toolbars()
         return button
+
+    def add_action_separator(self, separator_id: str, *, region: Region, order: int) -> None:
+        """A line in a toolbar region, placed by ``order`` like an action button, so it survives
+        the rebuilds a line inserted into the layout would not."""
+        if separator_id in self.action_separators:
+            raise ValueError(f"Duplicate action separator id: {separator_id}")
+        self.action_separators[separator_id] = {"region": region, "order": int(order), "button": ToolbarSeparator()}
+        self._build_toolbars()
 
     # ── Build ────────────────────────────────────────────────────
 
@@ -1595,7 +1604,7 @@ class DockManager:
                 # dock buttons keep their (possibly drag-set) region order; standalone action
                 # buttons are woven in by their `order` relative to the dock entries' orders.
                 merged = [(entry.order, self.buttons[entry.id]) for entry in self._region_entries(region)]
-                for action in self.action_buttons.values():
+                for action in (*self.action_buttons.values(), *self.action_separators.values()):
                     if action["region"] != region:
                         continue
                     idx = next((i for i, (order, _) in enumerate(merged) if order > action["order"]), len(merged))
