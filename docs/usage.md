@@ -190,6 +190,10 @@ application starts. Skip this call when PyMOL is disabled or running headlessly.
 `PymolDockWidget` also requests desktop OpenGL on its own widget and validates
 the actual context before drawing. An incompatible context displays an error
 in the viewer instead of passing it to PyMOL.
+Its command line supports Enter to run commands, Tab to complete, Up/Down for
+history, and an expandable Output panel. The widget starts PyMOL with cartoon
+oval width 0.15 and length 0.90; applications and users can change these PyMOL
+settings afterward.
 
 - `ProjectsMenuWidget(app_id=...)` and `ProjectBrowserWindow(app_id=...)` list
   and create projects through the public `ms_flow` project catalog. Connect
