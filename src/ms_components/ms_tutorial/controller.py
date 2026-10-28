@@ -57,6 +57,7 @@ class TutorialController(QObject):
                  instruction_provider: Callable[[TutorialStep], str] | None = None,
                  dim_background: bool = True,
                  close_only: bool = False,
+                 click_only_close: bool = False,
                  parent: QObject | None = None):
         super().__init__(parent)
         self.targets = dict(targets)
@@ -64,6 +65,7 @@ class TutorialController(QObject):
         self.instruction_provider = instruction_provider
         self.dim_background = dim_background
         self.close_only = close_only
+        self.click_only_close = click_only_close
         self._tutorial: Tutorial | None = None
         self._index = -1
         self._completed: set[str] = set()
@@ -221,7 +223,8 @@ class TutorialController(QObject):
                 if self.overlay is not None:
                     self.overlay.hide()
                     self.overlay.deleteLater()
-                self._overlay = TutorialOverlay(host, dim_background=self.dim_background, close_only=self.close_only)
+                self._overlay = TutorialOverlay(host, dim_background=self.dim_background, close_only=self.close_only,
+                                                click_only_close=self.click_only_close)
                 self._overlay.next_requested.connect(self.next)
                 self._overlay.back_requested.connect(self.back)
                 self._overlay.exit_requested.connect(self.stop)
@@ -263,7 +266,12 @@ class TutorialController(QObject):
         if watched.window() is not self.overlay.window():
             return False
         if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
-            self.stop()
+            if not self.click_only_close:
+                self.stop()
+            return True
+        if (self.click_only_close and watched is self.overlay.exit_button
+                and event.type() in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease)
+                and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space)):
             return True
         if event.type() == QEvent.Type.Close and watched is self.overlay.parentWidget():
             if isinstance(watched, QDialog):
@@ -281,5 +289,9 @@ class TutorialController(QObject):
         if self.current_step.advance_on is not None and self._target is not None and isValid(self._target):
             allowed |= watched is self._target or self._target.isAncestorOf(watched)
         if event.type() == QEvent.Type.FocusIn and not allowed:
-            self.overlay.focus_guide()
+            if (self.click_only_close and self.current_step.advance_on is not None
+                    and self._target is not None and isValid(self._target)):
+                self._target.setFocus()
+            else:
+                self.overlay.focus_guide()
         return not allowed and event.type() in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease)

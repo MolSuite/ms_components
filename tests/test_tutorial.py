@@ -505,6 +505,35 @@ def test_close_only_rejects_steps_that_need_next_button(ui):
     assert not controller.is_active
 
 
+def test_click_only_close_does_not_take_keyboard_focus_or_close_on_keys(ui):
+    app, window, button, _other, controller = ui
+    dialog = QDialog(window)
+    action = QPushButton("Finish", dialog)
+    action.setDefault(True)
+    button.clicked.connect(dialog.show)
+    controller.targets["dialog"] = TutorialTarget(action)
+    controller.events["finish"] = TutorialEvent(action.clicked)
+    controller.close_only = True
+    controller.click_only_close = True
+    controller.start(Tutorial("dialog", "Dialog", (
+        TutorialStep("open", "run", "Open", "Open dialog.", "clicked"),
+        TutorialStep("finish", "dialog", "Finish", "Finish the task.", "finish"),
+    )))
+    QTest.mouseClick(button, Qt.LeftButton)
+    app.processEvents()
+    overlay = controller.overlay
+    close = overlay.exit_button
+    assert close.focusPolicy() == Qt.NoFocus
+    assert not close.autoDefault() and not close.isDefault()
+    for key in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space, Qt.Key_Escape):
+        QTest.keyClick(close, key)
+        assert controller.is_active
+    assert "Esc" not in close.toolTip()
+    QTest.mouseClick(close, Qt.LeftButton)
+    assert not controller.is_active
+    dialog.close()
+
+
 def test_close_only_follows_target_into_another_window(ui):
     app, window, button, _other, controller = ui
     dialog = QDialog(window)

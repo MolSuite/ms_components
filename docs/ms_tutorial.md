@@ -137,6 +137,9 @@ with a compact close button in the callout header. Escape still cancels. Every
 step must provide `advance_on`; starting a close-only tutorial with an
 informational step raises `ValueError`, since there would be no way to advance.
 The default controls remain available for informative tours.
+Set `click_only_close=True` to keep the close control out of keyboard focus,
+disable its keyboard activation, and prevent Escape from cancelling the tutorial.
+Closing or rejecting a host dialog still cancels as described above.
 
 `TutorialController(dim_background=False)` preserves the application's background
 colors and draws only the target outline. Input gating remains the same.
@@ -157,7 +160,7 @@ Lifecycle signals:
 
 Call `start(tutorial)`, `next()`, `back()`, or `stop()` on the UI thread. Keep the
 controller alive, normally as an attribute of the main window, and give it a Qt
-parent. Escape/Exit cancel; closing the current host also cancels. Stopping a tour
+parent. Escape/Exit cancel by default; closing the current host also cancels. Stopping a tour
 removes its signal connection and event filter and restores the earlier focus
 when that widget is still visible. Switching tutorials cancels the previous one.
 Invalid target/event registry keys are rejected before cancelling an active tour.

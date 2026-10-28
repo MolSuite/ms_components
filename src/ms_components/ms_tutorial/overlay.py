@@ -19,7 +19,8 @@ class TutorialOverlay(QWidget):
     back_requested = Signal()
     exit_requested = Signal()
 
-    def __init__(self, host: QWidget, *, dim_background: bool = True, close_only: bool = False):
+    def __init__(self, host: QWidget, *, dim_background: bool = True, close_only: bool = False,
+                 click_only_close: bool = False):
         super().__init__(host)
         self.dim_background = dim_background
         self.close_only = close_only
@@ -62,12 +63,17 @@ class TutorialOverlay(QWidget):
         layout.addWidget(self.body)
         actions = QHBoxLayout()
         self.exit_button = QPushButton(self.tr("Exit · Esc"))
+        if click_only_close:
+            self.exit_button.setText(self.tr("Exit"))
+            self.exit_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            self.exit_button.setAutoDefault(False)
+            self.exit_button.setDefault(False)
         self.back_button = QPushButton(self.tr("Back"))
         self.next_button = QPushButton(self.tr("Next"))
         if close_only:
             self.exit_button.setText("×")
             self.exit_button.setAccessibleName(self.tr("Close tutorial"))
-            self.exit_button.setToolTip(self.tr("Close tutorial (Esc)"))
+            self.exit_button.setToolTip(self.tr("Close tutorial" if click_only_close else "Close tutorial (Esc)"))
             self.exit_button.setFlat(True)
             self.exit_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             self.exit_button.setFixedSize(28, 28)
