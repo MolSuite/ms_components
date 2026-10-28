@@ -154,3 +154,23 @@ def test_a_window_stays_a_window_on_double_click_and_drop(app):
 
     window.close()
     app.processEvents()
+
+
+def test_action_separator_sits_by_order_and_survives_a_rebuild(app):
+    from ms_components.ms_dockwidget.widget import ToolbarSeparator
+
+    window = QMainWindow()
+    manager = DockManager(window)
+    manager.add_action_button("a", region=Region.BOTTOM_LEFT, order=1, on_click=lambda: None)
+    manager.add_action_button("b", region=Region.BOTTOM_LEFT, order=3, on_click=lambda: None)
+    manager.add_action_separator("line", region=Region.BOTTOM_LEFT, order=2)
+    manager.set_show_tool_names(True)  # restyles every button: the separator is not one
+    manager._build_toolbars()
+
+    layout = manager.left_toolbar.layout_for_region(Region.BOTTOM_LEFT)
+    widgets = [layout.itemAt(i).widget() for i in range(layout.count())]
+    assert widgets[1] is manager.action_separators["line"]["button"]
+    assert isinstance(widgets[1], ToolbarSeparator)
+    assert widgets[0] is manager.action_buttons["a"]["button"]
+    assert widgets[2] is manager.action_buttons["b"]["button"]
+    window.close()
