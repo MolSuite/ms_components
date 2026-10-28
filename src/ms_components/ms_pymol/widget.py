@@ -36,6 +36,7 @@ except ImportError:
 
 # Ensure helper commands like cmd.draw_box are registered on the embedded PyMOL cmd.
 from . import plugins as _pymol_plugins  # noqa: F401
+from .command_line import PymolCommandLine
 
 
 class _PymolGLWidget(PyMOLGLWidget):
@@ -883,6 +884,12 @@ class PymolDockWidget(MSDockWidget):
         self.pymol_widget = _PymolGLWidget(self)
         if self.cmd is not None:
             self.cmd.set("internal_gui", False)
+            # Narrower cartoon helices improve the default view of protein structures.
+            self.cmd.set("cartoon_oval_width", 0.15)
+            self.cmd.set("cartoon_oval_length", 0.90)
+            # The Qt command bar replaces PyMOL's on-canvas prompt and shows
+            # the engine's feedback in its expandable Output panel.
+            self.cmd.set("internal_feedback", 0)
 
         self.control_bar = PymolControlBar(self.cmd, self)
         self.pymol_widget.before_render.connect(self.control_bar.apply_hydrogen_visibility)
@@ -916,6 +923,8 @@ class PymolDockWidget(MSDockWidget):
         layout.setSpacing(0)
         layout.addWidget(self.control_bar)
         layout.addWidget(self._splitter, 1)
+        self.command_line = PymolCommandLine(self.cmd, self)
+        layout.addWidget(self.command_line)
 
         container = QWidget()
         container.setLayout(layout)
