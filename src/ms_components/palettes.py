@@ -37,3 +37,60 @@ THEMES: dict[str, dict[str, str]] = {
     "nord": {"window": "#3b4252", "window_text": "#eceff4", "base": "#2e3440", "alternate_base": "#3b4252", "tooltip_base": "#2e3440", "tooltip_text": "#d8dee9", "placeholder_text": "#abafb8", "text": "#eceff4", "button": "#3b4252", "button_text": "#eceff4", "bright_text": "#0b0b0b", "light": "#2e3440", "midlight": "#2e3440", "mid": "#4c566a", "dark": "#525a6b", "shadow": "#878e9b", "highlight": "#81a1c1", "highlighted_text": "#2e3440", "link": "#88c0d0", "link_visited": "#88c0d0", "accent": "#88c0d0", "disabled_text": "#7c828e", "red": "#d89fa4", "orange": "#daa18f", "yellow": "#ebcb8b", "green": "#a3be8c", "cyan": "#88c0d0", "blue": "#97b2cc", "magenta": "#c3a5be"},
     "one_dark_two": {"window": "#282c34", "window_text": "#e6e6e6", "base": "#21252b", "alternate_base": "#282c34", "tooltip_base": "#21252b", "tooltip_text": "#969dab", "placeholder_text": "#919296", "text": "#e6e6e6", "button": "#282c34", "button_text": "#e6e6e6", "bright_text": "#191919", "light": "#1d1f23", "midlight": "#21252b", "mid": "#5b626d", "dark": "#4a505a", "shadow": "#6f7583", "highlight": "#62bac6", "highlighted_text": "#1d1f23", "link": "#eac786", "link_visited": "#eac786", "accent": "#eac786", "disabled_text": "#696b71", "red": "#e27881", "orange": "#e79c7e", "yellow": "#eac786", "green": "#98c379", "cyan": "#62bac6", "blue": "#71b9f4", "magenta": "#c88bda"},
 }
+
+
+GITHUB_LIGHT_FRAPPE = "github_light_frappe"
+G_THEME = "g"
+
+
+def _contrast_color(foreground: str, backgrounds: tuple[str, ...], minimum: float = 4.5) -> str:
+    """Darken an accent toward black until it is legible on each light surface."""
+    def luminance(value: str) -> float:
+        channels = [int(value[index:index + 2], 16) / 255 for index in (1, 3, 5)]
+        linear = [channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+                  for channel in channels]
+        return sum(channel * weight for channel, weight in zip(linear, (0.2126, 0.7152, 0.0722)))
+
+    rgb = [int(foreground[index:index + 2], 16) for index in (1, 3, 5)]
+    background_luminances = [luminance(color) for color in backgrounds]
+    for factor in range(255, -1, -1):
+        color = "#" + "".join(f"{round(channel * factor / 255):02x}" for channel in rgb)
+        lightness = luminance(color)
+        if all((max(lightness, bg) + 0.05) / (min(lightness, bg) + 0.05) >= minimum
+               for bg in background_luminances):
+            return color
+    return "#000000"
+
+
+def _github_light_frappe_palette() -> dict[str, str]:
+    github_light = THEMES["github_light"]
+    frappe = THEMES["catppuccin_frappe"]
+    palette = dict(github_light)
+    # Retain Frappé's lavender while meeting the selection contrast floor.
+    surfaces = tuple(github_light[key] for key in ("window", "base", "alternate_base"))
+    palette["highlight"] = _contrast_color(frappe["highlight"], surfaces, 3.0)
+    palette["highlighted_text"] = frappe["highlighted_text"]
+    for role in ("red", "orange", "yellow", "green", "cyan", "blue", "magenta", "accent", "link", "link_visited"):
+        palette[role] = _contrast_color(frappe[role], surfaces)
+    return palette
+
+
+def _github_light_dracula_palette() -> dict[str, str]:
+    github_light = THEMES["github_light"]
+    dracula = THEMES["dracula"]
+    palette = dict(github_light)
+    # Swap Dracula's secondary pink and primary purple for highlight and accent.
+    surfaces = tuple(github_light[key] for key in ("window", "base", "alternate_base"))
+    palette["highlight"] = _contrast_color(dracula["accent"], surfaces, 3.0)
+    palette["highlighted_text"] = dracula["highlighted_text"]
+    palette["accent"] = _contrast_color(dracula["highlight"], surfaces)
+    for role in ("red", "orange", "yellow", "green", "cyan", "blue", "magenta"):
+        palette[role] = _contrast_color(dracula[role], surfaces)
+    # Links use Dracula's primary purple, darkened for text on light surfaces.
+    palette["link"] = palette["link_visited"] = _contrast_color(dracula["highlight"], surfaces)
+    return palette
+
+
+# Shared hybrid palettes, available to every application using this registry.
+THEMES[GITHUB_LIGHT_FRAPPE] = _github_light_frappe_palette()
+THEMES[G_THEME] = _github_light_dracula_palette()

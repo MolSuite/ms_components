@@ -22,6 +22,11 @@ warning = color("orange")    # semantic accent from the live theme
 title_font = font("title")
 ```
 
+The shared registry also includes `github_light_frappe`, combining GitHub
+Light surfaces with Catppuccin Frappé accents, and `g`, which combines GitHub
+Light surfaces with swapped Dracula accents. Their accents are darkened where
+necessary for contrast on light surfaces.
+
 Widgets should read colours from the palette (`palette(window)`,
 `palette(highlight)`, …) instead of hard-coded hex values, so they follow theme
 changes. Non-Qt views such as PyMOL or pyqtgraph do not observe the palette and
