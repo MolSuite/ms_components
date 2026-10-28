@@ -23,6 +23,9 @@ def job_state(job, now: float) -> JobMonitorState:
         chunks_done=job.chunks_done,
         chunks_failed=job.chunks_failed,
         chunks_running=job.chunks_inflight,
+        # ms_flow < 0.7 does not tell them apart: every chunk in flight reads as running.
+        tasks_running=getattr(job, "tasks_running", job.chunks_inflight),
+        cpu_used=getattr(job, "cpu_used", 0),
         chunks_retried=job.chunks_retried,
         peak_mem_mb=job.peak_mem_mb,
         # ponytail: the mean since the job started, not the rate right now; a rate over the

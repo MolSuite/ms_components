@@ -8,7 +8,10 @@ be done now, and says why.
 """
 from __future__ import annotations
 
+import shlex
+import sys
 import threading
+import time
 import types
 from typing import Any, Literal, Union, get_args, get_origin
 
@@ -90,6 +93,44 @@ def _value(editor: QWidget) -> Any:
     return editor.text().strip()
 
 
+_VERSIONS = """import sys, importlib.metadata as m
+print("Python", sys.version.split()[0], "at", sys.prefix)
+for name in sys.argv[1:]:
+    try:
+        print(f"  {name} {m.version(name)}")
+    except m.PackageNotFoundError:
+        print(f"  {name}: not installed")
+"""
+
+
+def describe_host(address: str, env: str = "", packages=(), tools=None) -> str:
+    """What the machine `address` (empty: this one) is and has, in a few lines: its system, CPUs,
+    memory and GPUs, the Python of `env` there with the version of each of `packages`, and whether
+    each of `tools` (name -> path) can be run. One `ssh` call, which raises `HostError` when it does
+    not get in. Blocks: not on the GUI thread."""
+    from ms_env import Host
+
+    tools = tools or {}
+    python = f"{env.rstrip('/')}/bin/python" if env else ("" if address else sys.executable)
+    script = "; ".join([
+        "export LC_ALL=C", "uname -srm", '(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME")',
+        'echo "CPUs: $(nproc 2>/dev/null || sysctl -n hw.ncpu)"',
+        "awk '/MemTotal/ {printf \"Memory: %.1f GB\\n\", $2/1048576}' /proc/meminfo 2>/dev/null",
+        "(nvidia-smi -L 2>/dev/null || echo 'GPUs: none seen by nvidia-smi')",
+        "echo",
+        *([f"if [ -x {shlex.quote(python)} ]; then {shlex.quote(python)} -c {shlex.quote(_VERSIONS)} "
+           f"{' '.join(map(shlex.quote, packages))}; else echo 'Environment: none at '{shlex.quote(python)}; fi"]
+          if python else ["echo 'Environment: none named; the app prepares one before the first job'"]),
+        *(f"([ -x {shlex.quote(path)} ] && echo '  ✓ {name} '{shlex.quote(path)} || echo '  ✗ {name} not found at '{shlex.quote(path)})"
+          for name, path in tools.items()),
+    ])
+    if tools:
+        script = script.replace("; ([ -x", "; echo 'Tools:'; ([ -x", 1)
+    began = time.monotonic()
+    said = Host(address or None).run(script, timeout=60).decode(errors="replace").strip()
+    return f"Connected to {address or 'this machine'} in {time.monotonic() - began:.1f} s\n\n{said}"
+
+
 class KeptPage(QWidget):
     """The entries kept in `table` (`hosts` or `executors`) and the form of the chosen one.
 
@@ -98,10 +139,15 @@ class KeptPage(QWidget):
     """
 
     changed = Signal()
+    _checked = Signal(str)
 
-    def __init__(self, workspace, table: str, parent: QWidget | None = None):
+    def __init__(self, workspace, table: str, parent: QWidget | None = None, *, packages=("ms_flow", "ms_env"),
+                 default_env: str = ""):
+        """`packages`: whose version "Check connection" reads on a host; `default_env`: the
+        environment the app prepares on a host that names none, under the home there."""
         super().__init__(parent)
         self._workspace, self._table, self._one = workspace, table, table[:-1]
+        self._packages, self._default_env = tuple(packages), default_env
         settings = type(workspace.settings_manager.settings)
         self._model = get_args(settings.model_fields[table].annotation)[1]
         self._editors: dict[str, QWidget] = {}
@@ -130,6 +176,17 @@ class KeptPage(QWidget):
         self.save_button.clicked.connect(self._save)
         foot = QHBoxLayout()
         foot.addWidget(self.said, 1)
+        if table == "hosts":
+            self.check_button = QPushButton("Check connection", self)
+            self.check_button.setToolTip("Log in to it and say what it is and what it has: system, CPUs, GPUs, "
+                                         "the environment of the app and its packages, the tools named.")
+            self.check_button.clicked.connect(self._check)
+            foot.addWidget(self.check_button)
+            self.report = QPlainTextEdit(self)
+            self.report.setReadOnly(True)
+            self.report.setVisible(False)
+            self._right.addWidget(self.report, 8)  # the room the stretch below has while nothing is said
+            self._checked.connect(self._show_report)
         foot.addWidget(self.save_button)
         self._right.addStretch(1)
         self._right.addLayout(foot)
@@ -187,6 +244,8 @@ class KeptPage(QWidget):
             self._only_of_kind()
         self.remove_button.setEnabled(bool(name) and name != "local")
         self.said.setText("")
+        if self._table == "hosts":
+            self.report.setVisible(False)
         self._right.insertWidget(0, body)
 
     def _only_of_kind(self) -> None:
@@ -225,6 +284,28 @@ class KeptPage(QWidget):
         self.reload(select=name)
         self.said.setText(f"`{name}` is kept.")
         self.changed.emit()
+
+    def _check(self) -> None:
+        """What `describe_host` says of the host as the form has it now, saved or not."""
+        fields = {key: _value(editor) for key, editor in self._editors.items()}
+        address = fields.get("address") or ""
+        env = fields.get("env") or (self._default_env if address else "")
+        self.check_button.setEnabled(False)
+        self._show_report(f"Connecting to {address or 'this machine'}…")
+
+        def work() -> None:
+            try:
+                said = describe_host(address, env, self._packages, fields.get("tools") or {})
+            except Exception as error:  # noqa: BLE001 - said in the page, where it was asked for
+                said = f"Could not check {address or 'this machine'}:\n{str(error).split('` on ', 1)[-1]}"
+            self._checked.emit(said)
+
+        threading.Thread(target=work, name="host-check", daemon=True).start()
+
+    def _show_report(self, text: str) -> None:
+        self.report.setPlainText(text)
+        self.report.setVisible(True)
+        self.check_button.setEnabled(not text.endswith("…"))
 
     def _remove(self) -> None:
         name = self.name.text().strip()
@@ -359,4 +440,4 @@ class ExecutorsPanel(QDialog):
         self.refresh()
 
 
-__all__ = ["ExecutorsPanel", "KeptPage"]
+__all__ = ["ExecutorsPanel", "KeptPage", "describe_host"]

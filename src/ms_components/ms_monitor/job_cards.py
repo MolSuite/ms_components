@@ -7,8 +7,8 @@ panel. The card shows the job-level rollup; unfolded, the tasks in flight under 
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QPoint, QPropertyAnimation, QEasingCurve, Property, Signal
-from PySide6.QtGui import QBrush, QColor, QCursor, QLinearGradient, QPainter
+from PySide6.QtCore import Qt, QPoint, QPointF, QPropertyAnimation, QEasingCurve, Property, Signal
+from PySide6.QtGui import QBrush, QColor, QCursor, QLinearGradient, QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -164,6 +164,39 @@ class GlowBar(QWidget):
         p.drawRoundedRect(0, 0, fw, h, 3, 3)
 
 
+class _GlyphButton(QPushButton):
+    """A small flat button whose glyph is painted, not a font character: `ⓘ` and `▶` came out
+    in whatever font (or emoji) the system had, ringed twice, and blind to the theme."""
+
+    def __init__(self, glyph: str, tip: str, parent=None):
+        super().__init__(parent)
+        self._glyph = glyph  # "info", or "chevron": right while unchecked, down once checked
+        self.setFixedSize(22, 22)
+        self.setCursor(QCursor(Qt.PointingHandCursor))
+        self.setToolTip(tip)
+        self.setStyleSheet(
+            """QPushButton { background:transparent; border:1px solid transparent; border-radius:4px; }
+            QPushButton:hover, QPushButton:checked { border-color:palette(mid); background:palette(alternate-base); }"""
+        )
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        role = QPalette.ColorRole.Highlight if self.underMouse() or self.isChecked() else QPalette.ColorRole.PlaceholderText
+        pen = QPen(self.palette().color(role), 1.6, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        p.setPen(pen)
+        c = QPointF(self.width() / 2, self.height() / 2)
+        if self._glyph == "info":
+            p.drawEllipse(c, 7, 7)
+            p.drawLine(QPointF(c.x(), c.y() - 0.5), QPointF(c.x(), c.y() + 3.5))
+            p.drawPoint(QPointF(c.x(), c.y() - 3.2))
+        else:
+            d = 3.5
+            points = ((-d / 2, -d), (d / 2, 0), (-d / 2, d)) if not self.isChecked() else ((-d, -d / 2), (0, d / 2), (d, -d / 2))
+            p.drawPolyline([QPointF(c.x() + x, c.y() + y) for x, y in points])
+
+
 _TASKS_SHOWN = 12  # rows under an unfolded job; the rest are counted
 
 
@@ -227,6 +260,7 @@ class JobCard(QWidget):
 
     def _setup_ui(self):
         self.setObjectName("JobCard")
+        self.setAttribute(Qt.WA_StyledBackground, True)  # a plain QWidget paints no QSS background or border
         self.setCursor(QCursor(Qt.PointingHandCursor))
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
         self._apply_card_style()
@@ -262,28 +296,12 @@ class JobCard(QWidget):
         )
         top.addWidget(self._eta_lbl)
 
-        self._info_btn = QPushButton("ⓘ")
-        self._info_btn.setFixedSize(20, 20)
-        self._info_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self._info_btn.setStyleSheet(
-            f"""QPushButton {{ background:transparent; color:palette(placeholder-text);
-                border:1px solid palette(mid); border-radius:10px; font-size:11px; }}
-            QPushButton:hover {{ color:palette(highlight); border-color:palette(highlight);
-                background:palette(alternate-base); }}"""
-        )
+        self._info_btn = _GlyphButton("info", "Details of the job")
         self._info_btn.clicked.connect(self._show_info_tooltip)
         top.addWidget(self._info_btn)
 
-        self._toggle = QPushButton("▶")
+        self._toggle = _GlyphButton("chevron", "Show the tasks in flight")
         self._toggle.setCheckable(True)
-        self._toggle.setFixedSize(20, 20)
-        self._toggle.setCursor(QCursor(Qt.PointingHandCursor))
-        self._toggle.setToolTip("Show the tasks in flight")
-        self._toggle.setStyleSheet(
-            f"""QPushButton {{ background:transparent; color:palette(placeholder-text);
-                border:1px solid palette(mid); border-radius:4px; font-size:9px; }}
-            QPushButton:hover {{ color:palette(highlight); border-color:palette(highlight); }}"""
-        )
         self._toggle.toggled.connect(self._on_toggled)
         top.addWidget(self._toggle)
 
@@ -313,7 +331,6 @@ class JobCard(QWidget):
 
     def _on_toggled(self, unfolded: bool):
         self._tasks_wrap.setVisible(unfolded)
-        self._toggle.setText("▼" if unfolded else "▶")
         self._refresh_tasks()
         self.unfolded.emit(self._job.job_id, unfolded)
 
@@ -335,12 +352,16 @@ class JobCard(QWidget):
         self._tasks_note.setVisible(bool(more) or not shown)
 
     def _apply_card_style(self):
-        border = P["accent"] if self._selected else P["border"]
-        self.setStyleSheet(
-            f"""#JobCard {{ background:palette(base); border:1px solid {border};
-                border-radius:8px; }}
-            #JobCard:hover {{ border-color:palette(mid); }}"""
-        )
+        # Selected: tinted with the highlight and ringed by it, which hovering does not undo.
+        if self._selected:
+            tint = QColor(P["accent"])
+            tint.setAlphaF(0.12)
+            rule = f"background:{tint.name(QColor.HexArgb)}; border:2px solid {P['accent']};"
+            hover = ""
+        else:
+            rule = "background:palette(base); border:2px solid palette(mid);"
+            hover = f"#JobCard:hover {{ border-color:{P['accent']}; }}"
+        self.setStyleSheet(f"#JobCard {{ {rule} border-radius:8px; }} {hover}")
 
     def set_selected(self, selected: bool):
         if selected == self._selected:
@@ -369,12 +390,18 @@ class JobCard(QWidget):
         parts = []
         if job.chunks_done:
             parts.append(f"<span style='color:{P['ok']}'>{job.chunks_done:,} ✓</span>")
-        if job.chunks_running:
-            parts.append(f"<span style='color:{P['accent']}'>{job.chunks_running} ⚙</span>")
+        if job.tasks_running:
+            parts.append(f"<span style='color:{P['accent']}'>{job.tasks_running} ⚙</span>")
+        waiting = job.chunks_running - job.tasks_running  # ponytail: packed chunks count here too
+        if waiting > 0:
+            parts.append(f"<span style='color:{P['text_muted']}'>{waiting:,} ⧗</span>")
         if job.chunks_failed:
             parts.append(f"<span style='color:{P['error']}'>{job.chunks_failed:,} ✗</span>")
         total = f"  / {job.chunks_total:,}" if job.chunks_total else ""
         self._counters_lbl.setText("  ·  ".join(parts) + total)
+        self._counters_lbl.setToolTip(
+            "✓ done  ·  ⚙ tasks running now, one worker each  ·  ⧗ chunks taken that do not run: "
+            "carried in a task with others, or done and waiting to be written  ·  ✗ failed")
         if self._toggle.isChecked():
             self._refresh_tasks()
 
@@ -386,7 +413,8 @@ class JobCard(QWidget):
             f"<hr style='border-color:{P['border']}'>"
             f"<b>Key:</b> {j.job_id}<br>"
             f"<b>Chunks:</b> {j.chunks_done:,} ✓ / {total} total<br>"
-            f"<b>Running:</b> {j.chunks_running}  "
+            f"<b>Tasks running:</b> {j.tasks_running} on {j.cpu_used} CPU  "
+            f"<b>Chunks taken:</b> {j.chunks_running:,}<br>"
             f"<b>Failed:</b> {j.chunks_failed:,}  "
             f"<b>Retried:</b> {j.chunks_retried:,}<br>"
             f"<b>Peak memory:</b> {j.peak_mem_mb or '—'} MB<br>"

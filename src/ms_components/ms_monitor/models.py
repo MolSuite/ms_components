@@ -43,7 +43,9 @@ class JobMonitorState:
     chunks_total: int = 0  # 0 while the source of chunks has not said
     chunks_done: int = 0
     chunks_failed: int = 0
-    chunks_running: int = 0
+    chunks_running: int = 0  # taken and not settled: running, carried in a task, or being written
+    tasks_running: int = 0  # what runs now, one worker each; <= chunks_running
+    cpu_used: int = 0  # the CPU tokens those tasks hold
     chunks_retried: int = 0
     peak_mem_mb: int = 0
     throughput_eps: float = 0.0
