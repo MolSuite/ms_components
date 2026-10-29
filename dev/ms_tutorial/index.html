@@ -578,7 +578,13 @@ the parent window; closing or rejecting the host still cancels the tutorial.</p>
 with a compact close button in the callout header. Escape still cancels. Every
 step must provide <code>advance_on</code>; starting a close-only tutorial with an
 informational step raises <code>ValueError</code>, since there would be no way to advance.
-The default controls remain available for informative tours.</p>
+The default controls remain available for informative tours.
+Set <code>click_only_close=True</code> to keep the close control out of keyboard focus,
+disable its keyboard activation, and prevent Escape from cancelling the tutorial.
+Closing or rejecting a host dialog still cancels as described above.
+Set <code>block_tab=True</code> to suppress Tab and Shift+Tab throughout the active tour,
+including in dialogs. The default is false, and normal behavior returns when the
+tour ends.</p>
 <p><code>TutorialController(dim_background=False)</code> preserves the application's background
 colors and draws only the target outline. Input gating remains the same.
 <code>instruction_provider=lambda step: current_instruction</code> supplies dynamic plain-text
@@ -618,7 +624,7 @@ depend on any application or project package.</p>
 </table>
 <p>Call <code>start(tutorial)</code>, <code>next()</code>, <code>back()</code>, or <code>stop()</code> on the UI thread. Keep the
 controller alive, normally as an attribute of the main window, and give it a Qt
-parent. Escape/Exit cancel; closing the current host also cancels. Stopping a tour
+parent. Escape/Exit cancel by default; closing the current host also cancels. Stopping a tour
 removes its signal connection and event filter and restores the earlier focus
 when that widget is still visible. Switching tutorials cancels the previous one.
 Invalid target/event registry keys are rejected before cancelling an active tour.
