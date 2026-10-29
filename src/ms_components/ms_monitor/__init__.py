@@ -4,8 +4,10 @@ from importlib import import_module
 
 _LAZY = {
     "FailureState": "models",
-    "JobDetailPanel": "detail_panel",
+    "HostsStrip": "resources",
+    "JobDetail": "detail",
     "JobDetailState": "models",
+    "JobList": "jobs",
     "JobMonitorState": "models",
     "MonitorConfig": "config",
     "MonitorSyncState": "models",

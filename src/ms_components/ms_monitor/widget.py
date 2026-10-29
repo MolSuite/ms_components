@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from collections import Counter
+
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QFrame,
@@ -10,128 +12,120 @@ from PySide6.QtWidgets import (
     QMenu,
     QPushButton,
     QSplitter,
-    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from ms_components.ms_monitor.cards import MetricCard
-from ms_components.ms_monitor.detail_panel import JobDetailPanel
-from ms_components.ms_monitor.formatting import format_relative_time, format_throughput
-from ms_components.ms_monitor.job_cards import JobCardList
+from ms_components.ms_monitor.detail import JobDetail
+from ms_components.ms_monitor.formatting import format_relative_time
+from ms_components.ms_monitor.jobs import JobList
 from ms_components.ms_monitor.models import ProjectMonitorState
 from ms_components.ms_monitor.palette import P
-from ms_components.ms_monitor.resources import ResourcesPanel, workspace_hosts
+from ms_components.ms_monitor.resources import HostsStrip, workspace_hosts
 
 
 class MolSuiteMonitorWidget(QWidget):
+    """The jobs of the open project: a header with the tools, the executors' machines, the jobs,
+    and the one selected."""
+
     def __init__(self, *, bridge=None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._bridge = None
         self._snapshot: ProjectMonitorState | None = None
-        # The detail panel (summary/errors) is loaded once per explicit job selection and
-        # frozen afterwards — it does NOT follow the poll. Otherwise the constant re-render
-        # scrolls it back to the top while the user reads it.
-        self._detail_job_id: str | None = None
+        # The failures of the selected job come from the journal: read again only when the job
+        # changes or fails more, not each poll, so the list does not jump while it is read.
+        self._failures_key = None
+        self._qss = ""
 
         self.setObjectName("molsuiteMonitor")
-        # Only what the app-wide base.qss does NOT already give us: the card frame.
-        # Inputs/buttons/trees/scrollbars are deliberately left to the global
-        # stylesheet — re-declaring them here would override the theme.
-        self.setStyleSheet(
-            """
-            QFrame#panel {
-                background: palette(base);
-                border: 1px solid palette(mid);
-                border-radius: 10px;
-            }
-            QSplitter::handle { background: transparent; }
-            """
-        )
+        self._restyle()
 
         layout = QVBoxLayout(self)
-        # layout.setContentsMargins(12, 12, 12, 12)
-        # layout.setSpacing(10)
+        layout.setContentsMargins(14, 10, 14, 14)
+        layout.setSpacing(10)
 
-        self._project_panel = QFrame(self)
-        self._project_panel.setObjectName("panel")
-        project_layout = QVBoxLayout(self._project_panel)
-        # project_layout.setContentsMargins(14, 12, 14, 12)
-        project_layout.setSpacing(4)
+        # the project and what it runs on the left, the tools on the right
+        header = QHBoxLayout()
+        header.setSpacing(8)
+        about = QVBoxLayout()
+        about.setSpacing(2)
+        title_row = QHBoxLayout()
+        title_row.setSpacing(7)
+        self._title_label = QLabel("No active project", self)
+        self._title_label.setStyleSheet("font-size:16px; font-weight:650;")
+        self._sync_dot = QLabel("●", self)
+        self._sync_label = QLabel("idle", self)
+        self._sync_label.setStyleSheet("color:palette(placeholder-text); font-size:11.5px;")
+        self._action_label = QLabel("", self)
+        self._action_label.setStyleSheet("color:palette(highlight); font-size:11.5px;")
+        for widget in (self._title_label, self._sync_dot, self._sync_label, self._action_label):
+            title_row.addWidget(widget)
+        title_row.addStretch(1)
+        self._summary_label = QLabel("Open a project to monitor jobs.", self)
+        self._summary_label.setStyleSheet("color:palette(placeholder-text); font-size:11.5px;")
+        self._summary_label.setMinimumWidth(10)
+        about.addLayout(title_row)
+        about.addWidget(self._summary_label)
+        header.addLayout(about, 1)
 
-        self._title_label = QLabel("No active project", self._project_panel)
-        self._title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self._title_label.setStyleSheet("color:palette(text); font-size:16px; font-weight:700;")
-        self._summary_label = QLabel("Open a project to monitor jobs.", self._project_panel)
-        self._summary_label.setStyleSheet("color:palette(placeholder-text); font-size:11px;")
-
-        # One compact status strip instead of a vertical wall of labels.
-        status_row = QHBoxLayout()
-        status_row.setSpacing(16)
-        self._sync_label = QLabel("Sync: idle", self._project_panel)
-        self._sync_label.setStyleSheet("color:palette(placeholder-text); font-size:11px;")
-        status_row.addWidget(self._sync_label)
-        status_row.addStretch(1)
-        self._action_label = QLabel("", self._project_panel)
-        self._action_label.setStyleSheet("color:palette(highlight); font-size:11px;")
-        status_row.addWidget(self._action_label)
-
-        project_layout.addWidget(self._title_label)
-        project_layout.addWidget(self._summary_label)
-        project_layout.addLayout(status_row)
-        layout.addWidget(self._project_panel)
-
-        metrics_row = QHBoxLayout()
-        metrics_row.setSpacing(10)
-        self._active_jobs_card = MetricCard("ACTIVE JOBS", "0", subtitle="0 visible", parent=self)
-        self._throughput_card = MetricCard("THROUGHPUT", "-", subtitle="0 tasks running", parent=self)
-        self._chunks_card = MetricCard("CHUNKS", "0", subtitle="0%", accent=P["ok"], parent=self)
-        self._failures_card = MetricCard("FAILURES", "0", subtitle="0 ext. cancellers", accent=P["error"], parent=self)
-        metrics_row.addWidget(self._active_jobs_card)
-        metrics_row.addWidget(self._throughput_card)
-        metrics_row.addWidget(self._chunks_card)
-        metrics_row.addWidget(self._failures_card)
-        layout.addLayout(metrics_row)
-
-        filter_row = QHBoxLayout()
-        filter_row.setSpacing(8)
         self._search_input = QLineEdit(self)
-        self._search_input.setPlaceholderText("Search name, key, status...")
+        self._search_input.setPlaceholderText("Search jobs…")
+        self._search_input.setFixedWidth(190)
         self._status_filter = QComboBox(self)
         self._status_filter.addItem("All statuses", "all")
         self._refresh_button = QPushButton("Resync", self)
-        self._cancel_button = QPushButton("Cancel Selected", self)
-        self._cancel_button.setEnabled(False)
-        filter_row.addWidget(self._search_input, 1)
-        filter_row.addWidget(self._status_filter)
-        filter_row.addWidget(self._refresh_button)
+        self._refresh_button.setObjectName("primary")
+        self._cancel_button = QPushButton("Cancel", self)
+        self._cancel_button.setObjectName("danger")
+        self._cancel_button.setToolTip("Cancel the selected job")
         self._resume_button = QPushButton("Resume", self)
         self._resume_button.setToolTip("Continue a job that was canceled or interrupted, where it ran.")
-        self._move_button = QPushButton("Move to…", self)
+        self._move_button = QPushButton("Move to", self)
         self._move_button.setToolTip("Continue the job on another executor: one that is running is stopped first.")
         self._move_button.setMenu(QMenu(self._move_button))
-        filter_row.addWidget(self._cancel_button)
-        filter_row.addWidget(self._resume_button)
-        filter_row.addWidget(self._move_button)
+        for widget in (self._search_input, self._status_filter, self._refresh_button, self._cancel_button,
+                       self._resume_button, self._move_button):
+            widget.setFixedHeight(30)
+            header.addWidget(widget, 0, Qt.AlignVCenter)
         self._set_job_actions(None)
-        layout.addLayout(filter_row)
+        layout.addLayout(header)
 
-        self._jobs_view = JobCardList(self)
-        self._detail_panel = JobDetailPanel(parent=self)
-        self._resources = ResourcesPanel(getattr(bridge, "workspace", None), parent=self)
-        self._side = QTabWidget(self)
-        self._side.addTab(self._detail_panel, "Details")
-        self._side.addTab(self._resources, "Resources")
+        self._hosts = HostsStrip(getattr(bridge, "workspace", None), parent=self)
+        layout.addWidget(self._hosts)
 
-        # Horizontal split: jobs on the left, job detail on the right. Uses the
-        # available width instead of stacking, so the panel stays usable when its
-        # height is squeezed (e.g. docked below other panels).
+        jobs_panel = QFrame(self)
+        jobs_panel.setObjectName("panel")
+        jobs_box = QVBoxLayout(jobs_panel)
+        jobs_box.setContentsMargins(10, 10, 10, 10)
+        jobs_box.setSpacing(6)
+        jobs_head = QHBoxLayout()
+        jobs_head.setContentsMargins(4, 0, 2, 0)
+        jobs_title = QLabel("Jobs", jobs_panel)
+        jobs_title.setStyleSheet("font-weight:600; font-size:13px;")
+        self._jobs_count = QLabel(jobs_panel)
+        self._jobs_count.setStyleSheet("color:palette(placeholder-text); font-size:11.5px;")
+        self._filter_chip = QPushButton(jobs_panel)
+        self._filter_chip.setObjectName("filterChip")
+        self._filter_chip.setCursor(Qt.PointingHandCursor)
+        self._filter_chip.setToolTip("Show every job")
+        self._filter_chip.setVisible(False)
+        order = QLabel("active first", jobs_panel)
+        order.setStyleSheet("color:palette(placeholder-text); font-size:11.5px;")
+        for widget in (jobs_title, self._jobs_count, self._filter_chip):
+            jobs_head.addWidget(widget)
+        jobs_head.addStretch(1)
+        jobs_head.addWidget(order)
+        jobs_box.addLayout(jobs_head)
+        self._jobs_view = JobList(jobs_panel)
+        jobs_box.addWidget(self._jobs_view, 1)
+        self._detail = JobDetail(self)
+
         main_splitter = QSplitter(Qt.Horizontal, self)
-        main_splitter.addWidget(self._jobs_view)
-        main_splitter.addWidget(self._side)
-        main_splitter.setStretchFactor(0, 3)
-        main_splitter.setStretchFactor(1, 2)
-        main_splitter.setSizes([560, 440])
+        main_splitter.setHandleWidth(10)
+        main_splitter.addWidget(jobs_panel)
+        main_splitter.addWidget(self._detail)
+        main_splitter.setStretchFactor(1, 1)
+        main_splitter.setSizes([410, 1000])
         layout.addWidget(main_splitter, 1)
 
         self._search_input.textChanged.connect(self._jobs_view.set_search_text)
@@ -141,10 +135,41 @@ class MolSuiteMonitorWidget(QWidget):
         self._resume_button.clicked.connect(lambda: self._resume_selected_job())
         self._move_button.menu().aboutToShow.connect(self._fill_destinations)
         self._jobs_view.job_selected.connect(self._on_current_job_changed)
-        self._jobs_view.unfolded_changed.connect(self._on_unfolded_changed)
+        self._hosts.filter_changed.connect(
+            lambda executors: self._filter(executors, None if executors is None else f"host: {self._hosts.chosen}"))
+        self._detail.executor_clicked.connect(lambda name: self._filter({name}, f"executor: {name}", host=False))
+        self._filter_chip.clicked.connect(lambda: self._filter(None, None, host=False))
 
         if bridge is not None:
             self.attach_bridge(bridge)
+
+    def _restyle(self) -> None:
+        """The panels and the tool buttons. The danger red has no palette role, so this is built
+        again when the theme changes."""
+        qss = f"""
+            QFrame#panel {{ background: palette(base); border: 1px solid palette(mid); border-radius: 8px; }}
+            QSplitter::handle {{ background: transparent; }}
+            QPushButton#primary {{ color: palette(highlight); border: 1px solid palette(highlight); border-radius: 6px; padding: 0 12px; }}
+            QPushButton#danger {{ color: {P["error"]}; }}
+            QPushButton#danger:disabled {{ color: palette(placeholder-text); }}
+            QPushButton#xchip {{ color: palette(placeholder-text); background: transparent; border: 1px solid palette(mid);
+                                 border-radius: 4px; padding: 1px 7px; font-size: 11px; min-height: 0; }}
+            QPushButton#xchip:hover {{ color: palette(text); border-color: palette(highlight); }}
+            QPushButton#filterChip {{ color: palette(highlight); background: transparent; border: 1px solid palette(highlight);
+                                      border-radius: 9px; padding: 0 8px; font-size: 11px; min-height: 0; }}
+            QTabWidget#pills::pane {{ border: none; }}
+            QTabWidget#pills > QTabBar {{ background: palette(alternate-base); border-radius: 7px; }}
+            QTabWidget#pills > QTabBar::tab {{ background: transparent; border: none; border-radius: 5px; padding: 4px 12px; margin: 3px 1px; }}
+            QTabWidget#pills > QTabBar::tab:selected {{ background: palette(button); }}
+        """
+        if qss != self._qss:
+            self._qss = qss
+            self.setStyleSheet(qss)
+
+    def changeEvent(self, event):
+        if event.type() in (QEvent.PaletteChange, QEvent.ApplicationPaletteChange):
+            self._restyle()
+        super().changeEvent(event)
 
     def attach_bridge(self, bridge) -> None:
         if self._bridge is bridge:
@@ -157,7 +182,9 @@ class MolSuiteMonitorWidget(QWidget):
             self._bridge.operator_action_failed.disconnect(self._handle_action_failure)
             self._bridge.bridge_error.disconnect(self._handle_bridge_error)
         self._bridge = bridge
-        self._resources.hosts = lambda: workspace_hosts(bridge.workspace)
+        self._hosts.hosts = lambda: workspace_hosts(bridge.workspace)
+        if self._hosts.isVisible():
+            self._hosts.start()
         bridge.project_snapshot_updated.connect(self.update_snapshot)
         bridge.project_cleared.connect(self.clear_snapshot)
         bridge.sync_state_updated.connect(self._update_sync_state)
@@ -173,21 +200,19 @@ class MolSuiteMonitorWidget(QWidget):
         self._snapshot = None
         self._title_label.setText("No active project")
         self._summary_label.setText("Open a project to monitor jobs.")
-        self._sync_label.setText("Sync: idle")
+        self._update_sync_state(None)
         self._action_label.setText("")
-        self._active_jobs_card.set_value("0", "0 visible")
-        self._throughput_card.set_value("-", "0 tasks running")
-        self._chunks_card.set_value("0", "0%")
-        self._failures_card.set_value("0", "0 ext. cancellers")
         self._jobs_view.clear()
+        self._jobs_count.setText("")
+        self._hosts.set_jobs([])
         self._search_input.clear()
         self._status_filter.blockSignals(True)
         self._status_filter.clear()
         self._status_filter.addItem("All statuses", "all")
         self._status_filter.blockSignals(False)
         self._set_job_actions(None)
-        self._detail_panel.clear()
-        self._detail_job_id = None
+        self._detail.set_job(None)
+        self._failures_key = None
 
     def update_snapshot(self, snapshot: ProjectMonitorState) -> None:
         self._snapshot = snapshot
@@ -195,42 +220,19 @@ class MolSuiteMonitorWidget(QWidget):
             self.clear_snapshot()
             return
 
-        title = snapshot.project_name or snapshot.project_id or "Active project"
-        self._title_label.setText(title)
-        self._summary_label.setText(
-            f"Path: {snapshot.project_path or '-'} | Active jobs: {snapshot.jobs_active} | "
-            f"External cancellers: {snapshot.external_cancellers}"
-        )
+        self._title_label.setText(snapshot.project_name or snapshot.project_id or "Active project")
+        by_status = Counter(job.status.replace("_", " ") for job in snapshot.jobs)
+        said = f"{len(snapshot.jobs)} jobs" + (": " + " · ".join(f"{n} {s}" for s, n in by_status.most_common()) if by_status else "")
+        executors = sorted({job.executor for job in snapshot.jobs if job.executor and not job.is_terminal})
+        path = f"{snapshot.project_path} · " if snapshot.project_path else ""
+        self._summary_label.setText(path + said + (f" · on {', '.join(executors)}" if executors else ""))
+        self._summary_label.setToolTip(self._summary_label.text())
+        self._jobs_count.setText(str(len(snapshot.jobs)))
 
-        # Over the jobs that run, so the counts start again with each job instead of adding up
-        # every job still listed; the cards below keep what each one did.
-        jobs = snapshot.jobs
-        active = [j for j in jobs if not j.is_terminal]
-        total_eps = sum(j.throughput_eps for j in active)
-        tasks = sum(j.tasks_running for j in active)
-        cpus = sum(j.cpu_used for j in active)
-        chunks_done = sum(j.chunks_done for j in active)
-        chunks_total = sum(j.chunks_total for j in active)
-        failures = sum(j.chunks_failed for j in active)
-        pct = (chunks_done / chunks_total * 100.0) if chunks_total else 0.0
-
-        self._active_jobs_card.set_value(str(snapshot.jobs_active), f"{len(jobs)} visible")
-        self._throughput_card.set_value(
-            format_throughput(total_eps), f"{tasks:,} tasks running" + (f" on {cpus:,} CPU" if cpus else ""))
-        self._chunks_card.set_value(f"{chunks_done:,} / {chunks_total:,}", f"{pct:.0f}%")
-        self._failures_card.set_value(
-            f"{failures:,}", f"{snapshot.external_cancellers} ext. cancellers",
-            accent=P["error"] if failures else P["border"])
-        # Preserve selected job_id before refresh
-        selected_job_id = self._selected_job_id()
         self._jobs_view.set_jobs(snapshot.jobs)
+        self._hosts.set_jobs(snapshot.jobs)
         self._rebuild_filters(snapshot)
-        # Restore selection if the job still exists; the detail panels are NOT touched
-        # here — they only reload on an explicit (re)selection or Resync, so scrolling
-        # through the errors of the selected job is never yanked back to the top.
-        if selected_job_id:
-            self._jobs_view.select_job(selected_job_id)
-        self._set_job_actions(self._selected_job())  # the buttons do follow the job, as it ends
+        self._show_selected()
 
     def _rebuild_filters(self, snapshot: ProjectMonitorState) -> None:
         current_status = self._status_filter.currentData()
@@ -239,7 +241,7 @@ class MolSuiteMonitorWidget(QWidget):
         self._status_filter.clear()
         self._status_filter.addItem("All statuses", "all")
         for status in sorted({job.status for job in snapshot.jobs if job.status}):
-            self._status_filter.addItem(status, status)
+            self._status_filter.addItem(status.replace("_", " "), status)
         index = max(0, self._status_filter.findData(current_status))
         self._status_filter.setCurrentIndex(index)
         self._status_filter.blockSignals(False)
@@ -248,12 +250,19 @@ class MolSuiteMonitorWidget(QWidget):
     def _apply_filters(self) -> None:
         self._jobs_view.set_status_filter(str(self._status_filter.currentData() or "all"))
 
+    def _filter(self, executors, label: str | None, *, host: bool = True) -> None:
+        """Only the jobs of `executors` (None: every job), said by the chip in the jobs' header."""
+        if not host:
+            self._hosts.clear_choice()
+        self._jobs_view.set_executor_filter(executors)
+        self._filter_chip.setText(f"{label}  ✕" if label else "")
+        self._filter_chip.setVisible(executors is not None)
+
     def _refresh_from_bridge(self) -> None:
         if self._bridge is not None:
             self._bridge.request_refresh()
-        # Resync is an explicit user action, so it's the one place we reload the detail
-        # of the currently selected job.
-        self._load_detail()
+        self._failures_key = None  # an explicit resync reads the failures again
+        self._show_selected()
 
     def _selected_job_id(self) -> str | None:
         return self._jobs_view.selected_job_id()
@@ -285,71 +294,52 @@ class MolSuiteMonitorWidget(QWidget):
         job_id = self._selected_job_id()
         if self._bridge is None or not job_id:
             return
-        self._action_label.setText(f"Action: moving {job_id[:8]} to {executor}" if executor else f"Action: resuming {job_id[:8]}")
+        self._action_label.setText(f"moving {job_id[:8]} to {executor}…" if executor else f"resuming {job_id[:8]}…")
         self._bridge.resume_job(job_id, executor)
 
-    def _on_unfolded_changed(self, job_ids) -> None:
+    def _on_current_job_changed(self, job_id) -> None:
         if self._bridge is not None:
-            self._bridge.set_unfolded_jobs(job_ids)
+            self._bridge.select_job(job_id)
+        self._show_selected()
 
-    def _on_current_job_changed(self, *_args) -> None:
-        # Triggered only by an explicit click on a job card → reload its detail once.
-        self._side.setCurrentWidget(self._detail_panel)
-        self._load_detail()
-
-    def _load_detail(self) -> None:
-        if self._bridge is None:
-            self._detail_panel.clear()
-            self._set_job_actions(None)
+    def _show_selected(self) -> None:
+        job = self._selected_job()
+        self._set_job_actions(job)
+        self._detail.set_job(job)
+        if job is not None:
+            self._detail.set_color(self._jobs_view.color_of(job.job_id))
+        key = None if job is None else (job.job_id, job.chunks_failed, job.error)
+        if key == self._failures_key:
             return
-        job_id = self._selected_job_id()
-        self._set_job_actions(self._selected_job())
-        if not job_id:
-            self._detail_panel.clear()
-            self._detail_job_id = None
-            return
-        self._detail_panel.set_job_detail(self._bridge.get_job_detail(job_id))
-        self._detail_job_id = job_id
+        self._failures_key = key
+        detail = self._bridge.get_job_detail(job.job_id) if self._bridge is not None and job is not None else None
+        self._detail.set_failures(detail.failures if detail else [], job.chunks_failed if job else 0, job.error if job else "")
 
     def _selected_job(self):
         return self._jobs_view.selected_job()
 
     def _update_sync_state(self, state) -> None:
-        if state is None:
-            self._sync_label.setText("Sync: idle")
-            return
-        if getattr(state, "in_progress", False):
-            self._sync_label.setText("Sync: refreshing...")
-            return
-        last_error = str(getattr(state, "last_error", "") or "")
-        if last_error:
-            self._sync_label.setText(f"Sync error: {last_error}")
-            return
-        last_refresh_at = getattr(state, "last_refresh_at", None)
-        if last_refresh_at is None:
-            self._sync_label.setText("Sync: idle")
-            return
-        self._sync_label.setText(f"Sync: last refresh {format_relative_time(last_refresh_at)}")
+        hue, said = P["text_muted"], "idle"
+        if state is not None and getattr(state, "in_progress", False):
+            hue, said = P["warn"], "refreshing…"
+        elif state is not None and getattr(state, "last_error", ""):
+            hue, said = P["error"], f"sync error: {state.last_error}"
+        elif state is not None and getattr(state, "last_refresh_at", None) is not None:
+            hue, said = P["ok"], f"synced {format_relative_time(state.last_refresh_at)}"
+        self._sync_dot.setStyleSheet(f"color:{hue}; font-size:10px;")
+        self._sync_label.setText(said)
 
     def _handle_action_success(self, action: str, payload: str) -> None:
         if action == "cancel_job":
-            self._action_label.setText(f"Action: cancellation requested for {payload[:8]}")
+            self._action_label.setText(f"cancellation requested for {payload[:8]}")
         elif action == "resume_job":
-            self._action_label.setText(f"Action: {payload[:8]} continues")
+            self._action_label.setText(f"{payload[:8]} continues")
             self._bridge.request_refresh()
         else:
-            self._action_label.setText(f"Action: {action}")
+            self._action_label.setText(action)
 
     def _handle_action_failure(self, action: str, message: str) -> None:
-        self._action_label.setText(f"Action error [{action}]: {message}")
+        self._action_label.setText(f"{action} failed: {message}")
 
     def _handle_bridge_error(self, message: str) -> None:
-        self._action_label.setText(f"Bridge error: {message}")
-
-
-if __name__ == '__main__':
-    from PySide6.QtWidgets import QApplication
-    app = QApplication([])
-    window = MolSuiteMonitorWidget()
-    window.show()
-    app.exec()
+        self._action_label.setText(f"bridge error: {message}")

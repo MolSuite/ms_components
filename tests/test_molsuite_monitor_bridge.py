@@ -76,12 +76,14 @@ def test_a_job_is_followed_to_its_end_and_read_back_from_the_journal(ms, tmp_pat
     assert bridge.current_snapshot.jobs_active == 1 and bridge.current_snapshot.active
     assert bridge.cancel_job("unknown") is False
 
-    # its tasks in flight are read only while the job is unfolded
-    assert state.tasks == []
-    bridge.set_unfolded_jobs([state.job_id])
-    tasks = bridge.refresh_now().jobs[0].tasks
-    assert tasks and {task.input for task in tasks} <= {"0", "1", "2", "3"}
-    assert all((task.chunks, task.attempt, task.progress) == (1, 1, None) for task in tasks)  # threads do not say
+    # its tasks in flight and chunk states are read only while it is the selected job
+    assert (state.tasks, state.chunk_states, state.executor) == ([], None, "thread")
+    bridge.select_job(state.job_id)
+    selected = bridge.refresh_now().jobs[0]
+    assert selected.tasks and {task.input for task in selected.tasks} <= {"0", "1", "2", "3"}
+    assert all((task.chunks, task.attempt, task.progress, task.host) == (1, 1, None, None)  # threads do not say
+               for task in selected.tasks)
+    assert len(selected.chunk_states) == 4 and set(selected.chunk_states) <= {0, 1}  # pending or running
 
     GATE.set()
     ms.engine.wait(job_id, 30)
@@ -131,7 +133,7 @@ def test_a_job_is_moved_while_it_runs_from_the_buttons_of_the_monitor(ms, tmp_pa
     first = ms.submit(halves, executor="thread")
     state = _visible(bridge)
     widget.update_snapshot(bridge.current_snapshot)
-    widget._jobs_view._on_card_clicked(state.job_id)
+    widget._jobs_view.select_job(state.job_id)
 
     assert widget._move_button.isEnabled() and not widget._resume_button.isEnabled()
     widget._fill_destinations()
