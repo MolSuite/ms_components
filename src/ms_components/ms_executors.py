@@ -8,6 +8,7 @@ be done now, and says why.
 """
 from __future__ import annotations
 
+import re
 import shlex
 import sys
 import threading
@@ -30,6 +31,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPlainTextEdit,
+    QProgressBar,
     QPushButton,
     QRadioButton,
     QSpinBox,
@@ -92,6 +94,27 @@ def _value(editor: QWidget) -> Any:
         pairs = (line.partition("=") for line in editor.toPlainText().splitlines() if "=" in line)
         return {key.strip(): path.strip() for key, _, path in pairs}
     return editor.text().strip()
+
+
+class _Steps(QProgressBar):
+    """How far the preparation of a host got: moved by the lines `[done/total] what` it says."""
+
+    _LINE = re.compile(r"\[(\d+)/(\d+)\] (.*)")
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setVisible(False)
+
+    def take(self, line: str) -> bool:
+        """Whether `line` was one of those, shown here then, not in the log."""
+        found = self._LINE.fullmatch(line)
+        if found:
+            done, total, what = found.groups()
+            self.setRange(0, int(total))
+            self.setValue(int(done))
+            self.setFormat(f"{what}: %v of %m steps")
+            self.setVisible(True)
+        return bool(found)
 
 
 _VERSIONS = """import sys, importlib.metadata as m
@@ -190,6 +213,8 @@ class KeptPage(QWidget):
                                         "programs ticked, as saved. What is already as it is here is left alone.")
             self.sync_button.clicked.connect(self._sync)
             foot.addWidget(self.sync_button)
+            self.steps = _Steps(self)
+            self._right.addWidget(self.steps)
             self.report = QPlainTextEdit(self)
             self.report.setReadOnly(True)
             self.report.setVisible(False)
@@ -258,6 +283,7 @@ class KeptPage(QWidget):
         self.said.setText("")
         if self._table == "hosts":
             self.report.setVisible(False)
+            self.steps.setVisible(False)
             self.sync_button.setVisible(bool(name) and name != "local" and getattr(self._workspace, "host_env", None) is not None)
         self._right.insertWidget(0, body)
 
@@ -341,8 +367,11 @@ class KeptPage(QWidget):
         threading.Thread(target=work, name="host-sync", daemon=True).start()
 
     def _sync_said(self, line: str, last: bool) -> None:
-        self.report.appendPlainText(line)
+        if not self.steps.take(line):
+            self.report.appendPlainText(line)
         self.sync_button.setEnabled(last)
+        if last:
+            self.steps.setVisible(False)
 
     def _show_report(self, text: str) -> None:
         self.report.setPlainText(text)
@@ -389,6 +418,8 @@ class ExecutorsPanel(QDialog):
         self.defaults: dict[str, QRadioButton] = {}
 
         self._layout = QVBoxLayout(self)
+        self.steps = _Steps(self)
+        self._layout.addWidget(self.steps)
         self.said = QPlainTextEdit(self)
         self.said.setReadOnly(True)
         self.said.setVisible(False)
@@ -472,11 +503,14 @@ class ExecutorsPanel(QDialog):
         threading.Thread(target=work, name=f"executor-{name}", daemon=True).start()
 
     def _say(self, text: str) -> None:
+        if self.steps.take(text):
+            return
         self.said.setVisible(True)
         self.said.appendPlainText(text)
 
     def _ended(self, name: str, error: str) -> None:
         self._busy.discard(name)
+        self.steps.setVisible(bool(self._busy))
         if error:
             self._say(f"{name}: {error}")
         self.refresh()

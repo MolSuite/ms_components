@@ -1,5 +1,6 @@
 """The Settings pages of hosts and executors and the quick panel, on a real workspace whose
 Ray runs nothing."""
+import threading
 import time
 
 from PySide6.QtCore import Qt
@@ -105,6 +106,7 @@ def test_hosts_and_executors_are_kept_and_started_from_the_ui(tmp_path, monkeypa
 
         def unprepared(address, busy, on_line):
             on_line(f"looking for {address}")
+            on_line(f"[0/2] preparing {address}")
             raise OSError(f"{address} is not reached")
 
         ms.host_env = unprepared
@@ -112,6 +114,7 @@ def test_hosts_and_executors_are_kept_and_started_from_the_ui(tmp_path, monkeypa
         panel.buttons["lab"].click()
         assert _until(lambda: "lab: 192.168.1.2 is not reached" in panel.said.toPlainText())
         assert "looking for 192.168.1.2" in panel.said.toPlainText() and panel.states["lab"].text() == "Off"
+        assert "[0/2]" not in panel.said.toPlainText() and panel.steps.isHidden()  # the bar, gone when it ended
 
         executors.reload(select="lab")
         executors.remove_button.click()
@@ -129,11 +132,13 @@ def test_a_host_is_given_the_programs_ticked_for_it_when_synced(tmp_path, monkey
     app = QApplication.instance() or QApplication([])
     monkeypatch.setenv("MOLSUITE_HOME", str(tmp_path / "home"))
     ms = Workspace(app_id="ui")
-    asked = []
+    asked, seen = [], threading.Event()
 
     def prepare(address, busy, on_line):
         asked.append((address, ms.settings_manager.settings.hosts["laptop"].install))
         on_line(f"installing on {address}")
+        on_line(f"[1/3] preparing {address}")  # moves the bar, and is not in the log
+        seen.wait(10)  # while the test looks at the bar
         return "/far/env"
 
     ms.host_env = prepare
@@ -150,8 +155,11 @@ def test_a_host_is_given_the_programs_ticked_for_it_when_synced(tmp_path, monkey
         assert ms.settings_manager.settings.hosts["laptop"].install == ["unidock"]
 
         hosts.sync_button.click()
+        assert _until(lambda: not hosts.steps.isHidden()) and (hosts.steps.value(), hosts.steps.maximum()) == (1, 3)
+        seen.set()
         assert _until(lambda: hosts.sync_button.isEnabled() and "ready" in hosts.report.toPlainText())
         assert asked == [("192.168.1.2", ["unidock"])] and "installing on 192.168.1.2" in hosts.report.toPlainText()
+        assert "[1/3]" not in hosts.report.toPlainText() and hosts.steps.isHidden()
 
         ms.save_host("laptop", address="192.168.1.2", env="/mine")
         hosts.reload(select="laptop")
