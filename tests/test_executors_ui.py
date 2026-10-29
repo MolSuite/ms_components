@@ -121,3 +121,42 @@ def test_hosts_and_executors_are_kept_and_started_from_the_ui(tmp_path, monkeypa
     finally:
         ms.shutdown()
         app.processEvents()
+
+
+def test_a_host_is_given_the_programs_ticked_for_it_when_synced(tmp_path, monkeypatch):
+    from ms_flow.api import Workspace
+
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setenv("MOLSUITE_HOME", str(tmp_path / "home"))
+    ms = Workspace(app_id="ui")
+    asked = []
+
+    def prepare(address, busy, on_line):
+        asked.append((address, ms.settings_manager.settings.hosts["laptop"].install))
+        on_line(f"installing on {address}")
+        return "/far/env"
+
+    ms.host_env = prepare
+    try:
+        hosts = KeptPage(ms, "hosts", programs=("vina", "unidock"))
+        assert hosts._editors["install"].isHidden() and hosts.sync_button.isHidden()  # `local`: nothing to choose
+        hosts.new_button.click()
+        hosts.name.setText("laptop")
+        hosts._editors["address"].setText("192.168.1.2")
+        ticks = hosts._editors["install"]
+        assert not ticks.isHidden() and _value(ticks) == ["vina", "unidock"]  # a new host: each one
+        ticks.item(0).setCheckState(Qt.CheckState.Unchecked)
+        hosts.save_button.click()
+        assert ms.settings_manager.settings.hosts["laptop"].install == ["unidock"]
+
+        hosts.sync_button.click()
+        assert _until(lambda: hosts.sync_button.isEnabled() and "ready" in hosts.report.toPlainText())
+        assert asked == [("192.168.1.2", ["unidock"])] and "installing on 192.168.1.2" in hosts.report.toPlainText()
+
+        ms.save_host("laptop", address="192.168.1.2", env="/mine")
+        hosts.reload(select="laptop")
+        hosts.sync_button.click()
+        assert "names its own environment" in hosts.report.toPlainText() and len(asked) == 1
+    finally:
+        ms.shutdown()
+        app.processEvents()

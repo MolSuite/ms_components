@@ -38,7 +38,7 @@ from PySide6.QtWidgets import (
 )
 
 
-def _editor(field, value: Any, parent: QWidget, hosts=()) -> QWidget:
+def _editor(field, value: Any, parent: QWidget, names=()) -> QWidget:
     annotation, options = field.annotation, get_args(field.annotation)
     if get_origin(annotation) in (Union, types.UnionType) and options == (bool, type(None)):
         editor = QComboBox(parent)
@@ -48,13 +48,14 @@ def _editor(field, value: Any, parent: QWidget, hosts=()) -> QWidget:
         editor = QComboBox(parent)
         for option in options:
             editor.addItem(str(option), option)
-    elif get_origin(annotation) is list:  # names of hosts: the ones kept, to tick
+    elif list in (get_origin(annotation), *map(get_origin, options)):
+        # `names` to tick: the hosts kept, or the programs of the app; None ticks them all
         editor = QListWidget(parent)
         editor.setMaximumHeight(110)
-        for host in hosts:
-            item = QListWidgetItem("local (this computer)" if host == "local" else host, editor)
-            item.setData(Qt.ItemDataRole.UserRole, host)
-            item.setCheckState(Qt.CheckState.Checked if host in (value or ()) else Qt.CheckState.Unchecked)
+        for name in names:
+            item = QListWidgetItem("local (this computer)" if name == "local" else name, editor)
+            item.setData(Qt.ItemDataRole.UserRole, name)
+            item.setCheckState(Qt.CheckState.Checked if value is None or name in value else Qt.CheckState.Unchecked)
         return editor
     elif get_origin(annotation) is dict:
         editor = QPlainTextEdit("\n".join(f"{key} = {path}" for key, path in (value or {}).items()), parent)
@@ -140,14 +141,16 @@ class KeptPage(QWidget):
 
     changed = Signal()
     _checked = Signal(str)
+    _synced = Signal(str, bool)  # a line said there, and whether it is the last
 
     def __init__(self, workspace, table: str, parent: QWidget | None = None, *, packages=("ms_flow", "ms_env"),
-                 default_env: str = ""):
+                 default_env: str = "", programs=()):
         """`packages`: whose version "Check connection" reads on a host; `default_env`: the
-        environment the app prepares on a host that names none, under the home there."""
+        environment the app prepares on a host that names none, under the home there;
+        `programs`: the ones it can install there, to tick for each host (none: no choice shown)."""
         super().__init__(parent)
         self._workspace, self._table, self._one = workspace, table, table[:-1]
-        self._packages, self._default_env = tuple(packages), default_env
+        self._packages, self._default_env, self._programs = tuple(packages), default_env, tuple(programs)
         settings = type(workspace.settings_manager.settings)
         self._model = get_args(settings.model_fields[table].annotation)[1]
         self._editors: dict[str, QWidget] = {}
@@ -182,11 +185,17 @@ class KeptPage(QWidget):
                                          "the environment of the app and its packages, the tools named.")
             self.check_button.clicked.connect(self._check)
             foot.addWidget(self.check_button)
+            self.sync_button = QPushButton("Sync", self)
+            self.sync_button.setToolTip("Install there, or bring up to date, the environment of the app and the "
+                                        "programs ticked, as saved. What is already as it is here is left alone.")
+            self.sync_button.clicked.connect(self._sync)
+            foot.addWidget(self.sync_button)
             self.report = QPlainTextEdit(self)
             self.report.setReadOnly(True)
             self.report.setVisible(False)
             self._right.addWidget(self.report, 8)  # the room the stretch below has while nothing is said
             self._checked.connect(self._show_report)
+            self._synced.connect(self._sync_said)
         foot.addWidget(self.save_button)
         self._right.addStretch(1)
         self._right.addLayout(foot)
@@ -228,9 +237,12 @@ class KeptPage(QWidget):
         hosts = self._workspace.settings_manager.settings.hosts
         self._editors = {}
         for key, field in self._model.model_fields.items():
-            editor = self._editors[key] = _editor(field, getattr(entry, key, None), body, hosts)
+            names = self._programs if key == "install" else hosts
+            editor = self._editors[key] = _editor(field, getattr(entry, key, None), body, names)
             editor.setToolTip(field.description or "")
             form.addRow(field.title or key.replace("_", " ").capitalize(), editor)
+        if "install" in self._editors:  # this machine has its programs from the app's own settings
+            form.setRowVisible(self._editors["install"], bool(self._programs) and name != "local")
         kind = self._editors.get("kind")
         if name == "local":  # this machine and its pool: what they are is not a choice
             for fixed in ("address", "kind", "hosts"):
@@ -246,6 +258,7 @@ class KeptPage(QWidget):
         self.said.setText("")
         if self._table == "hosts":
             self.report.setVisible(False)
+            self.sync_button.setVisible(bool(name) and name != "local" and getattr(self._workspace, "host_env", None) is not None)
         self._right.insertWidget(0, body)
 
     def _only_of_kind(self) -> None:
@@ -301,6 +314,35 @@ class KeptPage(QWidget):
             self._checked.emit(said)
 
         threading.Thread(target=work, name="host-check", daemon=True).start()
+
+    def _sync(self) -> None:
+        """`Workspace.host_env` for the host as it is saved: what the app prepares there, made as it is here."""
+        name = self.names.currentItem().text()
+        host = self._kept()[name]
+        if host.env:
+            self._show_report(f"`{name}` names its own environment, {host.env}: the app prepares nothing there.")
+            return
+        users = [row["name"] for row in self._workspace.executors()
+                 if row["state"] in ("on", "starting") and name in row["hosts"]]
+        if users:  # what it runs would change under it
+            self._show_report(f"`{name}` is in use by `{users[0]}`, which is active: deactivate it first.")
+            return
+        self.sync_button.setEnabled(False)
+        self._show_report(f"Preparing {host.address}…")
+
+        def work() -> None:
+            try:
+                self._workspace.host_env(host.address, None, lambda line: self._synced.emit(line, False))
+                said = f"\n{name} is ready."
+            except Exception as error:  # noqa: BLE001 - said in the page, where it was asked for
+                said = f"\nCould not prepare {name}:\n{error}"
+            self._synced.emit(said, True)
+
+        threading.Thread(target=work, name="host-sync", daemon=True).start()
+
+    def _sync_said(self, line: str, last: bool) -> None:
+        self.report.appendPlainText(line)
+        self.sync_button.setEnabled(last)
 
     def _show_report(self, text: str) -> None:
         self.report.setPlainText(text)
