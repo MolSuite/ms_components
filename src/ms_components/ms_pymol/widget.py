@@ -151,6 +151,36 @@ def associate_scene_objects(cmd, objects, *, reference: str) -> None:
             cmd.set("grid_slot", slot, obj)
 
 
+class _ElidedLabel(QLabel):
+    """A label that never widens its bar: what does not fit ends in an ellipsis."""
+
+    def __init__(self, text: str, parent=None) -> None:
+        super().__init__(parent)
+        self._full = ""
+        self.setText(text)
+
+    def setText(self, text: str) -> None:  # noqa: N802
+        self._full = str(text)
+        self.updateGeometry()
+        self._elide()
+
+    def text(self) -> str:
+        return self._full
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        return QSize(self.fontMetrics().horizontalAdvance(self._full) + 4, super().sizeHint().height())
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        return QSize(0, super().minimumSizeHint().height())
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._elide()
+
+    def _elide(self) -> None:
+        super().setText(self.fontMetrics().elidedText(self._full, Qt.ElideRight, self.width()))
+
+
 class PymolControlBar(QFrame):
     """Compact, reusable controls for an embedded PyMOL scene."""
 
@@ -276,10 +306,10 @@ class PymolControlBar(QFrame):
             menu=self.preset_menu,
         )
 
-        self.context_label = QLabel("Generic", self)
+        self.context_label = _ElidedLabel("Generic", self)
         self.context_label.setObjectName("PymolSceneContext")
         self.context_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
-        self.context_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+        self.context_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.context_label.setToolTip("Current molecular scene context.")
         outer.addWidget(self.context_label)
 
@@ -711,7 +741,8 @@ class PymolControlBar(QFrame):
         target = str(self._context.target or "all").strip() or "all"
         summary, details = self._active_selection_summary()
         if not summary and target != "all":
-            summary = target
+            objects = target.split(" or ")  # several rows shown together: count them, the tooltip lists them
+            summary = f"{len(objects)} objects" if len(objects) > 1 else target
         self.context_label.setText(f"{kind} · {summary}" if summary else kind)
         context_lines = [f"Scene: {kind}", f"Target: {target}"]
         for role, selection in dict(self._context.selections or {}).items():

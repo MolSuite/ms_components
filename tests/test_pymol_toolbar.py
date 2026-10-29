@@ -269,3 +269,19 @@ def test_pymol_toolbar_ignores_deleted_overflow_button_during_icon_refresh():
     assert bar._overflow_btn is None
 
     bar.close()
+
+
+def test_the_context_label_counts_several_objects_and_never_widens_the_bar():
+    app = QApplication.instance() or QApplication([])
+    bar = PymolControlBar(None)
+    targets = " or ".join(f"receptor_1_pose_{n}" for n in range(40))
+    bar.set_scene_context("complex", target=targets)
+    assert bar.context_label.text() == "Complex · 40 objects"
+    assert "receptor_1_pose_39" in bar.context_label.toolTip()
+    bar.context_label.setText("x" * 500)
+    bar.resize(300, 30)
+    bar.show()
+    app.processEvents()
+    assert bar.context_label.minimumSizeHint().width() == 0
+    assert bar.context_label.width() <= 300
+    bar.close()
