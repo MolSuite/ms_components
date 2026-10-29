@@ -8,6 +8,7 @@ be done now, and says why.
 """
 from __future__ import annotations
 
+import re
 import shlex
 import sys
 import threading
@@ -30,6 +31,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPlainTextEdit,
+    QProgressBar,
     QPushButton,
     QRadioButton,
     QSpinBox,
@@ -38,7 +40,7 @@ from PySide6.QtWidgets import (
 )
 
 
-def _editor(field, value: Any, parent: QWidget, hosts=()) -> QWidget:
+def _editor(field, value: Any, parent: QWidget, names=()) -> QWidget:
     annotation, options = field.annotation, get_args(field.annotation)
     if get_origin(annotation) in (Union, types.UnionType) and options == (bool, type(None)):
         editor = QComboBox(parent)
@@ -48,13 +50,14 @@ def _editor(field, value: Any, parent: QWidget, hosts=()) -> QWidget:
         editor = QComboBox(parent)
         for option in options:
             editor.addItem(str(option), option)
-    elif get_origin(annotation) is list:  # names of hosts: the ones kept, to tick
+    elif list in (get_origin(annotation), *map(get_origin, options)):
+        # `names` to tick: the hosts kept, or the programs of the app; None ticks them all
         editor = QListWidget(parent)
         editor.setMaximumHeight(110)
-        for host in hosts:
-            item = QListWidgetItem("local (this computer)" if host == "local" else host, editor)
-            item.setData(Qt.ItemDataRole.UserRole, host)
-            item.setCheckState(Qt.CheckState.Checked if host in (value or ()) else Qt.CheckState.Unchecked)
+        for name in names:
+            item = QListWidgetItem("local (this computer)" if name == "local" else name, editor)
+            item.setData(Qt.ItemDataRole.UserRole, name)
+            item.setCheckState(Qt.CheckState.Checked if value is None or name in value else Qt.CheckState.Unchecked)
         return editor
     elif get_origin(annotation) is dict:
         editor = QPlainTextEdit("\n".join(f"{key} = {path}" for key, path in (value or {}).items()), parent)
@@ -91,6 +94,55 @@ def _value(editor: QWidget) -> Any:
         pairs = (line.partition("=") for line in editor.toPlainText().splitlines() if "=" in line)
         return {key.strip(): path.strip() for key, _, path in pairs}
     return editor.text().strip()
+
+
+class _Steps(QWidget):
+    """How far the preparation of a host got, what it is doing and for how long: moved by the
+    lines `[done/total] what` it says; `[0/0] what` is a wait with no steps to count."""
+
+    _LINE = re.compile(r"\[(\d+)/(\d+)\] (.*)")
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.label = QLabel(self)
+        self.bar = QProgressBar(self)
+        self.bar.setTextVisible(False)
+        layout.addWidget(self.label)
+        layout.addWidget(self.bar)
+        self._what, self._since = "", 0.0
+        self._clock = QTimer(self)  # a step of minutes moves nothing else: the time spent says it is alive
+        self._clock.setInterval(1000)
+        self._clock.timeout.connect(self._tell)
+        self.setVisible(False)
+
+    def take(self, line: str) -> bool:
+        """Whether `line` was one of those, shown here then, not in the log."""
+        found = self._LINE.fullmatch(line)
+        if found:
+            done, total, what = int(found[1]), int(found[2]), found[3]
+            if what != self._what:
+                self._what, self._since = what, time.monotonic()
+            self.bar.setRange(0, total)  # 0 of 0: Qt shows it busy
+            self.bar.setValue(done)
+            self._tell()
+            self.setVisible(True)
+            self._clock.start()
+        return bool(found)
+
+    def full(self) -> bool:
+        return 0 < self.bar.maximum() == self.bar.value()
+
+    def _tell(self) -> None:
+        spent = int(time.monotonic() - self._since)
+        done, total = self.bar.value(), self.bar.maximum()
+        counted = f"  ·  step {done + 1} of {total}" if done < total else ""
+        self.label.setText(f"{self._what}  ·  {spent // 60}:{spent % 60:02d}{counted}")
+
+    def hideEvent(self, event) -> None:
+        self._clock.stop()
+        super().hideEvent(event)
 
 
 _VERSIONS = """import sys, importlib.metadata as m
@@ -140,14 +192,16 @@ class KeptPage(QWidget):
 
     changed = Signal()
     _checked = Signal(str)
+    _synced = Signal(str, bool)  # a line said there, and whether it is the last
 
     def __init__(self, workspace, table: str, parent: QWidget | None = None, *, packages=("ms_flow", "ms_env"),
-                 default_env: str = ""):
+                 default_env: str = "", programs=()):
         """`packages`: whose version "Check connection" reads on a host; `default_env`: the
-        environment the app prepares on a host that names none, under the home there."""
+        environment the app prepares on a host that names none, under the home there;
+        `programs`: the ones it can install there, to tick for each host (none: no choice shown)."""
         super().__init__(parent)
         self._workspace, self._table, self._one = workspace, table, table[:-1]
-        self._packages, self._default_env = tuple(packages), default_env
+        self._packages, self._default_env, self._programs = tuple(packages), default_env, tuple(programs)
         settings = type(workspace.settings_manager.settings)
         self._model = get_args(settings.model_fields[table].annotation)[1]
         self._editors: dict[str, QWidget] = {}
@@ -182,11 +236,19 @@ class KeptPage(QWidget):
                                          "the environment of the app and its packages, the tools named.")
             self.check_button.clicked.connect(self._check)
             foot.addWidget(self.check_button)
+            self.sync_button = QPushButton("Sync", self)
+            self.sync_button.setToolTip("Install there, or bring up to date, the environment of the app and the "
+                                        "programs ticked, as saved. What is already as it is here is left alone.")
+            self.sync_button.clicked.connect(self._sync)
+            foot.addWidget(self.sync_button)
+            self.steps = _Steps(self)
+            self._right.addWidget(self.steps)
             self.report = QPlainTextEdit(self)
             self.report.setReadOnly(True)
             self.report.setVisible(False)
             self._right.addWidget(self.report, 8)  # the room the stretch below has while nothing is said
             self._checked.connect(self._show_report)
+            self._synced.connect(self._sync_said)
         foot.addWidget(self.save_button)
         self._right.addStretch(1)
         self._right.addLayout(foot)
@@ -228,9 +290,12 @@ class KeptPage(QWidget):
         hosts = self._workspace.settings_manager.settings.hosts
         self._editors = {}
         for key, field in self._model.model_fields.items():
-            editor = self._editors[key] = _editor(field, getattr(entry, key, None), body, hosts)
+            names = self._programs if key == "install" else hosts
+            editor = self._editors[key] = _editor(field, getattr(entry, key, None), body, names)
             editor.setToolTip(field.description or "")
             form.addRow(field.title or key.replace("_", " ").capitalize(), editor)
+        if "install" in self._editors:  # this machine has its programs from the app's own settings
+            form.setRowVisible(self._editors["install"], bool(self._programs) and name != "local")
         kind = self._editors.get("kind")
         if name == "local":  # this machine and its pool: what they are is not a choice
             for fixed in ("address", "kind", "hosts"):
@@ -246,6 +311,8 @@ class KeptPage(QWidget):
         self.said.setText("")
         if self._table == "hosts":
             self.report.setVisible(False)
+            self.steps.setVisible(False)
+            self.sync_button.setVisible(bool(name) and name != "local" and getattr(self._workspace, "host_env", None) is not None)
         self._right.insertWidget(0, body)
 
     def _only_of_kind(self) -> None:
@@ -302,6 +369,38 @@ class KeptPage(QWidget):
 
         threading.Thread(target=work, name="host-check", daemon=True).start()
 
+    def _sync(self) -> None:
+        """`Workspace.host_env` for the host as it is saved: what the app prepares there, made as it is here."""
+        name = self.names.currentItem().text()
+        host = self._kept()[name]
+        if host.env:
+            self._show_report(f"`{name}` names its own environment, {host.env}: the app prepares nothing there.")
+            return
+        users = [row["name"] for row in self._workspace.executors()
+                 if row["state"] in ("on", "starting") and name in row["hosts"]]
+        if users:  # what it runs would change under it
+            self._show_report(f"`{name}` is in use by `{users[0]}`, which is active: deactivate it first.")
+            return
+        self.sync_button.setEnabled(False)
+        self._show_report(f"Preparing {host.address}…")
+
+        def work() -> None:
+            try:
+                self._workspace.host_env(host.address, None, lambda line: self._synced.emit(line, False))
+                said = f"\n{name} is ready."
+            except Exception as error:  # noqa: BLE001 - said in the page, where it was asked for
+                said = f"\nCould not prepare {name}:\n{error}"
+            self._synced.emit(said, True)
+
+        threading.Thread(target=work, name="host-sync", daemon=True).start()
+
+    def _sync_said(self, line: str, last: bool) -> None:
+        if not self.steps.take(line):
+            self.report.appendPlainText(line)
+        self.sync_button.setEnabled(last)
+        if last:
+            self.steps.setVisible(False)
+
     def _show_report(self, text: str) -> None:
         self.report.setPlainText(text)
         self.report.setVisible(True)
@@ -340,6 +439,7 @@ class ExecutorsPanel(QDialog):
         self.resize(640, 260)
         self._workspace = workspace
         self._busy: set[str] = set()  # the ones a thread of this panel is starting or stopping
+        self._waiting = ""  # the line the bar shows while they have no steps to count
         self._shown: Any = None
         self._body: QWidget | None = None
         self.buttons: dict[str, QPushButton] = {}
@@ -347,6 +447,8 @@ class ExecutorsPanel(QDialog):
         self.defaults: dict[str, QRadioButton] = {}
 
         self._layout = QVBoxLayout(self)
+        self.steps = _Steps(self)
+        self._layout.addWidget(self.steps)
         self.said = QPlainTextEdit(self)
         self.said.setReadOnly(True)
         self.said.setVisible(False)
@@ -426,15 +528,22 @@ class ExecutorsPanel(QDialog):
                 self.ended.emit(name, "")
 
         self._busy.add(name)
+        self._waiting = f"[0/0] {'stopping' if stop else 'starting'} {name}"
+        self.steps.take(self._waiting)
         self.refresh()
         threading.Thread(target=work, name=f"executor-{name}", daemon=True).start()
 
     def _say(self, text: str) -> None:
+        if self.steps.take(text):
+            if self.steps.full() and self._busy:  # its hosts are ready: it is still starting on them
+                self.steps.take(self._waiting)
+            return
         self.said.setVisible(True)
         self.said.appendPlainText(text)
 
     def _ended(self, name: str, error: str) -> None:
         self._busy.discard(name)
+        self.steps.setVisible(bool(self._busy))
         if error:
             self._say(f"{name}: {error}")
         self.refresh()

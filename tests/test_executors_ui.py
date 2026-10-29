@@ -1,11 +1,12 @@
 """The Settings pages of hosts and executors and the quick panel, on a real workspace whose
 Ray runs nothing."""
+import threading
 import time
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from ms_components.ms_executors import ExecutorsPanel, KeptPage, _value
+from ms_components.ms_executors import ExecutorsPanel, KeptPage, _Steps, _value
 
 
 class _Ray:
@@ -105,6 +106,7 @@ def test_hosts_and_executors_are_kept_and_started_from_the_ui(tmp_path, monkeypa
 
         def unprepared(address, busy, on_line):
             on_line(f"looking for {address}")
+            on_line(f"[0/2] preparing {address}")
             raise OSError(f"{address} is not reached")
 
         ms.host_env = unprepared
@@ -112,6 +114,7 @@ def test_hosts_and_executors_are_kept_and_started_from_the_ui(tmp_path, monkeypa
         panel.buttons["lab"].click()
         assert _until(lambda: "lab: 192.168.1.2 is not reached" in panel.said.toPlainText())
         assert "looking for 192.168.1.2" in panel.said.toPlainText() and panel.states["lab"].text() == "Off"
+        assert "[0/2]" not in panel.said.toPlainText() and panel.steps.isHidden()  # the bar, gone when it ended
 
         executors.reload(select="lab")
         executors.remove_button.click()
@@ -121,3 +124,61 @@ def test_hosts_and_executors_are_kept_and_started_from_the_ui(tmp_path, monkeypa
     finally:
         ms.shutdown()
         app.processEvents()
+
+
+def test_a_host_is_given_the_programs_ticked_for_it_when_synced(tmp_path, monkeypatch):
+    from ms_flow.api import Workspace
+
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setenv("MOLSUITE_HOME", str(tmp_path / "home"))
+    ms = Workspace(app_id="ui")
+    asked, seen = [], threading.Event()
+
+    def prepare(address, busy, on_line):
+        asked.append((address, ms.settings_manager.settings.hosts["laptop"].install))
+        on_line(f"installing on {address}")
+        on_line(f"[1/3] preparing {address}")  # moves the bar, and is not in the log
+        seen.wait(10)  # while the test looks at the bar
+        return "/far/env"
+
+    ms.host_env = prepare
+    try:
+        hosts = KeptPage(ms, "hosts", programs=("vina", "unidock"))
+        assert hosts._editors["install"].isHidden() and hosts.sync_button.isHidden()  # `local`: nothing to choose
+        hosts.new_button.click()
+        hosts.name.setText("laptop")
+        hosts._editors["address"].setText("192.168.1.2")
+        ticks = hosts._editors["install"]
+        assert not ticks.isHidden() and _value(ticks) == ["vina", "unidock"]  # a new host: each one
+        ticks.item(0).setCheckState(Qt.CheckState.Unchecked)
+        hosts.save_button.click()
+        assert ms.settings_manager.settings.hosts["laptop"].install == ["unidock"]
+
+        hosts.sync_button.click()
+        assert _until(lambda: not hosts.steps.isHidden()) and (hosts.steps.bar.value(), hosts.steps.bar.maximum()) == (1, 3)
+        assert hosts.steps.label.text().startswith("preparing 192.168.1.2  ·  0:0")
+        assert hosts.steps.label.text().endswith("step 2 of 3")
+        seen.set()
+        assert _until(lambda: hosts.sync_button.isEnabled() and "ready" in hosts.report.toPlainText())
+        assert asked == [("192.168.1.2", ["unidock"])] and "installing on 192.168.1.2" in hosts.report.toPlainText()
+        assert "[1/3]" not in hosts.report.toPlainText() and hosts.steps.isHidden()
+
+        ms.save_host("laptop", address="192.168.1.2", env="/mine")
+        hosts.reload(select="laptop")
+        hosts.sync_button.click()
+        assert "names its own environment" in hosts.report.toPlainText() and len(asked) == 1
+    finally:
+        ms.shutdown()
+        app.processEvents()
+
+
+def test_the_bar_says_what_is_done_for_how_long_and_waits_with_nothing_to_count():
+    QApplication.instance() or QApplication([])
+    steps = _Steps(None)
+    assert not steps.take("a line for the log") and steps.isHidden()
+    assert steps.take("[0/0] starting lab") and steps.bar.maximum() == 0 and not steps.full()  # busy
+    assert steps.label.text() == "starting lab  ·  0:00"
+    steps._since -= 75  # a step of minutes
+    steps.take("[0/0] starting lab")
+    assert steps.label.text() == "starting lab  ·  1:15"
+    assert steps.take("[2/2] pc2: ready") and steps.full() and steps.label.text() == "pc2: ready  ·  0:00"
