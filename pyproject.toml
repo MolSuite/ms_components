@@ -31,9 +31,9 @@ dependencies = [
 
 [project.optional-dependencies]
 monitor = ["pydantic>=2.0"]
-projects = ["ms_flow>=0.2.0"]
+projects = ["ms_flow>=0.7.1"]
 pymol = ["pymol-open-source>=3.2.0a0"]
-steps = ["ms_env>=0.2.0"]
+steps = ["ms_env>=0.3.3"]
 table = ["sqlmodel>=0.0.14"]
 all = ["ms_components[monitor,projects,pymol,steps,table]"]
 # Test + development tooling.
