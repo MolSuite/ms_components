@@ -134,3 +134,45 @@ def test_the_hosts_are_listed_once_with_their_executors_and_a_queue_is_not_read(
         ("pc2", "me@pc2", "ray", ["ray", "gpus"], 15),
         ("hpc", "me@login", "queue", ["slurm"], None),
     ]
+
+
+def test_a_host_under_a_ray_is_read_from_its_metrics_with_no_ssh():
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    from ms_components.ms_monitor.resources import HostsStrip, _Reader
+
+    text = ('# HELP ray_node_cpu_utilization Total CPU usage\n'
+            'ray_node_cpu_utilization{ip="10.0.0.2",SessionName="s"} 42.5\n'
+            'ray_node_mem_used{ip="10.0.0.2"} 4294967296.0\n'
+            'ray_node_mem_total{ip="10.0.0.2"} 17179869184.0\n'
+            'ray_node_gpus_utilization{GpuIndex="1",ip="10.0.0.2"} 80.0\n'
+            'ray_node_gram_used{GpuIndex="1",ip="10.0.0.2"} 2048.0\n'
+            'ray_node_gram_available{GpuIndex="1",ip="10.0.0.2"} 4096.0\n'
+            'ray_node_gpus_utilization{GpuIndex="0",ip="10.0.0.2"} 20.0\n')
+
+    class Metrics(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(text.encode())
+
+        def log_message(self, *_):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Metrics)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{server.server_port}/metrics"
+    try:
+        asked = []
+        workspace = SimpleNamespace(node_metrics=lambda executor: asked.append(executor) or {"pc2": url})
+        metrics = HostsStrip(workspace, hosts=lambda: [])._metrics("pc2", "ray", ["ray"])
+        reader = _Reader("me@nowhere.invalid", metrics)  # ssh there would fail: the sample says it did not go
+        for _ in range(2):
+            sample = reader.read()
+            assert (sample.error, sample.via, sample.cpu, round(sample.mem), round(sample.mem_total_gb)) == ("", "Ray", 42.5, 25, 16)
+            assert sample.gpus == [(20.0, 0.0, 0.0), (80.0, 2048.0, 6144.0)]
+        assert asked == ["ray"]  # the URL is kept while it answers
+        assert HostsStrip(workspace, hosts=lambda: [])._metrics("pc2", "queue", ["slurm"]) is None
+    finally:
+        server.shutdown()

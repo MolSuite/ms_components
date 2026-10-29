@@ -1,8 +1,9 @@
 """What the machines that run jobs are using: CPU, memory and GPU of each host, over the last minutes.
 
-A host is read where it is: this machine with `psutil` (or `/proc`), another one through
-`ms_env.Host` (the system's `ssh`), with one command that prints `/proc/stat`, `/proc/meminfo`
-and `nvidia-smi`. The CPU in use is the change of `/proc/stat` between two reads, so the first
+A host is read where it is: this machine with `psutil` (or `/proc`); a node of a Ray that is on
+from the metrics Ray's agent exports there (`Workspace.node_metrics`), so with no ssh; another one
+through `ms_env.Host` (the system's `ssh`), with one command that prints `/proc/stat`,
+`/proc/meminfo` and `nvidia-smi`. The CPU in use is the change of `/proc/stat` between two reads, so the first
 read of a host shows none. Each host is read in its own thread, only while the strip is shown,
 every `interval` seconds: a few for this machine, more for one over the network. The login node
 of a queue is not read: what it uses says nothing of the nodes its jobs got.
@@ -14,6 +15,7 @@ import shutil
 import subprocess
 import threading
 import time
+import urllib.request
 from collections import deque
 from dataclasses import dataclass, field
 
@@ -39,6 +41,31 @@ class Sample:
     mem_total_gb: float = 0.0
     gpus: list[tuple[float, float, float]] = field(default_factory=list)  # (util %, MiB used, MiB total)
     error: str = ""
+    via: str = ""  # "Ray" when its metrics said it
+
+
+def parse_metrics(text: str) -> Sample:
+    """A sample from the Prometheus text Ray's agent exports on a node: the whole machine."""
+    got, gpus = {}, {}
+    for line in text.splitlines():
+        if not line.startswith("ray_node_") or "} " not in line:
+            continue
+        name, _, rest = line.partition("{")
+        labels, _, value = rest.rpartition("} ")
+        if name in ("ray_node_gpus_utilization", "ray_node_gram_used", "ray_node_gram_available"):
+            index = labels.split('GpuIndex="', 1)[-1].split('"', 1)[0]
+            gpus.setdefault(index, {})[name] = float(value)
+        else:
+            got.setdefault(name, float(value))
+    sample = Sample(cpu=got.get("ray_node_cpu_utilization"), via="Ray")
+    total = got.get("ray_node_mem_total", 0.0)
+    if total:
+        sample.mem_total_gb, sample.mem_used_gb = total / 1024**3, got.get("ray_node_mem_used", 0.0) / 1024**3
+        sample.mem = 100.0 * sample.mem_used_gb / sample.mem_total_gb
+    for _index, gpu in sorted(gpus.items()):
+        used = gpu.get("ray_node_gram_used", 0.0)  # MiB
+        sample.gpus.append((gpu.get("ray_node_gpus_utilization", 0.0), used, used + gpu.get("ray_node_gram_available", 0.0)))
+    return sample
 
 
 def parse(text: str, previous: tuple[int, int] | None) -> tuple[Sample, tuple[int, int] | None]:
@@ -79,8 +106,9 @@ def _local_gpus() -> list[tuple[float, float, float]]:
 class _Reader:
     """Reads one host; keeps what the next read needs."""
 
-    def __init__(self, address: str):
-        self.address, self._ticks, self._psutil = address, None, None
+    def __init__(self, address: str, metrics=None):
+        # `metrics()` gives the URL of the host's Ray metrics, or None while no Ray has it
+        self.address, self._ticks, self._psutil, self._metrics, self._url = address, None, None, metrics, None
         if not address:
             try:
                 import psutil
@@ -96,6 +124,13 @@ class _Reader:
                 memory = self._psutil.virtual_memory()
                 return Sample(self._psutil.cpu_percent(None), memory.percent, (memory.total - memory.available) / 1024**3,
                               memory.total / 1024**3, _local_gpus())
+            if self._metrics is not None:
+                self._url = self._url or self._metrics()
+                if self._url:
+                    try:
+                        return parse_metrics(urllib.request.urlopen(self._url, timeout=10).read().decode())
+                    except OSError:
+                        self._url = None  # the node left, or its Ray ended: asked again, ssh meanwhile
             from ms_env import Host
 
             text = Host(self.address or None).run(_SCRIPT, timeout=30).decode(errors="replace")
@@ -238,6 +273,8 @@ class _HostCard(QFrame):
         said = [self.address] if self.address else ["this computer", f"{os.cpu_count()} threads"]
         if sample is not None and sample.mem_total_gb:
             said.append(f"{sample.mem_total_gb:.0f} GB")
+        if sample is not None and sample.via:
+            said.append(f"via {sample.via}")
         self.about.setText(" · ".join(said))
 
     def set_jobs(self, active: int, cpus: int) -> None:
@@ -280,7 +317,7 @@ class HostsStrip(QScrollArea):
 
     def __init__(self, workspace=None, *, hosts=None, parent=None):
         super().__init__(parent)
-        self.hosts = hosts or (lambda: workspace_hosts(workspace))
+        self.hosts, self._workspace = hosts or (lambda: workspace_hosts(workspace)), workspace
         self._cards: dict[str, _HostCard] = {}
         self._chosen: str | None = None
         self._stop = threading.Event()
@@ -323,7 +360,7 @@ class HostsStrip(QScrollArea):
             card.clicked.connect(self._choose)
             row.addWidget(card, 145 if kind == "local" else 100)
             if interval is not None:
-                threading.Thread(target=self._read, args=(name, address, interval, stop),
+                threading.Thread(target=self._read, args=(name, address, interval, stop, self._metrics(name, kind, executors)),
                                  name=f"resources-{name}", daemon=True).start()
         if not listed:
             empty = QLabel(failed or "No executor is on.", body)
@@ -363,8 +400,15 @@ class HostsStrip(QScrollArea):
         card = self._cards.get(self._chosen)
         self.filter_changed.emit(None if card is None else set(card.executors))
 
-    def _read(self, name: str, address: str, interval: int, stop: threading.Event) -> None:
-        reader = _Reader(address)
+    def _metrics(self, name: str, kind: str, executors: list[str]):
+        """What gives the URL of the Ray metrics of host `name`, for one under a Ray."""
+        ask = getattr(self._workspace, "node_metrics", None)
+        if kind != "ray" or ask is None:
+            return None
+        return lambda: next((url for executor in executors if (url := ask(executor).get(name))), None)
+
+    def _read(self, name: str, address: str, interval: int, stop: threading.Event, metrics=None) -> None:
+        reader = _Reader(address, metrics)
         while not stop.is_set():
             began = time.monotonic()
             sample = reader.read()
@@ -401,4 +445,4 @@ def workspace_hosts(workspace) -> list[tuple[str, str, str, list[str], int | Non
     return [tuple(row) for row in rows.values()]
 
 
-__all__ = ["HostsStrip", "INTERVALS", "Sample", "Sparkline", "parse", "workspace_hosts"]
+__all__ = ["HostsStrip", "INTERVALS", "Sample", "Sparkline", "parse", "parse_metrics", "workspace_hosts"]
