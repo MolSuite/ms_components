@@ -670,17 +670,19 @@ class JobDetail(QWidget):
 
 
 def _used(job: JobMonitorState, seconds: float) -> tuple[str, str]:
-    """The CPU and GPU lines of a job's summary: what it held, and what its cards did."""
+    """The CPU and GPU lines of a job's summary: what it kept busy, of what it held."""
     usage = job.usage
-    if not usage:
+    if not usage or seconds <= 0:
         return "—", "—"
-    cpu = (f"{usage['cpu_s'] / 3600:,.2f} CPU·h · {usage['cpu_s'] / seconds:,.1f} held on average"
-           f" · {usage['peak_cpu']:g} at most") if usage.get("peak_cpu") and seconds > 0 else "—"
-    gpu = "—"
+    cpu = gpu = "—"
+    if usage.get("peak_cpu"):
+        held = f"{usage['cpu_s'] / seconds:,.1f} held on average · {usage['peak_cpu']:g} at most"
+        busy = usage.get("busy_s")  # on this machine only: what it read while the job ran
+        cpu = held if busy is None else f"{busy / 3600:,.2f} CPU·h · {busy / seconds:,.1f} busy of " + held
     if usage.get("peak_gpu"):
         gpu = f"{usage['gpu_s'] / 3600:,.2f} GPU·h · {usage['peak_gpu']:g} at most"
         if usage.get("vram_mb") is not None:
-            gpu += f" · {usage['vram_mb']:,} MB VRAM at most · {usage['gpu_util']:.0f} % busy on average (whole machine)"
+            gpu += f" · {usage['vram_mb']:,} MB VRAM at most · {usage['gpu_util']:.0f} % busy on average"
     return cpu, gpu
 
 

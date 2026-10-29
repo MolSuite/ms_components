@@ -78,12 +78,12 @@ def test_the_detail_shows_the_numbers_the_tasks_and_the_failures_grouped():
     assert detail._fact["status"].text() == "completed"
     assert detail._fact["CPU"].text() == detail._fact["GPU"].text() == "—"  # recorded without its usage
 
-    used = {"cpu_s": 7200.0, "peak_cpu": 4, "gpu_s": 1800.0, "peak_gpu": 1, "vram_mb": 1200, "gpu_util": 61.4}
+    used = {"cpu_s": 7200.0, "peak_cpu": 4, "busy_s": 5400.0, "gpu_s": 1800.0, "peak_gpu": 1, "vram_mb": 1200,
+            "gpu_util": 61.4}
     detail.set_job(_job(status="completed", engine_id=None, started_at=datetime(2026, 1, 1, 10),
                         finished_at=datetime(2026, 1, 1, 11), usage=used))
-    assert detail._fact["CPU"].text() == "2.00 CPU·h · 2.0 held on average · 4 at most"
-    assert detail._fact["GPU"].text() == ("0.50 GPU·h · 1 at most · 1,200 MB VRAM at most"
-                                          " · 61 % busy on average (whole machine)")
+    assert detail._fact["CPU"].text() == "1.50 CPU·h · 1.5 busy of 2.0 held on average · 4 at most"
+    assert detail._fact["GPU"].text() == "0.50 GPU·h · 1 at most · 1,200 MB VRAM at most · 61 % busy on average"
 
 
 def test_monitor_widget_lists_filters_and_selects_the_jobs_and_empties_without_a_project():
