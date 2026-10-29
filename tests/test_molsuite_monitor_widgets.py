@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -109,6 +110,23 @@ def test_monitor_widget_lists_filters_and_selects_the_jobs_and_empties_without_a
     assert widget._title_label.text() == "No active project" and not widget._jobs_view.jobs()
     assert widget._detail._name.text() == "Select a job"
 
+
+def test_a_mac_is_read_without_proc(tmp_path):
+    """Run the Mac half of the script with stand-ins for its `sysctl`, `ps` and `vm_stat`."""
+    from ms_components.ms_monitor.resources import _MAC, parse
+
+    fakes = {
+        "sysctl": 'case "$2" in hw.ncpu) echo 8 ;; hw.memsize) echo 17179869184 ;; esac',
+        "ps": "printf ' 100.0\\n 50.0\\n 10.0\\n'",  # 160 % of one core = 20 % of eight
+        "vm_stat": "printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\\nPages free:  65536.\\n"
+                   "Pages active:  9999.\\nPages inactive:  131072.\\nPages speculative:  65536.\\n'",  # 4 GB free
+    }
+    for name, body in fakes.items():
+        (tmp_path / name).write_text(f"#!/bin/sh\n{body}\n")
+        (tmp_path / name).chmod(0o755)
+    text = subprocess.check_output(["sh", "-c", _MAC], text=True, env={"PATH": f"{tmp_path}:/usr/bin:/bin"})
+    sample, _ = parse(text, None)
+    assert (sample.cpu, round(sample.mem), round(sample.mem_total_gb)) == (20.0, 75, 16), text
 
 def test_the_hosts_are_listed_once_with_their_executors_and_a_queue_is_not_read():
     from ms_components.ms_monitor.resources import parse, workspace_hosts

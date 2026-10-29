@@ -4,7 +4,7 @@ A host is read where it is: this machine with `psutil` (or `/proc`); a node of a
 from the metrics Ray's agent exports there (`Workspace.node_metrics`), so with no ssh; another one
 through `ms_env.Host` (the system's `ssh`), with one command that prints `/proc/stat`,
 `/proc/meminfo` and `nvidia-smi`. The CPU in use is the change of `/proc/stat` between two reads, so the first
-read of a host shows none. Each host is read in its own thread, only while the strip is shown,
+read of a host shows none; a Mac, with no `/proc`, says it from `ps`, `sysctl` and `vm_stat`. Each host is read in its own thread, only while the strip is shown,
 every `interval` seconds: a few for this machine, more for one over the network. The login node
 of a queue is not read: what it uses says nothing of the nodes its jobs got.
 """
@@ -30,7 +30,14 @@ INTERVALS = {"local": 5, "ray": 15}
 _HISTORY = 120  # reads kept per host: 10 min of this machine, 30 of one over the network
 
 _GPU_QUERY = "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits"
-_SCRIPT = f"head -1 /proc/stat; grep -E '^(MemTotal|MemAvailable):' /proc/meminfo; {_GPU_QUERY} 2>/dev/null || true"
+# macOS has no /proc: the CPU its processes use now (`ps`, 100 = one core), and memory from
+# `sysctl` and `vm_stat` (free + inactive + speculative pages), said the way Linux says it.
+_MAC = ("n=$(sysctl -n hw.ncpu); ps -A -o %cpu= | awk -v n=$n '{s += $1} END {printf \"cpunow %.1f\\n\", s / n}'; "
+        "echo \"MemTotal: $(($(sysctl -n hw.memsize) / 1024)) kB\"; "
+        "vm_stat | awk '/page size of/ {p = $8} /^Pages (free|inactive|speculative):/ {a += $NF} "
+        "END {printf \"MemAvailable: %d kB\\n\", a * p / 1024}'")
+_SCRIPT = (f"if [ -r /proc/stat ]; then head -1 /proc/stat; grep -E '^(MemTotal|MemAvailable):' /proc/meminfo; "
+           f"else {_MAC}; fi; {_GPU_QUERY} 2>/dev/null || true")
 
 
 @dataclass(slots=True)
@@ -72,7 +79,9 @@ def parse(text: str, previous: tuple[int, int] | None) -> tuple[Sample, tuple[in
     """What `_SCRIPT` printed, and the CPU counters it read (busy, total) for the next read."""
     sample, ticks, mem = Sample(), None, {}
     for line in text.splitlines():
-        if line.startswith("cpu "):
+        if line.startswith("cpunow "):  # a Mac says its share now, no counters
+            sample.cpu = min(100.0, float(line.split()[1]))
+        elif line.startswith("cpu "):
             values = [int(v) for v in line.split()[1:]]
             idle = values[3] + (values[4] if len(values) > 4 else 0)  # idle + iowait
             ticks = (sum(values) - idle, sum(values))
