@@ -9449,9 +9449,7 @@ environment the app prepares on a host that names none, under the home there;
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>src/ms_components/ms_executors.py</code></summary>
-                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">199</span>
 <span class="normal">200</span>
 <span class="normal">201</span>
 <span class="normal">202</span>
@@ -9508,7 +9506,9 @@ environment the app prepares on a host that names none, under the home there;
 <span class="normal">253</span>
 <span class="normal">254</span>
 <span class="normal">255</span>
-<span class="normal">256</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workspace</span><span class="p">,</span> <span class="n">table</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">packages</span><span class="o">=</span><span class="p">(</span><span class="s2">"ms_flow"</span><span class="p">,</span> <span class="s2">"ms_env"</span><span class="p">),</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workspace</span><span class="p">,</span> <span class="n">table</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">packages</span><span class="o">=</span><span class="p">(</span><span class="s2">"ms_flow"</span><span class="p">,</span> <span class="s2">"ms_env"</span><span class="p">),</span>
              <span class="n">default_env</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span> <span class="n">programs</span><span class="o">=</span><span class="p">()):</span>
 <span class="w">    </span><span class="sd">"""`packages`: whose version "Check connection" reads on a host; `default_env`: the</span>
 <span class="sd">    environment the app prepares on a host that names none, under the home there;</span>
@@ -9629,9 +9629,7 @@ goes to when nobody is named.</p>
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>src/ms_components/ms_executors.py</code></summary>
-                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">435</span>
-<span class="normal">436</span>
-<span class="normal">437</span>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">437</span>
 <span class="normal">438</span>
 <span class="normal">439</span>
 <span class="normal">440</span>
@@ -9664,7 +9662,9 @@ goes to when nobody is named.</p>
 <span class="normal">467</span>
 <span class="normal">468</span>
 <span class="normal">469</span>
-<span class="normal">470</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workspace</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workspace</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">setWindowTitle</span><span class="p">(</span><span class="s2">"Executors"</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">setModal</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
@@ -9771,7 +9771,9 @@ not get in. Blocks: not on the GUI thread.</p>
 <span class="normal">180</span>
 <span class="normal">181</span>
 <span class="normal">182</span>
-<span class="normal">183</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">describe_host</span><span class="p">(</span><span class="n">address</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">env</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span> <span class="n">packages</span><span class="o">=</span><span class="p">(),</span> <span class="n">tools</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">describe_host</span><span class="p">(</span><span class="n">address</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">env</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span> <span class="n">packages</span><span class="o">=</span><span class="p">(),</span> <span class="n">tools</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""What the machine `address` (empty: this one) is and has, in a few lines: its system, CPUs,</span>
 <span class="sd">    memory and GPUs, the Python of `env` there with the version of each of `packages`, and whether</span>
 <span class="sd">    each of `tools` (name -&gt; path) can be run. One `ssh` call, which raises `HostError` when it does</span>
@@ -9781,9 +9783,11 @@ not get in. Blocks: not on the GUI thread.</p>
     <span class="n">tools</span> <span class="o">=</span> <span class="n">tools</span> <span class="ow">or</span> <span class="p">{}</span>
     <span class="n">python</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">env</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s1">'/'</span><span class="p">)</span><span class="si">}</span><span class="s2">/bin/python"</span> <span class="k">if</span> <span class="n">env</span> <span class="k">else</span> <span class="p">(</span><span class="s2">""</span> <span class="k">if</span> <span class="n">address</span> <span class="k">else</span> <span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">)</span>
     <span class="n">script</span> <span class="o">=</span> <span class="s2">"; "</span><span class="o">.</span><span class="n">join</span><span class="p">([</span>
-        <span class="s2">"export LC_ALL=C"</span><span class="p">,</span> <span class="s2">"uname -srm"</span><span class="p">,</span> <span class="s1">'(. /etc/os-release 2&gt;/dev/null &amp;&amp; echo "$PRETTY_NAME")'</span><span class="p">,</span>
+        <span class="s2">"export LC_ALL=C"</span><span class="p">,</span> <span class="s2">"uname -srm"</span><span class="p">,</span>
+        <span class="s1">'(. /etc/os-release 2&gt;/dev/null &amp;&amp; echo "$PRETTY_NAME") || (v=$(sw_vers -productVersion 2&gt;/dev/null) &amp;&amp; echo "macOS $v")'</span><span class="p">,</span>
         <span class="s1">'echo "CPUs: $(nproc 2&gt;/dev/null || sysctl -n hw.ncpu)"'</span><span class="p">,</span>
-        <span class="s2">"awk '/MemTotal/ {printf </span><span class="se">\"</span><span class="s2">Memory: </span><span class="si">%.1f</span><span class="s2"> GB</span><span class="se">\\</span><span class="s2">n</span><span class="se">\"</span><span class="s2">, $2/1048576}' /proc/meminfo 2&gt;/dev/null"</span><span class="p">,</span>
+        <span class="s2">"awk '/MemTotal/ {printf </span><span class="se">\"</span><span class="s2">Memory: </span><span class="si">%.1f</span><span class="s2"> GB</span><span class="se">\\</span><span class="s2">n</span><span class="se">\"</span><span class="s2">, $2/1048576}' /proc/meminfo 2&gt;/dev/null"</span>
+        <span class="s2">" || sysctl -n hw.memsize | awk '{printf </span><span class="se">\"</span><span class="s2">Memory: </span><span class="si">%.1f</span><span class="s2"> GB</span><span class="se">\\</span><span class="s2">n</span><span class="se">\"</span><span class="s2">, $1/1073741824}'"</span><span class="p">,</span>  <span class="c1"># macOS: no /proc</span>
         <span class="s2">"(nvidia-smi -L 2&gt;/dev/null || echo 'GPUs: none seen by nvidia-smi')"</span><span class="p">,</span>
         <span class="s2">"echo"</span><span class="p">,</span>
         <span class="o">*</span><span class="p">([</span><span class="sa">f</span><span class="s2">"if [ -x </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">python</span><span class="p">)</span><span class="si">}</span><span class="s2"> ]; then </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">python</span><span class="p">)</span><span class="si">}</span><span class="s2"> -c </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">_VERSIONS</span><span class="p">)</span><span class="si">}</span><span class="s2"> "</span>
