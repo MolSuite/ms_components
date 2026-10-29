@@ -10,18 +10,15 @@ from PySide6.QtWidgets import (
     QMenu,
     QPushButton,
     QSplitter,
-    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from ms_components.ms_monitor.cards import MetricCard
-from ms_components.ms_monitor.detail_panel import JobDetailPanel
-from ms_components.ms_monitor.formatting import format_relative_time, format_throughput
-from ms_components.ms_monitor.job_cards import JobCardList
+from ms_components.ms_monitor.detail import JobDetail
+from ms_components.ms_monitor.formatting import format_relative_time
+from ms_components.ms_monitor.jobs import JobList
 from ms_components.ms_monitor.models import ProjectMonitorState
-from ms_components.ms_monitor.palette import P
-from ms_components.ms_monitor.resources import ResourcesPanel, workspace_hosts
+from ms_components.ms_monitor.resources import HostsStrip, workspace_hosts
 
 
 class MolSuiteMonitorWidget(QWidget):
@@ -29,10 +26,9 @@ class MolSuiteMonitorWidget(QWidget):
         super().__init__(parent)
         self._bridge = None
         self._snapshot: ProjectMonitorState | None = None
-        # The detail panel (summary/errors) is loaded once per explicit job selection and
-        # frozen afterwards — it does NOT follow the poll. Otherwise the constant re-render
-        # scrolls it back to the top while the user reads it.
-        self._detail_job_id: str | None = None
+        # The failures of the selected job come from the journal: read again only when the job
+        # changes or fails more, not each poll, so the list does not jump while it is read.
+        self._failures_key = None
 
         self.setObjectName("molsuiteMonitor")
         # Only what the app-wide base.qss does NOT already give us: the card frame.
@@ -81,17 +77,8 @@ class MolSuiteMonitorWidget(QWidget):
         project_layout.addLayout(status_row)
         layout.addWidget(self._project_panel)
 
-        metrics_row = QHBoxLayout()
-        metrics_row.setSpacing(10)
-        self._active_jobs_card = MetricCard("ACTIVE JOBS", "0", subtitle="0 visible", parent=self)
-        self._throughput_card = MetricCard("THROUGHPUT", "-", subtitle="0 tasks running", parent=self)
-        self._chunks_card = MetricCard("CHUNKS", "0", subtitle="0%", accent=P["ok"], parent=self)
-        self._failures_card = MetricCard("FAILURES", "0", subtitle="0 ext. cancellers", accent=P["error"], parent=self)
-        metrics_row.addWidget(self._active_jobs_card)
-        metrics_row.addWidget(self._throughput_card)
-        metrics_row.addWidget(self._chunks_card)
-        metrics_row.addWidget(self._failures_card)
-        layout.addLayout(metrics_row)
+        self._hosts = HostsStrip(getattr(bridge, "workspace", None), parent=self)
+        layout.addWidget(self._hosts)
 
         filter_row = QHBoxLayout()
         filter_row.setSpacing(8)
@@ -116,22 +103,17 @@ class MolSuiteMonitorWidget(QWidget):
         self._set_job_actions(None)
         layout.addLayout(filter_row)
 
-        self._jobs_view = JobCardList(self)
-        self._detail_panel = JobDetailPanel(parent=self)
-        self._resources = ResourcesPanel(getattr(bridge, "workspace", None), parent=self)
-        self._side = QTabWidget(self)
-        self._side.addTab(self._detail_panel, "Details")
-        self._side.addTab(self._resources, "Resources")
+        self._jobs_view = JobList(self)
+        self._detail = JobDetail(self)
 
-        # Horizontal split: jobs on the left, job detail on the right. Uses the
-        # available width instead of stacking, so the panel stays usable when its
-        # height is squeezed (e.g. docked below other panels).
+        # Jobs on the left, the selected one on the right: uses the width, so the panel stays
+        # usable when its height is squeezed (docked below other panels).
         main_splitter = QSplitter(Qt.Horizontal, self)
         main_splitter.addWidget(self._jobs_view)
-        main_splitter.addWidget(self._side)
-        main_splitter.setStretchFactor(0, 3)
-        main_splitter.setStretchFactor(1, 2)
-        main_splitter.setSizes([560, 440])
+        main_splitter.addWidget(self._detail)
+        main_splitter.setStretchFactor(0, 2)
+        main_splitter.setStretchFactor(1, 3)
+        main_splitter.setSizes([380, 620])
         layout.addWidget(main_splitter, 1)
 
         self._search_input.textChanged.connect(self._jobs_view.set_search_text)
@@ -141,7 +123,7 @@ class MolSuiteMonitorWidget(QWidget):
         self._resume_button.clicked.connect(lambda: self._resume_selected_job())
         self._move_button.menu().aboutToShow.connect(self._fill_destinations)
         self._jobs_view.job_selected.connect(self._on_current_job_changed)
-        self._jobs_view.unfolded_changed.connect(self._on_unfolded_changed)
+        self._hosts.filter_changed.connect(self._jobs_view.set_executor_filter)
 
         if bridge is not None:
             self.attach_bridge(bridge)
@@ -157,7 +139,9 @@ class MolSuiteMonitorWidget(QWidget):
             self._bridge.operator_action_failed.disconnect(self._handle_action_failure)
             self._bridge.bridge_error.disconnect(self._handle_bridge_error)
         self._bridge = bridge
-        self._resources.hosts = lambda: workspace_hosts(bridge.workspace)
+        self._hosts.hosts = lambda: workspace_hosts(bridge.workspace)
+        if self._hosts.isVisible():
+            self._hosts.start()
         bridge.project_snapshot_updated.connect(self.update_snapshot)
         bridge.project_cleared.connect(self.clear_snapshot)
         bridge.sync_state_updated.connect(self._update_sync_state)
@@ -175,10 +159,6 @@ class MolSuiteMonitorWidget(QWidget):
         self._summary_label.setText("Open a project to monitor jobs.")
         self._sync_label.setText("Sync: idle")
         self._action_label.setText("")
-        self._active_jobs_card.set_value("0", "0 visible")
-        self._throughput_card.set_value("-", "0 tasks running")
-        self._chunks_card.set_value("0", "0%")
-        self._failures_card.set_value("0", "0 ext. cancellers")
         self._jobs_view.clear()
         self._search_input.clear()
         self._status_filter.blockSignals(True)
@@ -186,8 +166,8 @@ class MolSuiteMonitorWidget(QWidget):
         self._status_filter.addItem("All statuses", "all")
         self._status_filter.blockSignals(False)
         self._set_job_actions(None)
-        self._detail_panel.clear()
-        self._detail_job_id = None
+        self._detail.set_job(None)
+        self._failures_key = None
 
     def update_snapshot(self, snapshot: ProjectMonitorState) -> None:
         self._snapshot = snapshot
@@ -202,35 +182,9 @@ class MolSuiteMonitorWidget(QWidget):
             f"External cancellers: {snapshot.external_cancellers}"
         )
 
-        # Over the jobs that run, so the counts start again with each job instead of adding up
-        # every job still listed; the cards below keep what each one did.
-        jobs = snapshot.jobs
-        active = [j for j in jobs if not j.is_terminal]
-        total_eps = sum(j.throughput_eps for j in active)
-        tasks = sum(j.tasks_running for j in active)
-        cpus = sum(j.cpu_used for j in active)
-        chunks_done = sum(j.chunks_done for j in active)
-        chunks_total = sum(j.chunks_total for j in active)
-        failures = sum(j.chunks_failed for j in active)
-        pct = (chunks_done / chunks_total * 100.0) if chunks_total else 0.0
-
-        self._active_jobs_card.set_value(str(snapshot.jobs_active), f"{len(jobs)} visible")
-        self._throughput_card.set_value(
-            format_throughput(total_eps), f"{tasks:,} tasks running" + (f" on {cpus:,} CPU" if cpus else ""))
-        self._chunks_card.set_value(f"{chunks_done:,} / {chunks_total:,}", f"{pct:.0f}%")
-        self._failures_card.set_value(
-            f"{failures:,}", f"{snapshot.external_cancellers} ext. cancellers",
-            accent=P["error"] if failures else P["border"])
-        # Preserve selected job_id before refresh
-        selected_job_id = self._selected_job_id()
         self._jobs_view.set_jobs(snapshot.jobs)
         self._rebuild_filters(snapshot)
-        # Restore selection if the job still exists; the detail panels are NOT touched
-        # here — they only reload on an explicit (re)selection or Resync, so scrolling
-        # through the errors of the selected job is never yanked back to the top.
-        if selected_job_id:
-            self._jobs_view.select_job(selected_job_id)
-        self._set_job_actions(self._selected_job())  # the buttons do follow the job, as it ends
+        self._show_selected()
 
     def _rebuild_filters(self, snapshot: ProjectMonitorState) -> None:
         current_status = self._status_filter.currentData()
@@ -251,9 +205,8 @@ class MolSuiteMonitorWidget(QWidget):
     def _refresh_from_bridge(self) -> None:
         if self._bridge is not None:
             self._bridge.request_refresh()
-        # Resync is an explicit user action, so it's the one place we reload the detail
-        # of the currently selected job.
-        self._load_detail()
+        self._failures_key = None  # an explicit resync reads the failures again
+        self._show_selected()
 
     def _selected_job_id(self) -> str | None:
         return self._jobs_view.selected_job_id()
@@ -288,28 +241,21 @@ class MolSuiteMonitorWidget(QWidget):
         self._action_label.setText(f"Action: moving {job_id[:8]} to {executor}" if executor else f"Action: resuming {job_id[:8]}")
         self._bridge.resume_job(job_id, executor)
 
-    def _on_unfolded_changed(self, job_ids) -> None:
+    def _on_current_job_changed(self, job_id) -> None:
         if self._bridge is not None:
-            self._bridge.set_unfolded_jobs(job_ids)
+            self._bridge.select_job(job_id)
+        self._show_selected()
 
-    def _on_current_job_changed(self, *_args) -> None:
-        # Triggered only by an explicit click on a job card → reload its detail once.
-        self._side.setCurrentWidget(self._detail_panel)
-        self._load_detail()
-
-    def _load_detail(self) -> None:
-        if self._bridge is None:
-            self._detail_panel.clear()
-            self._set_job_actions(None)
+    def _show_selected(self) -> None:
+        job = self._selected_job()
+        self._set_job_actions(job)
+        self._detail.set_job(job)
+        key = None if job is None else (job.job_id, job.chunks_failed, job.error)
+        if key == self._failures_key:
             return
-        job_id = self._selected_job_id()
-        self._set_job_actions(self._selected_job())
-        if not job_id:
-            self._detail_panel.clear()
-            self._detail_job_id = None
-            return
-        self._detail_panel.set_job_detail(self._bridge.get_job_detail(job_id))
-        self._detail_job_id = job_id
+        self._failures_key = key
+        detail = self._bridge.get_job_detail(job.job_id) if self._bridge is not None and job is not None else None
+        self._detail.set_failures(detail.failures if detail else [], job.chunks_failed if job else 0, job.error if job else "")
 
     def _selected_job(self):
         return self._jobs_view.selected_job()
@@ -345,11 +291,3 @@ class MolSuiteMonitorWidget(QWidget):
 
     def _handle_bridge_error(self, message: str) -> None:
         self._action_label.setText(f"Bridge error: {message}")
-
-
-if __name__ == '__main__':
-    from PySide6.QtWidgets import QApplication
-    app = QApplication([])
-    window = MolSuiteMonitorWidget()
-    window.show()
-    app.exec()

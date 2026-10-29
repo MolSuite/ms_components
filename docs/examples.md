@@ -137,3 +137,9 @@ try:
 finally:
     ms.shutdown()
 ```
+
+The strip on top shows the hosts of the executors that are on (CPU over time, memory, GPU);
+clicking one keeps only the jobs of its executors. A queue's login node is not read. Selecting a
+job shows its time left and speed over the last 5 minutes, its progress, its failures, a cell
+per chunk (only while the job runs in this session), its tasks in flight with the host of each,
+and its failures grouped by message.

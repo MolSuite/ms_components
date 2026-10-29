@@ -3,9 +3,9 @@
 A host is read where it is: this machine with `psutil` (or `/proc`), another one through
 `ms_env.Host` (the system's `ssh`), with one command that prints `/proc/stat`, `/proc/meminfo`
 and `nvidia-smi`. The CPU in use is the change of `/proc/stat` between two reads, so the first
-read of a host shows none. Each host is read in its own thread, only while the panel is shown,
-every `interval` seconds: a few for this machine, more for one over the network, the most for
-the login node of a queue, which is asked through the same `ssh` its jobs are.
+read of a host shows none. Each host is read in its own thread, only while the strip is shown,
+every `interval` seconds: a few for this machine, more for one over the network. The login node
+of a queue is not read: what it uses says nothing of the nodes its jobs got.
 """
 from __future__ import annotations
 
@@ -18,10 +18,10 @@ from dataclasses import dataclass, field
 
 from PySide6.QtCore import QObject, QPointF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPalette, QPen
-from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QScrollArea, QToolTip, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QToolTip, QVBoxLayout, QWidget
 
-# Seconds between two reads, by the kind of executor the host is under.
-INTERVALS = {"local": 5, "ray": 15, "queue": 60}
+# Seconds between two reads, by the kind of executor the host is under; a queue's is not read.
+INTERVALS = {"local": 5, "ray": 15}
 _HISTORY = 120  # reads kept per host: 10 min of this machine, 30 of one over the network
 
 _GPU_QUERY = "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits"
@@ -161,61 +161,84 @@ class Sparkline(QWidget):
 
 
 class _Relay(QObject):
-    sampled = Signal(str, object)  # host key, Sample
+    sampled = Signal(str, object)  # host name, Sample
 
 
-class _HostRow(QFrame):
-    def __init__(self, name: str, address: str, interval: int, parent=None):
+class _HostCard(QFrame):
+    """One host in the strip: CPU over time, memory and GPU now. Checked, it filters the jobs."""
+
+    clicked = Signal(str)
+
+    def __init__(self, name: str, address: str, kind: str, executors: list[str], interval: int | None, parent=None):
         super().__init__(parent)
-        self.setObjectName("hostRow")
-        self.setStyleSheet("QFrame#hostRow { background:palette(base); border:1px solid palette(mid); border-radius:8px; }")
-        grid = QGridLayout(self)
-        grid.setContentsMargins(10, 6, 10, 6)
-        title = QLabel(f"<b>{name}</b> <span style='color:palette(placeholder-text)'>"
-                       f"{address or 'this computer'} · every {interval}s</span>", self)
-        grid.addWidget(title, 0, 0)
-        self.said = QLabel(self)
+        self.name, self.executors = name, executors
+        self.setObjectName("hostCard")
+        self.setProperty("checked", False)
+        self.setFixedWidth(230)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setToolTip(f"{address or 'this computer'} · in {', '.join(executors) or 'no executor'}"
+                        + (f" · read every {interval}s" if interval else "") + "\nClick: only its jobs")
+        box = QVBoxLayout(self)
+        box.setContentsMargins(8, 4, 8, 4)
+        box.setSpacing(0)
+        title = QLabel(f"<b>{name}</b> <span style='color:palette(placeholder-text)'>{kind}</span>", self)
+        box.addWidget(title)
+        self.cpu = Sparkline("CPU", self)
+        self.cpu.setMinimumSize(120, 36)
+        self.cpu.interval = interval or 0
+        self.said = QLabel("not read: the login node of a queue" if interval is None else "", self)
         self.said.setStyleSheet("color:palette(placeholder-text); font-size:10px;")
-        self.said.setWordWrap(True)
-        self.said.setVisible(False)
-        grid.addWidget(self.said, 1, 0)
-        self.lines = {key: Sparkline(key, self) for key in ("CPU", "Memory", "GPU")}
-        for at, line in enumerate(self.lines.values(), start=2):  # stacked: each its own axis, full width
-            line.interval = interval
-            grid.addWidget(line, at, 0)
-        self.lines["GPU"].setVisible(False)
+        self.cpu.setVisible(interval is not None)
+        box.addWidget(self.cpu)
+        box.addWidget(self.said)
+
+    def set_checked(self, checked: bool) -> None:
+        self.setProperty("checked", checked)
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit(self.name)
+        super().mouseReleaseEvent(event)
 
     def apply(self, sample: Sample) -> None:
-        self.said.setText(sample.error)
-        self.said.setVisible(bool(sample.error))
         if sample.error:
+            self.said.setText(sample.error)
             return
-        self.lines["CPU"].push(sample.cpu)
-        self.lines["Memory"].push(sample.mem, f"{sample.mem_used_gb:.1f}/{sample.mem_total_gb:.0f} GB")
-        if sample.gpus:  # ponytail: the mean over the cards; a line per card when one host has several that differ
+        self.cpu.push(sample.cpu)
+        said = f"Mem {sample.mem_used_gb:.1f}/{sample.mem_total_gb:.0f} GB"
+        if sample.gpus:  # ponytail: the mean over the cards; one per card when a host has several that differ
             util = sum(g[0] for g in sample.gpus) / len(sample.gpus)
             used, total = sum(g[1] for g in sample.gpus) / 1024, sum(g[2] for g in sample.gpus) / 1024
-            self.lines["GPU"].setVisible(True)
-            self.lines["GPU"].push(util, f"{len(sample.gpus)}× · {used:.1f}/{total:.0f} GB")
+            said += f" · GPU {util:.0f}% {used:.1f}/{total:.0f} GB" + (f" ({len(sample.gpus)}×)" if len(sample.gpus) > 1 else "")
+        self.said.setText(said)
 
 
-class ResourcesPanel(QScrollArea):
-    """The hosts of the executors that are on, under the name of each, read while shown.
+class HostsStrip(QScrollArea):
+    """The hosts of the executors that are on, side by side, read while shown. Clicking one keeps
+    only the jobs of its executors (`filter_changed` gives their names, or None for all).
 
-    `hosts()` gives `(group, name, address, interval_s)` for each host to read; by default
-    they come from `workspace` (see `workspace_hosts`).
+    `hosts()` gives `(name, address, kind, executors, interval_s or None)` for each host; by
+    default they come from `workspace` (see `workspace_hosts`).
     """
+
+    filter_changed = Signal(object)
 
     def __init__(self, workspace=None, *, hosts=None, parent=None):
         super().__init__(parent)
         self.hosts = hosts or (lambda: workspace_hosts(workspace))
-        self._rows: dict[str, _HostRow] = {}
-        self._threads: list[threading.Thread] = []
+        self._cards: dict[str, _HostCard] = {}
+        self._chosen: str | None = None
         self._stop = threading.Event()
         self._relay = _Relay(self)
         self._relay.sampled.connect(self._on_sample)
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.NoFrame)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setFixedHeight(92)
+        self.setStyleSheet("QFrame#hostCard { background:palette(base); border:1px solid palette(mid); border-radius:8px; }"
+                           "QFrame#hostCard[checked=\"true\"] { border:2px solid palette(highlight); }")
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -229,77 +252,78 @@ class ResourcesPanel(QScrollArea):
         self.stop()
         self._stop = stop = threading.Event()
         body = QWidget()
-        layout = QVBoxLayout(body)
-        layout.setContentsMargins(4, 4, 4, 4)
-        self._rows.clear()
+        row = QHBoxLayout(body)
+        row.setContentsMargins(0, 0, 0, 0)
+        self._cards.clear()
         try:
             listed = list(self.hosts())
         except Exception as error:  # noqa: BLE001
             listed, failed = [], str(error)
         else:
             failed = ""
-        group = None
-        for at, (in_group, name, address, interval) in enumerate(listed):
-            if in_group != group:
-                group = in_group
-                heading = QLabel(f"<b>{group}</b>", body)
-                heading.setStyleSheet("color:palette(placeholder-text); margin-top:6px;")
-                layout.addWidget(heading)
-            key = f"{at}:{name}"
-            self._rows[key] = row = _HostRow(name, address, interval, body)
-            layout.addWidget(row)
-            thread = threading.Thread(target=self._read, args=(key, address, interval, stop),
-                                      name=f"resources-{name}", daemon=True)
-            self._threads.append(thread)
-            thread.start()
+        for name, address, kind, executors, interval in listed:
+            self._cards[name] = card = _HostCard(name, address, kind, executors, interval, body)
+            card.set_checked(name == self._chosen)
+            card.clicked.connect(self._choose)
+            row.addWidget(card)
+            if interval is not None:
+                threading.Thread(target=self._read, args=(name, address, interval, stop),
+                                 name=f"resources-{name}", daemon=True).start()
         if not listed:
             empty = QLabel(failed or "No executor is on.", body)
             empty.setStyleSheet("color:palette(placeholder-text);")
-            layout.addWidget(empty)
-        layout.addStretch(1)
+            row.addWidget(empty)
+        row.addStretch(1)
         self.setWidget(body)
+        if self._chosen is not None and self._chosen not in self._cards:
+            self._choose(self._chosen)  # it is gone: the filter goes with it
 
     def stop(self) -> None:
-        self._stop.set()
-        self._threads.clear()  # daemons: each ends at its next wake-up, an ssh call in flight included
+        self._stop.set()  # daemons: each ends at its next wake-up, an ssh call in flight included
 
-    def _read(self, key: str, address: str, interval: int, stop: threading.Event) -> None:
+    def _choose(self, name: str) -> None:
+        self._chosen = None if name == self._chosen else name
+        for key, card in self._cards.items():
+            card.set_checked(key == self._chosen)
+        card = self._cards.get(self._chosen)
+        self.filter_changed.emit(None if card is None else set(card.executors))
+
+    def _read(self, name: str, address: str, interval: int, stop: threading.Event) -> None:
         reader = _Reader(address)
         while not stop.is_set():
             began = time.monotonic()
             sample = reader.read()
             if stop.is_set():
                 return
-            self._relay.sampled.emit(key, sample)
+            self._relay.sampled.emit(name, sample)
             stop.wait(max(0.5, interval - (time.monotonic() - began)))
 
-    def _on_sample(self, key: str, sample: Sample) -> None:
-        row = self._rows.get(key)
-        if row is not None:
-            row.apply(sample)
+    def _on_sample(self, name: str, sample: Sample) -> None:
+        card = self._cards.get(name)
+        if card is not None:
+            card.apply(sample)
 
 
-def workspace_hosts(workspace) -> list[tuple[str, str, str, int]]:
-    """`(executor, host, address, interval)` for every host of an executor that is on, a host under
-    the first one that has it; this machine always, under `local` when no executor that is on has it."""
+def workspace_hosts(workspace) -> list[tuple[str, str, str, list[str], int | None]]:
+    """`(host, address, kind, executors, interval)` for every host of an executor that is on, with
+    every such executor it is in; this machine always. `interval` is None for a queue's login node."""
     if workspace is None:
-        return [("local", "local", "", INTERVALS["local"])]
+        return [("local", "", "local", [], INTERVALS["local"])]
     kept = workspace.settings_manager.settings.hosts
-    rows, seen = [], set()
+    rows: dict[str, list] = {}
     for executor in workspace.executors():
         if executor["state"] != "on":
             continue
         for name in executor["hosts"]:
-            if name in seen:
+            if name in rows:
+                rows[name][3].append(executor["name"])
                 continue
-            seen.add(name)
             address = getattr(kept.get(name), "address", "") or ""
             kind = "local" if not address else executor["kind"]
-            group = f"{executor['name']} ({executor['kind']}{', login node' if kind == 'queue' else ''})"
-            rows.append((group, name, address, INTERVALS.get(kind, INTERVALS["ray"])))
-    if "local" not in seen:
-        rows.insert(0, ("local", "local", "", INTERVALS["local"]))
-    return rows
+            rows[name] = [name, address, kind, [executor["name"]], INTERVALS.get(kind, INTERVALS["ray"]) if kind != "queue" else None]
+    if "local" not in rows:
+        rows = {"local": ["local", "", "local", [], INTERVALS["local"]], **rows}
+    return [tuple(row) for row in rows.values()]
 
 
-__all__ = ["INTERVALS", "ResourcesPanel", "Sample", "Sparkline", "parse", "workspace_hosts"]
+__all__ = ["HostsStrip", "INTERVALS", "Sample", "Sparkline", "parse", "workspace_hosts"]

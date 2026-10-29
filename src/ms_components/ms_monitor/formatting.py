@@ -3,9 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 
 
-def format_throughput(eps: float) -> str:
+def format_speed(eps: float) -> str:
+    """Chunks per second, or per minute below one a second."""
     eps = max(0.0, eps)
-    return "-" if eps <= 0.0 else f"{eps:.2f} chunks/s"
+    if eps <= 0.0:
+        return "—"
+    return f"{eps:,.1f}/s" if eps >= 1 else f"{eps * 60:,.1f}/min"
 
 
 def format_duration(seconds: float) -> str:
@@ -14,7 +17,9 @@ def format_duration(seconds: float) -> str:
         return f"{seconds}s"
     if seconds < 3600:
         return f"{seconds // 60}m"
-    return f"{seconds // 3600}h"
+    if seconds < 86400:
+        return f"{seconds // 3600}h {seconds % 3600 // 60:02d}m"
+    return f"{seconds // 86400}d {seconds % 86400 // 3600}h"
 
 
 def format_relative_time(value: datetime | None, *, now: datetime | None = None) -> str:
