@@ -641,13 +641,21 @@ job must live in an importable module:</p>
 
 <span class="n">ms</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">slow_squares</span><span class="p">,</span> <span class="n">executor</span><span class="o">=</span><span class="s2">"thread"</span><span class="p">)</span>
 
-<span class="n">monitor</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="mi">1100</span><span class="p">,</span> <span class="mi">650</span><span class="p">)</span>
+<span class="n">monitor</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="mi">1440</span><span class="p">,</span> <span class="mi">880</span><span class="p">)</span>
 <span class="n">monitor</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 <span class="k">try</span><span class="p">:</span>
     <span class="n">app</span><span class="o">.</span><span class="n">exec</span><span class="p">()</span>
 <span class="k">finally</span><span class="p">:</span>
     <span class="n">ms</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
 </code></pre></div>
+<p>The header holds the tools (search, status, Resync, Cancel, Resume, Move to). Below it, a card
+per host of the executors that are on charts CPU, memory and GPU over time; clicking one (or
+the executor chip of a job) keeps only the jobs of its executors. A queue's login node is not
+read. Selecting a job shows its ETA and throughput over the last 5 minutes, its progress, its
+failures, and a cell per chunk while the job runs in this session. The grid holds 1,000 cells
+at most: past that, it moves 500 on each time the work reaches its end, and the chunks out of
+it are given as counts (<code>+1,500 done</code>, <code>+200 failed</code>). The tabs list the tasks in flight with
+the host of each, the failures grouped by message, and a summary of the job.</p>
 
 
 
