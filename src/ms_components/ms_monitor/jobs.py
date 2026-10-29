@@ -6,12 +6,13 @@ apart) and the time left at the speed of the last minutes. Active jobs come firs
 from __future__ import annotations
 
 from PySide6.QtCore import QEasingCurve, Property, QPropertyAnimation, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QFont, QLinearGradient, QPainter, QPalette, QPen
+from PySide6.QtGui import QBrush, QColor, QFont, QFontMetricsF, QLinearGradient, QPainter, QPalette, QPen
 from PySide6.QtWidgets import QAbstractItemView, QApplication, QListWidget, QListWidgetItem, QStyle, QStyledItemDelegate, QWidget
 
 from ms_components.ms_monitor.formatting import format_duration
 from ms_components.ms_monitor.models import JobMonitorState
 from ms_components.ms_monitor.palette import P
+from ms_components.theme import color as theme_color
 
 
 def status_color(status: str, default: str | None = None) -> str:
@@ -28,10 +29,14 @@ def status_color(status: str, default: str | None = None) -> str:
 
 
 def counts_label(job: JobMonitorState) -> str:
-    """`done/total · time left`, as a row and the detail say it."""
+    """`done/total · time left`, or `· took` once it ended."""
     total = f"{job.chunks_total:,}" if job.chunks_total else "?"
     left = job.seconds_left
-    tail = "" if job.is_terminal else " · calculating…" if left is None else f" · {format_duration(left)} left"
+    if job.is_terminal:
+        took = (job.finished_at - job.started_at).total_seconds() if job.finished_at and job.started_at else None
+        tail = "" if took is None else f" · took {format_duration(took)}"
+    else:
+        tail = " · calculating…" if left is None else f" · {format_duration(left)} left"
     return f"{job.chunks_done:,}/{total}{tail}"
 
 
@@ -100,12 +105,13 @@ class GlowBar(QWidget):
 
 
 
-_ROLE = Qt.UserRole
+_ROLE, _COLOR = Qt.UserRole, Qt.UserRole + 1
+JOB_HUES = ("cyan", "blue", "magenta", "orange", "yellow", "green")  # a job's own color, in the order first seen
 
 
 class _JobRow(QStyledItemDelegate):
     def sizeHint(self, option, index) -> QSize:
-        return QSize(200, 50)
+        return QSize(200, 58)
 
     def paint(self, p: QPainter, option, index) -> None:
         job: JobMonitorState = index.data(_ROLE)
@@ -114,72 +120,86 @@ class _JobRow(QStyledItemDelegate):
         p.save()
         p.setRenderHint(QPainter.Antialiasing)
         pal = QApplication.palette()  # the list's own is bent by its transparent stylesheet
-        r = QRectF(option.rect).adjusted(2, 2, -2, -2)
+        r = QRectF(option.rect).adjusted(0, 2, -1, -2)
+        accent = pal.color(QPalette.ColorRole.Highlight)
         if option.state & QStyle.State_Selected:
-            fill = QColor(pal.color(QPalette.ColorRole.Highlight))
-            fill.setAlphaF(0.16)
+            fill, edge = QColor(accent), QColor(accent)
+            fill.setAlphaF(0.10)
+            edge.setAlphaF(0.45)
             p.setBrush(fill)
-            p.setPen(QPen(pal.color(QPalette.ColorRole.Highlight), 1))
-        else:
-            p.setBrush(pal.color(QPalette.ColorRole.Base))
-            p.setPen(QPen(pal.color(QPalette.ColorRole.Mid), 1))
-        p.drawRoundedRect(r, 6, 6)
-        x, right, top = r.left() + 8, r.right() - 8, r.top() + 4
+            p.setPen(QPen(edge, 1))
+            p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), 6, 6)
+        elif option.state & QStyle.State_MouseOver:
+            p.setPen(Qt.NoPen)
+            p.setBrush(pal.color(QPalette.ColorRole.AlternateBase))
+            p.drawRoundedRect(r, 6, 6)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(index.data(_COLOR) or accent))
+        p.drawRoundedRect(QRectF(r.left() + 4, r.top() + 7, 3, r.height() - 14), 1.5, 1.5)
+        x, right, top = r.left() + 15, r.right() - 9, r.top() + 7
         muted, text = pal.color(QPalette.ColorRole.PlaceholderText), pal.color(QPalette.ColorRole.Text)
         font, small = QFont(option.font), QFont(option.font)
-        small.setPointSizeF(max(6.0, font.pointSizeF() - 1.5))
+        small.setPixelSize(11)
+        tiny = QFont(small)
+        tiny.setPixelSize(10)
+        tiny.setWeight(QFont.DemiBold)
 
-        # the status, a badge on the right
-        p.setFont(small)
-        badge = job.status.replace("_", " ")
+        # the status, an uppercase badge on the right
+        p.setFont(tiny)
+        badge = job.status.replace("_", " ").upper()
         bw = p.fontMetrics().horizontalAdvance(badge) + 12
-        brect = QRectF(right - bw, top, bw, 18)
+        brect = QRectF(right - bw, top + 1, bw, 16)
         hue = QColor(status_color(job.status))
         back = QColor(hue)
-        back.setAlphaF(0.15)
-        p.setPen(Qt.NoPen)
+        back.setAlphaF(0.13)
         p.setBrush(back)
-        p.drawRoundedRect(brect, 9, 9)
+        p.drawRoundedRect(brect, 4, 4)
         p.setPen(hue)
         p.drawText(brect, Qt.AlignCenter, badge)
 
         # the name, and its failures
-        font.setBold(True)
+        font.setWeight(QFont.DemiBold)
         p.setFont(font)
         failed = f"  ⚠ {job.chunks_failed:,}" if job.chunks_failed else ""
-        room = brect.left() - x - 6 - (p.fontMetrics().horizontalAdvance(failed) if failed else 0)
+        p.setFont(tiny)
+        failed_w = p.fontMetrics().horizontalAdvance(failed) if failed else 0
+        p.setFont(font)
+        room = brect.left() - x - 8 - failed_w
         name = p.fontMetrics().elidedText(job.name or job.job_id[:8], Qt.ElideRight, int(max(0, room)))
         p.setPen(text)
         p.drawText(QRectF(x, top, room, 18), Qt.AlignLeft | Qt.AlignVCenter, name)
         if failed:
+            p.setFont(tiny)
             p.setPen(QColor(P["error"]))
-            p.drawText(QRectF(x + p.fontMetrics().horizontalAdvance(name), top, 200, 18), Qt.AlignLeft | Qt.AlignVCenter, failed)
+            p.drawText(QRectF(x + QFontMetricsF(font).horizontalAdvance(name), top, failed_w + 4, 18),
+                       Qt.AlignLeft | Qt.AlignVCenter, failed)
 
         # the executor, the bar, the counts
-        p.setFont(small)
-        line = top + 24
+        line = top + 25
         if job.executor:
-            cw = p.fontMetrics().horizontalAdvance(job.executor) + 10
+            p.setFont(tiny)
+            cw = p.fontMetrics().horizontalAdvance(job.executor) + 12
             p.setPen(QPen(pal.color(QPalette.ColorRole.Mid), 1))
             p.setBrush(Qt.NoBrush)
-            p.drawRoundedRect(QRectF(x, line, cw, 16), 4, 4)
+            p.drawRoundedRect(QRectF(x, line, cw, 17), 4, 4)
             p.setPen(muted)
-            p.drawText(QRectF(x, line, cw, 16), Qt.AlignCenter, job.executor)
-            x += cw + 8
+            p.drawText(QRectF(x, line, cw, 17), Qt.AlignCenter, job.executor)
+            x += cw + 10
+        p.setFont(small)
         said = counts_label(job)
         sw = p.fontMetrics().horizontalAdvance(said)
         p.setPen(muted)
-        p.drawText(QRectF(right - sw, line, sw, 16), Qt.AlignRight | Qt.AlignVCenter, said)
-        bar = QRectF(x, line + 6, max(0.0, right - sw - 10 - x), 4)
+        p.drawText(QRectF(right - sw, line, sw, 17), Qt.AlignRight | Qt.AlignVCenter, said)
+        bar = QRectF(x, line + 6.5, max(0.0, right - sw - 12 - x), 4)
         p.setPen(Qt.NoPen)
-        p.setBrush(pal.color(QPalette.ColorRole.Window))
+        p.setBrush(pal.color(QPalette.ColorRole.Mid))
         p.drawRoundedRect(bar, 2, 2)
         total = job.chunks_total or 0
         if total and bar.width() > 0:
             done = bar.width() * min(1.0, job.chunks_done / total)
             gone = bar.width() * min(1.0, job.chunks_failed / total)
-            p.setBrush(QColor(P["ok"]))
-            p.drawRect(QRectF(bar.left(), bar.top(), done, bar.height()))
+            p.setBrush(QColor(P["ok"]) if job.status.startswith("completed") else accent if job.status == "running" else muted)
+            p.drawRoundedRect(QRectF(bar.left(), bar.top(), done, bar.height()), 2, 2)
             p.setBrush(QColor(P["error"]))
             p.drawRect(QRectF(bar.left() + done, bar.top(), gone, bar.height()))
         p.restore()
@@ -197,7 +217,10 @@ class JobList(QListWidget):
         self.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.setFrameShape(QListWidget.NoFrame)
         self.setStyleSheet("QListWidget { background: transparent; }")
+        self.setMouseTracking(True)
+        self.setSpacing(0)
         self._search, self._status, self._executors = "", "all", None
+        self._hues: dict[str, int] = {}
         self.currentItemChanged.connect(lambda item, _: self.job_selected.emit(None if item is None else item.data(_ROLE).job_id))
 
     def set_jobs(self, jobs: list[JobMonitorState]) -> None:
@@ -211,9 +234,15 @@ class JobList(QListWidget):
             self.blockSignals(False)
         for at, job in enumerate(jobs):
             self.item(at).setData(_ROLE, job)
+            self.item(at).setData(_COLOR, self.color_of(job.job_id))
         self._apply_filters()
         if chosen and self.selected_job_id() != chosen:
             self.select_job(chosen)
+
+    def color_of(self, job_id: str) -> str:
+        """The job's own color: a hue of the theme, given in the order the jobs are first seen."""
+        at = self._hues.setdefault(job_id, len(self._hues))
+        return theme_color(JOB_HUES[at % len(JOB_HUES)]).name()
 
     def jobs(self) -> list[JobMonitorState]:
         return [self.item(i).data(_ROLE) for i in range(self.count())]
@@ -262,4 +291,4 @@ class JobList(QListWidget):
             self.item(i).setHidden(not shown)
 
 
-__all__ = ["GlowBar", "JobList", "counts_label", "status_color"]
+__all__ = ["GlowBar", "JOB_HUES", "JobList", "counts_label", "status_color"]

@@ -1,24 +1,33 @@
-"""The selected job: what it is, four numbers (time left, progress, speed, failures), a cell per
-chunk, and its tasks in flight and failures.
+"""The selected job: a header, four numbers (ETA, progress, throughput, failures), a cell per
+chunk, and its tasks in flight, failures and summary.
 
-The grid is one 8-bit indexed image of the job's chunk bytes (`JobMonitorState.chunk_states`):
-a cell per chunk while they fit, else several chunks per pixel painted as the worst of them
-(failed, then running, then done, then pending). Chunks the source has not given yet are pending.
+The grid shows at most `GRID_MAX` chunks of `JobMonitorState.chunk_states`, a cell each,
+column by column. Past that it is a window: when the furthest chunk that began reaches the
+window's end, the window moves `GRID_STEP` on, and what it left behind (and what is still ahead)
+is said as counts above it, so the cells keep moving while the counts stay exact.
 """
 from __future__ import annotations
 
 import statistics
 from datetime import datetime
 
-from PySide6.QtCore import QPointF, QRect, QRectF, Qt
-from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPalette, QPen
+from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QGuiApplication, QPainter, QPainterPath, QPalette, QPen
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QFrame,
+    QGridLayout,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
     QPlainTextEdit,
+    QPushButton,
     QSplitter,
+    QStyle,
+    QStyledItemDelegate,
     QTabWidget,
     QToolTip,
     QTreeWidget,
@@ -31,14 +40,15 @@ from ms_components.ms_monitor.formatting import format_duration, format_speed
 from ms_components.ms_monitor.jobs import status_color
 from ms_components.ms_monitor.models import FailureState, JobMonitorState
 from ms_components.ms_monitor.palette import P
+from ms_components.theme import font
 
 SLOW = 2.5  # a task that has run this many times the median of its job's tasks reads as slow
+GRID_MAX = 1000  # cells at most
+GRID_STEP = 500  # how far the window moves when the work reaches its end
 
-# ms_flow's chunk byte (0 pending, 1 running, 2 done, 3 failed) → how bad it is, and back:
-# the same table both ways, so a pixel of several chunks keeps the max.
-_RANK = bytes([0, 2, 1, 3, 4] + [4] * 251)
-_STATES = ("pending", "done", "running", "failed")  # by rank
-_EMPTY = 4  # past the last chunk
+# ms_flow's chunk byte: 0 pending, 1 running, 2 done, 3 failed
+_STATES = ("pending", "running", "done", "failed")
+_LEGEND = (2, 1, 3, 0)  # the order they are said in
 
 
 def reason(text: str) -> str:
@@ -49,92 +59,89 @@ def reason(text: str) -> str:
     return lines[-1] if any(line.startswith("Traceback") for line in lines) else lines[0]
 
 
-def _colors() -> list[QColor]:
-    """By rank: pending, done, running, failed, and the background."""
+def _pal() -> QPalette:
     app = QApplication.instance()
-    pal = app.palette() if app else QPalette()
-    return [pal.color(QPalette.ColorRole.Mid), QColor(P["ok"]), pal.color(QPalette.ColorRole.Highlight),
-            QColor(P["error"]), pal.color(QPalette.ColorRole.Base)]
+    return app.palette() if app else QPalette()
+
+
+def _colors() -> list[QColor]:
+    """By chunk byte: pending, running, done, failed."""
+    pal = _pal()
+    return [pal.color(QPalette.ColorRole.Mid), pal.color(QPalette.ColorRole.Highlight), QColor(P["ok"]), QColor(P["error"])]
+
+
+def _swatch(color: QColor | str, text: str) -> str:
+    return f"<span style='color:{QColor(color).name()}'>■</span>&nbsp;{text}"
+
+
+def grid_window(states: bytes, start: int) -> int:
+    """The first chunk the grid shows, from the one it showed: it only moves on, `GRID_STEP` at
+    a time, once the furthest chunk that began reaches the end of `GRID_MAX` cells."""
+    n = len(states)
+    if n <= GRID_MAX:
+        return 0
+    head = len(states.rstrip(b"\x00"))  # past the furthest chunk that is not pending
+    while head >= start + GRID_MAX and start + GRID_MAX < n:
+        start += GRID_STEP
+    return min(start, n - GRID_MAX)
+
+
+def counts(states: bytes) -> list[int]:
+    """How many chunks are in each state, by chunk byte."""
+    return [states.count(value) for value in range(4)]
 
 
 def layout_cells(n: int, width: int, height: int) -> tuple[int, int, int]:
-    """`(cell px, columns, chunks per cell)` to fit `n` chunks in `width` × `height`."""
-    for size in range(12, 0, -1):
-        cols = max(1, width // size)
-        if -(-n // cols) <= max(1, height // size):
-            return size, cols, 1
-    per = -(-n // max(1, width * height))
-    return 1, max(1, width), per
-
-
-def ranks(states: bytes, n: int, per: int) -> bytes:
-    """A rank per cell: `states` padded to `n` as pending, `per` chunks to a cell, the worst of them."""
-    ranked = bytes(states[:n]).translate(_RANK) + bytes(max(0, n - len(states)))
-    if per == 1:
-        return ranked
-    return bytes(max(ranked[i:i + per]) for i in range(0, n, per))
+    """`(cell px, gap px, rows)`: the biggest cells, 22 px down to 4, that fit `n` column by column."""
+    for size in range(22, 3, -1):
+        gap = 2 if size >= 10 else 1
+        pitch = size + gap
+        rows, cols = max(1, (height + gap) // pitch), max(1, (width + gap) // pitch)
+        if rows * cols >= n:
+            return size, gap, rows
+    return 4, 1, max(1, (height + 1) // 5)
 
 
 class ChunkGrid(QWidget):
-    """A cell per chunk of the selected job, as one indexed image."""
+    """A rounded cell per chunk of the window, filled column by column."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumHeight(60)
+        self.setMinimumHeight(80)
         self.setMouseTracking(True)
-        self._states, self._n = b"", 0
-        self._image: QImage | None = None
-        self._layout = (1, 1, 1)
-        self._cells = b""
-        self._key = None
+        self.cells, self.first = b"", 0  # the window's bytes, and the chunk number of its first
 
-    def set_states(self, states: bytes | None, total: int) -> None:
-        states = states or b""
-        n = max(len(states), total)
-        if (states, n) != (self._states, self._n):
-            self._states, self._n = states, n
+    def set_cells(self, cells: bytes, first: int) -> None:
+        if (cells, first) != (self.cells, self.first):
+            self.cells, self.first = cells, first
             self.update()
 
-    def _build(self) -> None:
-        key = (self._states, self._n, self.width(), self.height())
-        if key == self._key:
-            return
-        self._key = key
-        self._layout = size, cols, per = layout_cells(self._n, self.width(), self.height())
-        self._cells = cells = ranks(self._states, self._n, per)
-        rows = max(1, -(-len(cells) // cols))
-        data = cells + bytes([_EMPTY]) * (rows * cols - len(cells))
-        image = QImage(data, cols, rows, cols, QImage.Format_Indexed8)
-        image.setColorTable([color.rgba() for color in _colors()])
-        self._image = image.copy()  # its own pixels: `data` goes away
-
     def paintEvent(self, _):
-        if not self._n:
+        if not self.cells:
             return
-        self._build()
-        size, cols, _ = self._layout
+        size, gap, rows = layout_cells(len(self.cells), self.width(), self.height())
+        pitch, radius = size + gap, 2.0 if size >= 8 else 0.5
         p = QPainter(self)
-        p.drawImage(QRect(0, 0, self._image.width() * size, self._image.height() * size), self._image)
-        if size >= 5:  # a gap between cells that are big enough to see one
-            p.setPen(QPen(self.palette().color(QPalette.ColorRole.Base), 1))
-            w, h = self._image.width() * size, self._image.height() * size
-            for x in range(size, w, size):
-                p.drawLine(x, 0, x, h)
-            for y in range(size, h, size):
-                p.drawLine(0, y, w, y)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(Qt.NoPen)
+        colors = _colors()
+        for value in range(4):  # one brush per state
+            p.setBrush(colors[value])
+            for at, state in enumerate(self.cells):
+                if state == value:
+                    p.drawRoundedRect(QRectF(at // rows * pitch, at % rows * pitch, size, size), radius, radius)
 
     def mouseMoveEvent(self, event):
-        size, cols, per = self._layout
-        x, y = int(event.position().x()) // size, int(event.position().y()) // size
-        cell = y * cols + x
-        if x >= cols or not 0 <= cell < len(self._cells):
+        if not self.cells:
+            return
+        size, gap, rows = layout_cells(len(self.cells), self.width(), self.height())
+        pitch = size + gap
+        x, y = int(event.position().x()) // pitch, int(event.position().y()) // pitch
+        at = x * rows + y
+        if y >= rows or not 0 <= at < len(self.cells):
             QToolTip.hideText()
             return
-        first = cell * per
-        what = _STATES[self._cells[cell]]
-        said = (f"chunk {first + 1:,}: {what}" if per == 1
-                else f"chunks {first + 1:,}–{min(self._n, first + per):,}: {what} at worst")
-        QToolTip.showText(event.globalPosition().toPoint(), said, self)
+        QToolTip.showText(event.globalPosition().toPoint(), f"chunk {self.first + at + 1:,}: {_STATES[self.cells[at]]}", self)
 
 
 class _StackBar(QWidget):
@@ -152,23 +159,23 @@ class _StackBar(QWidget):
         clip = QPainterPath()
         clip.addRoundedRect(r, 3, 3)
         p.setClipPath(clip)
-        p.fillRect(r, self.palette().color(QPalette.ColorRole.Mid))
+        colors = _colors()
+        p.fillRect(r, colors[0])
         total, x = sum(self.parts), 0.0
         if not total:
             return
-        hues = (QColor(P["ok"]), self.palette().color(QPalette.ColorRole.Highlight), QColor(P["error"]))
-        for part, hue in zip(self.parts, hues):
+        for part, hue in zip(self.parts, (colors[2], colors[1], colors[3])):
             w = r.width() * part / total
             p.fillRect(QRectF(x, 0, w, r.height()), hue)
             x += w
 
 
 class _Trend(QWidget):
-    """A line of the speed over the last minutes, its own scale."""
+    """The speed over the last minutes, its own scale: an area and its line."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(18)
+        self.setFixedSize(84, 30)
         self.values: list[float] = []
 
     def paintEvent(self, _):
@@ -178,174 +185,378 @@ class _Trend(QWidget):
         p.setRenderHint(QPainter.Antialiasing)
         w, h, top = self.width(), self.height() - 1, max(self.values) or 1.0
         step = w / (len(self.values) - 1)
-        p.setPen(QPen(self.palette().color(QPalette.ColorRole.Highlight), 1.5))
-        p.drawPolyline([QPointF(i * step, h - (h - 1) * v / top) for i, v in enumerate(self.values)])
+        points = [QPointF(i * step, h - (h - 2) * v / top) for i, v in enumerate(self.values)]
+        accent = _pal().color(QPalette.ColorRole.Highlight)
+        area = QPainterPath(QPointF(0, h))
+        for point in points:
+            area.lineTo(point)
+        area.lineTo(QPointF(w, h))
+        fill = QColor(accent)
+        fill.setAlphaF(0.18)
+        p.fillPath(area, fill)
+        p.setPen(QPen(accent, 1.4))
+        p.drawPolyline(points)
+
+
+def _muted(text: str = "", px: float = 11.5) -> QLabel:
+    label = QLabel(text)
+    label.setStyleSheet(f"color:palette(placeholder-text); font-size:{px}px;")
+    return label
 
 
 class _Kpi(QFrame):
-    def __init__(self, title: str, extra: QWidget | None = None, parent=None):
-        super().__init__(parent)
-        self.setObjectName("kpi")
-        box = QVBoxLayout(self)
-        box.setContentsMargins(10, 6, 10, 6)
-        box.setSpacing(2)
-        head = QLabel(title, self)
-        head.setStyleSheet("color:palette(placeholder-text); font-size:10px; font-weight:600;")
-        self.value = QLabel("—", self)
-        self.value.setStyleSheet("font-size:18px; font-weight:700;")
-        self.sub = QLabel("", self)
-        self.sub.setStyleSheet("color:palette(placeholder-text); font-size:10px;")
-        box.addWidget(head)
-        box.addWidget(self.value)
-        if extra is not None:
-            extra.setParent(self)
-            box.addWidget(extra)
-        box.addWidget(self.sub)
+    """A card: a title (and something at its right), a big value (and something at its right),
+    a line under it. A bar of the accent color runs down its left edge."""
 
-    def set(self, value: str, sub: str = "", accent: str | None = None) -> None:
+    def __init__(self, title: str, parent=None):
+        super().__init__(parent)
+        self.accent: str | None = None
+        self.grid = QGridLayout(self)
+        self.grid.setContentsMargins(15, 8, 13, 8)
+        self.grid.setHorizontalSpacing(8)
+        self.grid.setVerticalSpacing(2)
+        self.head = QLabel(title.upper(), self)
+        head_font = QFont(self.head.font())
+        head_font.setLetterSpacing(QFont.PercentageSpacing, 108)
+        self.head.setFont(head_font)
+        self.head.setStyleSheet("color:palette(placeholder-text); font-size:10.5px; font-weight:600;")
+        self.value = QLabel("—", self)
+        self.unit = _muted("", 12.5)
+        self.sub = _muted()
+        value_row = QHBoxLayout()
+        value_row.setSpacing(5)
+        value_row.addWidget(self.value, 0, Qt.AlignBaseline)
+        value_row.addWidget(self.unit, 0, Qt.AlignBaseline)
+        value_row.addStretch(1)
+        self.grid.addWidget(self.head, 0, 0)
+        self.grid.addLayout(value_row, 1, 0)
+        self.grid.addWidget(self.sub, 2, 0, 1, 2)
+        self.grid.setColumnStretch(0, 1)
+        self.set("—")
+
+    def set(self, value: str, sub: str = "", accent: str | None = None, *, color: str | None = None, unit: str = "") -> None:
         self.value.setText(value)
+        self.value.setStyleSheet(f"font-size:22px; font-weight:600;{f' color:{color};' if color else ''}")
+        self.unit.setText(unit)
         self.sub.setText(sub)
-        self.value.setStyleSheet(f"font-size:18px; font-weight:700;{f' color:{accent};' if accent else ''}")
+        if accent != self.accent:
+            self.accent = accent
+            self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        pal = _pal()
+        p.setPen(QPen(pal.color(QPalette.ColorRole.Mid), 1))
+        p.setBrush(pal.color(QPalette.ColorRole.Base))
+        p.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 8, 8)
+        if self.accent:
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(self.accent))
+            p.drawRoundedRect(QRectF(1, 9, 3, self.height() - 18), 1.5, 1.5)
+
+
+class _ErrorBox(QStyledItemDelegate):
+    """A group of failures: how many and the message, then its share of the failures."""
+
+    def sizeHint(self, option, index) -> QSize:
+        return QSize(200, 50 if index.data(Qt.UserRole + 1) else 30)
+
+    def paint(self, p: QPainter, option, index) -> None:
+        many, share = index.data(Qt.UserRole + 1), index.data(Qt.UserRole + 2)
+        pal = _pal()
+        p.save()
+        p.setRenderHint(QPainter.Antialiasing)
+        r = QRectF(option.rect).adjusted(1, 3, -1, -3)
+        selected = bool(option.state & QStyle.State_Selected)
+        p.setPen(QPen(pal.color(QPalette.ColorRole.Highlight) if selected else pal.color(QPalette.ColorRole.Mid), 1))
+        p.setBrush(pal.color(QPalette.ColorRole.AlternateBase))
+        p.drawRoundedRect(r, 6, 6)
+        x, line = r.left() + 10, QRectF(r.left() + 10, r.top() + 4, r.width() - 20, 20)
+        if many:
+            bold = QFont(option.font)
+            bold.setBold(True)
+            p.setFont(bold)
+            p.setPen(QColor(P["error"]))
+            said = f"×{many:,}"
+            p.drawText(line, Qt.AlignLeft | Qt.AlignVCenter, said)
+            x += p.fontMetrics().horizontalAdvance(said) + 8
+        mono = font(mono=True)
+        p.setFont(mono)
+        p.setPen(pal.color(QPalette.ColorRole.Text) if many else pal.color(QPalette.ColorRole.PlaceholderText))
+        room = QRectF(x, line.top(), r.right() - 10 - x, 20)
+        p.drawText(room, Qt.AlignLeft | Qt.AlignVCenter, p.fontMetrics().elidedText(index.data(Qt.DisplayRole), Qt.ElideRight, int(room.width())))
+        if many:
+            p.setFont(option.font)
+            p.setPen(pal.color(QPalette.ColorRole.PlaceholderText))
+            p.drawText(QRectF(r.left() + 10, r.top() + 24, r.width() - 20, 18), Qt.AlignLeft | Qt.AlignVCenter, share)
+        p.restore()
 
 
 def _clock(seconds_from_now: float) -> str:
     return datetime.fromtimestamp(datetime.now().timestamp() + seconds_from_now).strftime("%H:%M")
 
 
+def _panel(parent=None) -> QFrame:
+    frame = QFrame(parent)
+    frame.setObjectName("panel")
+    return frame
+
+
 class JobDetail(QWidget):
-    """The selected job. `set_job` each poll; `set_failures` when its failures change."""
+    """The selected job. `set_job` each poll; `set_failures` when its failures change.
+    `executor_clicked` says the executor chip was clicked."""
+
+    executor_clicked = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setStyleSheet("QFrame#kpi { background:palette(base); border:1px solid palette(mid); border-radius:8px; }")
         box = QVBoxLayout(self)
         box.setContentsMargins(0, 0, 0, 0)
+        box.setSpacing(10)
+        self._job: JobMonitorState | None = None
+        self._start: tuple[str | None, int] = (None, 0)  # the grid's window, by job
+        self._error_types = 0
 
-        head = QHBoxLayout()
-        self._name = QLabel("Select a job", self)
-        self._name.setStyleSheet("font-size:15px; font-weight:700;")
-        self._badge = QLabel(self)
-        self._chip = QLabel(self)
-        self._chip.setStyleSheet("color:palette(placeholder-text); border:1px solid palette(mid); border-radius:4px; padding:0 4px;")
-        head.addWidget(self._name)
-        head.addWidget(self._badge)
-        head.addWidget(self._chip)
-        head.addStretch(1)
-        box.addLayout(head)
-        self._meta = QLabel(self)
-        self._meta.setStyleSheet("color:palette(placeholder-text); font-size:10px;")
-        self._meta.setWordWrap(True)
-        box.addWidget(self._meta)
+        head = _panel(self)
+        head.setFixedHeight(44)
+        row = QHBoxLayout(head)
+        row.setContentsMargins(14, 0, 14, 0)
+        row.setSpacing(8)
+        self._swatch = QLabel(head)
+        self._swatch.setFixedSize(11, 11)
+        self._name = QLabel("Select a job", head)
+        self._name.setStyleSheet("font-size:14px; font-weight:650;")
+        self._badge = QLabel(head)
+        self._on = _muted("on", 12)
+        self._chip = QPushButton(head)
+        self._chip.setObjectName("xchip")
+        self._chip.setCursor(Qt.PointingHandCursor)
+        self._chip.setToolTip("Only the jobs of this executor")
+        self._chip.clicked.connect(lambda: self.executor_clicked.emit(self._chip.text()))
+        self._meta = _muted("", 11.5)
+        for widget in (self._swatch, self._name, self._badge, self._on, self._chip):
+            row.addWidget(widget, 0, Qt.AlignVCenter)
+        row.addStretch(1)
+        row.addWidget(self._meta)
+        box.addWidget(head)
 
         kpis = QHBoxLayout()
-        self._bar, self._trend = _StackBar(), _Trend()
-        self._left = _Kpi("TIME LEFT", parent=self)
-        self._progress = _Kpi("PROGRESS", self._bar, self)
-        self._speed = _Kpi("SPEED · LAST 5 MIN", self._trend, self)
-        self._failed = _Kpi("FAILURES", parent=self)
-        for kpi in (self._left, self._progress, self._speed, self._failed):
-            kpis.addWidget(kpi, 1)
+        kpis.setSpacing(10)
+        self._left = _Kpi("ETA", self)
+        self._progress = _Kpi("Progress", self)
+        self._pct = QLabel(self._progress)
+        self._progress.grid.addWidget(self._pct, 0, 1, Qt.AlignRight)
+        self._legend = _muted("", 11.5)
+        self._progress.grid.addWidget(self._legend, 1, 1, Qt.AlignRight | Qt.AlignVCenter)
+        self._bar = _StackBar(self._progress)
+        self._progress.grid.addWidget(self._bar, 3, 0, 1, 2)
+        self._speed = _Kpi("Throughput", self)
+        self._trend = _Trend(self._speed)
+        self._speed.grid.addWidget(self._trend, 0, 1, 2, 1, Qt.AlignRight | Qt.AlignTop)
+        self._failed = _Kpi("Failures", self)
+        for kpi, stretch in ((self._left, 9), (self._progress, 27), (self._speed, 12), (self._failed, 9)):
+            kpi.setFixedHeight(80)
+            kpis.addWidget(kpi, stretch)
         box.addLayout(kpis)
 
-        self._grid = ChunkGrid(self)
-        self._legend = QLabel(self)
-        self._legend.setStyleSheet("font-size:10px; color:palette(placeholder-text);")
+        work = QSplitter(Qt.Horizontal, self)
+        work.setHandleWidth(10)
+        grid_panel = _panel(work)
+        grid_box = QVBoxLayout(grid_panel)
+        grid_box.setContentsMargins(14, 10, 14, 10)
+        grid_box.setSpacing(8)
+        grid_head = QHBoxLayout()
+        title = QLabel("Chunks", grid_panel)
+        title.setStyleSheet("font-weight:600; font-size:13px;")
+        self._grid_meta = _muted()
+        grid_head.addWidget(title)
+        grid_head.addStretch(1)
+        grid_head.addWidget(self._grid_meta)
+        grid_box.addLayout(grid_head)
+        self._before = _muted("", 11.5)
+        self._before.setTextFormat(Qt.RichText)
+        grid_box.addWidget(self._before)
+        self._grid = ChunkGrid(grid_panel)
+        grid_box.addWidget(self._grid, 1)
+        self._grid_note = _muted("", 11.5)
+        self._grid_note.setWordWrap(True)
+        grid_box.addWidget(self._grid_note, 1)
+        foot = QHBoxLayout()
+        self._after = _muted("", 11.5)
+        self._grid_legend = _muted("", 11.5)
+        foot.addWidget(self._after)
+        foot.addStretch(1)
+        foot.addWidget(self._grid_legend)
+        grid_box.addLayout(foot)
 
-        self._tabs = QTabWidget(self)
-        self._tasks = QTreeWidget(self)
+        side = _panel(work)
+        side_box = QVBoxLayout(side)
+        side_box.setContentsMargins(10, 10, 10, 10)
+        self._tabs = QTabWidget(side)
+        self._tabs.setObjectName("pills")
+        self._tabs.setDocumentMode(True)
+        self._tabs.setUsesScrollButtons(False)
+        self._tabs.tabBar().setElideMode(Qt.ElideNone)
+        self._tabs.tabBar().setExpanding(False)
+        self._tab_meta = _muted("", 11.5)
+        self._tab_meta.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._tab_meta.setContentsMargins(0, 0, 4, 2)
+        self._tabs.setCornerWidget(self._tab_meta, Qt.TopRightCorner)
+        side_box.addWidget(self._tabs)
+
+        self._tasks = QTreeWidget(side)
         self._tasks.setHeaderLabels(["Input", "Host", "Attempt", "Elapsed", "Progress"])
         self._tasks.setRootIsDecorated(False)
         self._tasks.setUniformRowHeights(True)
-        self._errors = QTreeWidget(self)
-        self._errors.setHeaderLabels(["Error", "Count"])
-        self._errors.setUniformRowHeights(True)
-        self._traceback = QPlainTextEdit(self)
+        self._tasks.setFrameShape(QFrame.NoFrame)
+        self._tasks.header().setStretchLastSection(False)
+        self._tasks.header().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self._tasks.header().setSectionResizeMode(0, QHeaderView.Stretch)
+        self._errors = QListWidget(side)
+        self._errors.setItemDelegate(_ErrorBox(self._errors))
+        self._errors.setFrameShape(QFrame.NoFrame)
+        self._errors.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self._errors.setStyleSheet("QListWidget { background: transparent; }")
+        self._traceback = QPlainTextEdit(side)
         self._traceback.setReadOnly(True)
         self._traceback.setLineWrapMode(QPlainTextEdit.NoWrap)
-        errors = QSplitter(Qt.Vertical, self)
+        self._traceback.setFont(font(mono=True))
+        errors = QSplitter(Qt.Vertical, side)
         errors.addWidget(self._errors)
         errors.addWidget(self._traceback)
+        errors.setSizes([260, 140])
+        self._summary = QWidget(side)
+        self._facts = QGridLayout(self._summary)
+        self._facts.setContentsMargins(6, 8, 6, 8)
+        self._facts.setVerticalSpacing(7)
+        self._facts.setColumnStretch(1, 1)
+        self._facts.setRowStretch(len(self._FACTS), 1)
+        self._build_summary()
         self._tabs.addTab(self._tasks, "Running")
         self._tabs.addTab(errors, "Errors")
+        self._tabs.addTab(self._summary, "Summary")
         self._errors.currentItemChanged.connect(self._show_traceback)
 
-        lower = QSplitter(Qt.Vertical, self)
-        grid_box = QWidget(self)
-        grid_layout = QVBoxLayout(grid_box)
-        grid_layout.setContentsMargins(0, 0, 0, 0)
-        grid_layout.addWidget(self._legend)
-        grid_layout.addWidget(self._grid, 1)
-        lower.addWidget(grid_box)
-        lower.addWidget(self._tabs)
-        lower.setSizes([140, 260])
-        box.addWidget(lower, 1)
+        work.addWidget(grid_panel)
+        work.addWidget(side)
+        work.setStretchFactor(0, 1)
+        work.setSizes([640, 450])
+        box.addWidget(work, 1)
         self.set_job(None)
 
     def set_job(self, job: JobMonitorState | None) -> None:
-        for widget in (self._badge, self._chip, self._meta):
+        self._job = job
+        for widget in (self._swatch, self._badge, self._on, self._chip, self._meta):
             widget.setVisible(job is not None)
         if job is None:
             self._name.setText("Select a job")
             for kpi in (self._left, self._progress, self._speed, self._failed):
                 kpi.set("—")
-            self._bar.parts, self._trend.values = (0, 0, 0, 0), []
-            self._grid.set_states(None, 0)
-            self._grid.setVisible(False)
+            self._pct.setText("")
             self._legend.setText("")
+            self._bar.parts, self._trend.values = (0, 0, 0, 0), []
+            self._show_grid(None)
             self._tasks.clear()
             self._tabs.setTabText(0, "Running")
+            self._tab_meta.setText("")
             self.set_failures([], 0)
+            self._set_summary(None)
             return
-        self._name.setText(job.name or job.job_id[:8])
         hue = status_color(job.status)
-        self._badge.setText(job.status.replace("_", " "))
-        self._badge.setStyleSheet(f"color:{hue}; border:1px solid {hue}; border-radius:8px; padding:0 6px; font-size:10px;")
+        self._name.setText(job.name or job.job_id[:8])
+        self._badge.setText(job.status.replace("_", " ").upper())
+        back = QColor(hue)
+        self._badge.setStyleSheet(f"color:{hue}; background:rgba({back.red()},{back.green()},{back.blue()},30);"
+                                  " border-radius:4px; padding:1px 6px; font-size:10.5px; font-weight:650;")
         self._chip.setText(job.executor or "")
         self._chip.setVisible(bool(job.executor))
+        self._on.setVisible(bool(job.executor))
         self._meta.setText(self._meta_text(job))
 
         total = job.chunks_total
         pending = max(0, total - job.chunks_settled - job.chunks_running)
         left = job.seconds_left
         if job.is_terminal:
-            self._left.set("—", "ended " + job.finished_at.strftime("%H:%M") if job.finished_at else "ended")
+            self._left.set("—", "ended " + job.finished_at.strftime("%H:%M") if job.finished_at else "ended", hue)
         elif left is None:
-            self._left.set("…", "calculating")
+            self._left.set("…", "calculating", hue)
         else:
-            self._left.set(format_duration(left), f"ends ~{_clock(left)}")
+            self._left.set(format_duration(left), f"≈ {_clock(left)} · 5-min rate", hue)
         pct = 100.0 * job.chunks_settled / total if total else job.progress
-        self._progress.set(f"{pct:.0f}%", f"{job.chunks_done:,} done · {job.chunks_running:,} running · "
-                                          f"{job.chunks_failed:,} failed · {pending:,} pending")
+        accent = _pal().color(QPalette.ColorRole.Highlight).name()
+        self._progress.set(f"{job.chunks_done:,} / {total:,}" if total else f"{job.chunks_done:,}", "", accent)
+        self._pct.setText(f"{pct:.1f}%" if pct < 10 else f"{pct:.0f}%")
+        self._pct.setStyleSheet(f"color:{accent}; font-weight:650; font-size:12px;")
+        colors = _colors()
+        said = [(job.chunks_done, 2, "done"), (job.chunks_running, 1, "running"), (job.chunks_failed, 3, "failed"),
+                (pending, 0, "pending")]
+        self._legend.setText("&nbsp;&nbsp;&nbsp;".join(_swatch(colors[at], f"{many:,} {what}") for many, at, what in said if many))
         self._bar.parts = (job.chunks_done, job.chunks_running, job.chunks_failed, pending)
         self._bar.update()
-        cpu = f" · {job.cpu_used:,} CPU" if job.cpu_used else ""
-        self._speed.set(format_speed(job.throughput_eps),
-                        f"{job.tasks_running:,} tasks{cpu}" if not job.is_terminal else "mean over the run")
+        speed = format_speed(job.throughput_eps)
+        number, _, unit = speed.partition("/")
+        cpu = f" · {job.cpu_used:,} CPUs" if job.cpu_used else ""
+        self._speed.set(number, f"{job.tasks_running:,} tasks{cpu}" if not job.is_terminal else "mean over the run",
+                        accent, unit=f"chunks/{unit}" if unit else "")
         self._trend.values = job.throughput_history
         self._trend.update()
-        self._failed.set(f"{job.chunks_failed:,}", f"{job.chunks_retried:,} retried",
-                         P["error"] if job.chunks_failed else None)
+        self._set_failed_kpi()
 
-        self._grid.setVisible(job.chunk_states is not None)
-        self._grid.set_states(job.chunk_states, total)
-        if job.chunk_states is None:
-            self._legend.setText("A cell per chunk is kept only while the job runs in this session.")
-        else:
-            c = _colors()
-            self._legend.setText("  ".join(f"<span style='color:{c[rank].name()}'>■</span> {_STATES[rank]}"
-                                           for rank in (1, 2, 3, 0)) + f"  ·  {max(len(job.chunk_states), total):,} chunks")
+        self._show_grid(job)
         self._set_tasks(job)
+        self._set_summary(job)
+
+    def set_color(self, color: str) -> None:
+        """The job's own color, as the list paints it."""
+        self._swatch.setStyleSheet(f"background:{color}; border-radius:3px;")
 
     def _meta_text(self, job: JobMonitorState) -> str:
-        said = [job.job_id[:12]]
+        said = []
         if job.started_at is not None:
             end = job.finished_at or datetime.now()
-            said.append(f"started {job.started_at:%Y-%m-%d %H:%M} · ran {format_duration((end - job.started_at).total_seconds())}")
-        if job.peak_mem_mb:
-            said.append(f"peak {job.peak_mem_mb:,} MB")
+            said.append(f"started {job.started_at:%H:%M} · elapsed {format_duration((end - job.started_at).total_seconds())}")
+        if not job.is_terminal and job.tasks_running:
+            said.append(f"{job.tasks_running:,} tasks" + (f" · {job.cpu_used:,} CPUs" if job.cpu_used else ""))
         if job.engine_id is None:
-            said.append("read from the journal: not run by this session")
+            said.append("not run by this session")
         return " · ".join(said)
+
+    def _show_grid(self, job: JobMonitorState | None) -> None:
+        states = None if job is None else job.chunk_states
+        self._grid.setVisible(states is not None)
+        self._grid_note.setVisible(states is None)
+        colors = _colors()
+        if states is None:
+            self._grid.set_cells(b"", 0)
+            self._grid_meta.setText("" if job is None else f"{job.chunks_total:,} chunks")
+            self._grid_note.setText("" if job is None else "A cell per chunk is kept only while the job runs in this session.")
+            self._before.setText("")
+            self._after.setText("")
+            self._grid_legend.setText("")
+            return
+        states = bytes(states) + bytes(max(0, job.chunks_total - len(states)))  # not given yet: pending
+        held_for, start = self._start
+        start = grid_window(states, start if held_for == job.job_id else 0)
+        self._start = (job.job_id, start)
+        end = min(len(states), start + GRID_MAX)
+        self._grid.set_cells(states[start:end], start)
+        self._grid_meta.setText(f"{len(states):,} chunks · 1 cell = 1 chunk"
+                                + (f" · showing {start + 1:,}–{end:,}" if len(states) > GRID_MAX else ""))
+        self._before.setText(self._said(states[:start], f"before {start + 1:,}", colors))
+        self._before.setVisible(start > 0)
+        self._after.setText(self._said(states[end:], "after", colors))
+        self._grid_legend.setText("&nbsp;&nbsp;&nbsp;".join(_swatch(colors[at], _STATES[at]) for at in (0, 2, 1, 3)))
+
+    @staticmethod
+    def _said(states: bytes, where: str, colors: list[QColor]) -> str:
+        """`+1,000 done · +200 failed` of the chunks out of the window."""
+        if not states:
+            return ""
+        many = counts(states)
+        return f"{where}: " + "&nbsp;&nbsp;".join(
+            f"<span style='color:{colors[at].name() if at else 'palette(placeholder-text)'}'>+{many[at]:,} {_STATES[at]}</span>"
+            for at in _LEGEND if many[at])
 
     def _set_tasks(self, job: JobMonitorState) -> None:
         tasks = job.tasks
@@ -355,17 +566,35 @@ class JobDetail(QWidget):
             self._tasks.takeTopLevelItem(self._tasks.topLevelItemCount() - 1)
         while self._tasks.topLevelItemCount() < len(tasks):
             self._tasks.addTopLevelItem(QTreeWidgetItem())
+        slow = 0
         for at, task in enumerate(tasks):
             item = self._tasks.topLevelItem(at)
             what = task.input + (f" +{task.chunks - 1}" if task.chunks > 1 else "")
             for column, text in enumerate((what, task.host or "", str(task.attempt), format_duration(task.seconds),
                                            "—" if task.progress is None else f"{task.progress:.0f}%")):
                 item.setText(column, text)
-            slow = median is not None and median > 0 and task.seconds > SLOW * median
+            late = median is not None and median > 0 and task.seconds > SLOW * median
+            slow += late
             for column in range(5):
-                item.setForeground(column, warn if slow else self._tasks.palette().color(QPalette.ColorRole.Text))
-            item.setToolTip(0, f"slow: {task.seconds / median:.1f}× the median" if slow else task.input)
-        self._tabs.setTabText(0, f"Running ({len(tasks)})" if tasks else "Running")
+                item.setForeground(column, warn if late else self._tasks.palette().color(QPalette.ColorRole.Text))
+            item.setToolTip(0, f"slow: {task.seconds / median:.1f}× the median" if late else task.input)
+        self._tabs.setTabText(0, f"Running  {len(tasks)}" if tasks else "Running")
+        said = [f"{len(tasks)} running"] if tasks else []
+        if median is not None:
+            said.append(f"median {format_duration(median)}")
+        if slow:
+            said.append(f"<span style='color:{warn.name()}'>⚠ {slow} slow</span>")
+        self._tab_meta.setText(" · ".join(said))
+
+    def _set_failed_kpi(self) -> None:
+        job = self._job
+        if job is None:
+            return
+        failed = job.chunks_failed
+        types = f"{self._error_types:,} error type{'s' * (self._error_types != 1)}" if self._error_types else ""
+        retried = f"{job.chunks_retried:,} retried" if job.chunks_retried else ""
+        self._failed.set(f"{failed:,}", " · ".join(x for x in (types, retried) if x) or ("no errors" if not failed else ""),
+                         P["error"] if failed else P["ok"], color=P["error"] if failed else None)
 
     def set_failures(self, failures: list[FailureState], failed: int, job_error: str = "") -> None:
         """The failed chunks read from the journal, grouped by their message; `failed` is how many there are."""
@@ -376,25 +605,67 @@ class JobDetail(QWidget):
             groups[f"job: {reason(job_error)}"] = [FailureState(0, job_error, "the job")]
         for failure in failures:
             groups.setdefault(reason(failure.error) or "failed (no message recorded)", []).append(failure)
+        read = max(1, sum(len(members) for members in groups.values()))
         for said, members in sorted(groups.items(), key=lambda kv: -len(kv[1])):
-            group = QTreeWidgetItem([said, f"{len(members):,}"])
-            group.setData(0, Qt.UserRole, members[0].error)
-            group.setToolTip(0, said)
-            for failure in members:
-                child = QTreeWidgetItem([f"{failure.input or 'chunk'} · attempt {failure.attempt}", ""])
-                child.setData(0, Qt.UserRole, failure.error)
-                group.addChild(child)
-            self._errors.addTopLevelItem(group)
+            item = QListWidgetItem(said)
+            item.setData(Qt.UserRole, members[0].error)
+            item.setData(Qt.UserRole + 1, len(members))
+            item.setData(Qt.UserRole + 2, f"{100 * len(members) / read:.0f}% of the failures read")
+            shown = ", ".join(f"{m.input or 'chunk'} (attempt {m.attempt})" for m in members[:12])
+            item.setToolTip(f"{said}\n{shown}" + (f", … {len(members) - 12:,} more" if len(members) > 12 else ""))
+            self._errors.addItem(item)
+        self._error_types = len(groups)
         if failed > len(failures):
-            self._errors.addTopLevelItem(QTreeWidgetItem([f"… {failed - len(failures):,} more failed chunks not read", ""]))
-        if self._errors.topLevelItemCount():
-            self._errors.setCurrentItem(self._errors.topLevelItem(0))
-        self._errors.resizeColumnToContents(1)
+            self._errors.addItem(QListWidgetItem(f"… {failed - len(failures):,} more failed chunks not read"))
+        if self._errors.count():
+            self._errors.setCurrentRow(0)
         count = failed + bool(job_error)
-        self._tabs.setTabText(1, f"Errors ({count:,})" if count else "Errors")
+        self._tabs.setTabText(1, f"Errors  {count:,}" if count else "Errors")
+        self._tabs.tabBar().setTabTextColor(1, QColor(P["error"]) if count else _pal().color(QPalette.ColorRole.Text))
+        self._set_failed_kpi()
 
     def _show_traceback(self, item, _previous=None) -> None:
-        self._traceback.setPlainText("" if item is None else str(item.data(0, Qt.UserRole) or ""))
+        self._traceback.setPlainText("" if item is None else str(item.data(Qt.UserRole) or ""))
+
+    _FACTS = ("key", "status", "executor", "started", "finished", "elapsed", "chunks", "retried", "throughput",
+              "peak memory", "in flight", "errors")
+
+    def _build_summary(self) -> None:
+        self._fact: dict[str, QLabel] = {}
+        for row, key in enumerate(self._FACTS):
+            self._facts.addWidget(_muted(key, 12), row, 0, Qt.AlignTop)
+            self._fact[key] = label = QLabel(self._summary)
+            label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            label.setWordWrap(True)
+            self._facts.addWidget(label, row, 1)
+        self._fact["key"].setFont(font(mono=True))
+        copy = QPushButton("copy", self._summary)
+        copy.setObjectName("xchip")
+        copy.clicked.connect(lambda: QGuiApplication.clipboard().setText(self._fact["key"].text()))
+        self._facts.addWidget(copy, 0, 2)
+
+    def _set_summary(self, job: JobMonitorState | None) -> None:
+        if job is None:
+            for label in self._fact.values():
+                label.setText("")
+            return
+        end = job.finished_at or datetime.now()
+        values = (
+            job.job_id,
+            job.status.replace("_", " "),
+            job.executor or "—",
+            f"{job.started_at:%Y-%m-%d %H:%M:%S}" if job.started_at else "—",
+            f"{job.finished_at:%Y-%m-%d %H:%M:%S}" if job.finished_at else "—",
+            format_duration((end - job.started_at).total_seconds()) if job.started_at else "—",
+            f"{job.chunks_done:,} done · {job.chunks_failed:,} failed · {job.chunks_total:,} in all",
+            f"{job.chunks_retried:,}",
+            format_speed(job.throughput_eps) + ("" if job.is_terminal else " · last 5 min"),
+            f"{job.peak_mem_mb:,} MB" if job.peak_mem_mb else "—",
+            f"{job.tasks_running:,} tasks · {job.cpu_used:,} CPUs" if not job.is_terminal else "—",
+            f"{self._error_types:,} types" if self._error_types else "none",
+        )
+        for key, value in zip(self._FACTS, values):
+            self._fact[key].setText(value)
 
 
-__all__ = ["ChunkGrid", "JobDetail", "layout_cells", "ranks", "reason"]
+__all__ = ["ChunkGrid", "GRID_MAX", "GRID_STEP", "JobDetail", "counts", "grid_window", "layout_cells", "reason"]

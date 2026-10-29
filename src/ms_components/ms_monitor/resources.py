@@ -9,6 +9,7 @@ of a queue is not read: what it uses says nothing of the nodes its jobs got.
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import threading
@@ -16,9 +17,11 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 
-from PySide6.QtCore import QObject, QPointF, Qt, Signal
+from PySide6.QtCore import QObject, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPalette, QPen
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QToolTip, QVBoxLayout, QWidget
+
+from ms_components.theme import color
 
 # Seconds between two reads, by the kind of executor the host is under; a queue's is not read.
 INTERVALS = {"local": 5, "ray": 15}
@@ -104,16 +107,20 @@ class _Reader:
 
 
 class Sparkline(QWidget):
-    """One measure of one host over time, 0-100 %: the line, the area under it and the value now.
-    Hovering says the value under the pointer and how long ago it was."""
+    """One measure of one host over time, 0-100 %: a label row (the name, the value now), then the
+    area under the line on a sunken panel. Hovering says the value under the pointer and how long
+    ago it was."""
+
+    _TOP = 18  # the label row
 
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
         self.title, self.values, self.interval, self.note = title, deque(maxlen=_HISTORY), 5, ""
-        self.setMinimumSize(160, 64)
+        self.setMinimumSize(120, 70)
         self.setMouseTracking(True)
 
     def push(self, value: float | None, note: str = "") -> None:
+        """`note` is said instead of the percent, when given."""
         self.values.append(value)
         self.note = note
         self.update()
@@ -125,29 +132,41 @@ class Sparkline(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         pal = self.palette()
-        w, h, top = self.width(), self.height(), 14
-        p.setPen(QPen(pal.color(QPalette.ColorRole.Mid), 1))
-        p.drawLine(0, h - 1, w, h - 1)  # the 0 %, recessive
+        w, h, top = self.width(), self.height(), self._TOP
+        small = p.font()
+        small.setPixelSize(11)
+        p.setFont(small)
         p.setPen(pal.color(QPalette.ColorRole.PlaceholderText))
-        p.drawText(0, 0, w, top, Qt.AlignLeft | Qt.AlignTop, self.title)
+        p.drawText(0, 0, w, top - 4, Qt.AlignLeft | Qt.AlignVCenter, self.title)
         now = next((v for v in reversed(self.values) if v is not None), None)
+        small.setBold(True)
+        p.setFont(small)
         p.setPen(pal.color(QPalette.ColorRole.Text))
-        p.drawText(0, 0, w, top, Qt.AlignRight | Qt.AlignTop,
-                   "—" if now is None else f"{now:.0f}%" + (f"  {self.note}" if self.note else ""))
+        p.drawText(0, 0, w, top - 4, Qt.AlignRight | Qt.AlignVCenter, self.note or ("—" if now is None else f"{now:.0f}%"))
+        chart = QRectF(0, top, w, h - top)
+        p.setPen(Qt.NoPen)
+        p.setBrush(pal.color(QPalette.ColorRole.AlternateBase))
+        p.drawRoundedRect(chart, 4, 4)
+        p.setPen(QPen(pal.color(QPalette.ColorRole.Mid), 1, Qt.DashLine))
+        p.drawLine(QPointF(4, chart.center().y()), QPointF(w - 4, chart.center().y()))  # the 50 %
         start = _HISTORY - len(self.values)
-        points = [QPointF(self._x(start + i), h - 1 - (h - top - 2) * min(100.0, v) / 100.0)
+        bottom = h - 1
+        points = [QPointF(self._x(start + i), bottom - (chart.height() - 3) * min(100.0, v) / 100.0)
                   for i, v in enumerate(self.values) if v is not None]
         if len(points) < 2:
             return
         accent = pal.color(QPalette.ColorRole.Highlight)
-        area = QPainterPath(QPointF(points[0].x(), h - 1))
+        area = QPainterPath(QPointF(points[0].x(), bottom))
         for point in points:
             area.lineTo(point)
-        area.lineTo(QPointF(points[-1].x(), h - 1))
+        area.lineTo(QPointF(points[-1].x(), bottom))
         fill = QColor(accent)
-        fill.setAlphaF(0.18)
+        fill.setAlphaF(0.38)
+        clip = QPainterPath()
+        clip.addRoundedRect(chart, 4, 4)
+        p.setClipPath(clip)
         p.fillPath(area, fill)
-        p.setPen(QPen(accent, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        p.setPen(QPen(accent, 1.2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         p.drawPolyline(points)
 
     def mouseMoveEvent(self, event):
@@ -165,32 +184,64 @@ class _Relay(QObject):
 
 
 class _HostCard(QFrame):
-    """One host in the strip: CPU over time, memory and GPU now. Checked, it filters the jobs."""
+    """One host: a header (name, kind, what it is, the jobs on it) over CPU, memory and GPU in
+    time. Checked, it filters the jobs."""
 
     clicked = Signal(str)
 
     def __init__(self, name: str, address: str, kind: str, executors: list[str], interval: int | None, parent=None):
         super().__init__(parent)
-        self.name, self.executors = name, executors
+        # this machine's pool has no executor row of its own: its jobs say `local`
+        self.name, self.address, self.executors = name, address, executors or ([name] if kind == "local" else [])
         self.setObjectName("hostCard")
         self.setProperty("checked", False)
-        self.setFixedWidth(230)
+        self.setMinimumWidth(380)
         self.setCursor(Qt.PointingHandCursor)
-        self.setToolTip(f"{address or 'this computer'} · in {', '.join(executors) or 'no executor'}"
+        self.setToolTip(f"{address or 'this computer'} · in {', '.join(self.executors) or 'no executor'}"
                         + (f" · read every {interval}s" if interval else "") + "\nClick: only its jobs")
         box = QVBoxLayout(self)
-        box.setContentsMargins(8, 4, 8, 4)
-        box.setSpacing(0)
-        title = QLabel(f"<b>{name}</b> <span style='color:palette(placeholder-text)'>{kind}</span>", self)
-        box.addWidget(title)
-        self.cpu = Sparkline("CPU", self)
-        self.cpu.setMinimumSize(120, 36)
-        self.cpu.interval = interval or 0
+        box.setContentsMargins(12, 8, 12, 10)
+        box.setSpacing(6)
+        head = QHBoxLayout()
+        head.setSpacing(7)
+        dot = QLabel("●", self)
+        dot.setStyleSheet(f"color:{color('green').name()}; font-size:10px;")
+        title = QLabel(name, self)
+        title.setStyleSheet("font-weight:650; font-size:13px;")
+        chip = QLabel(kind, self)
+        chip.setStyleSheet("color:palette(placeholder-text); border:1px solid palette(mid); border-radius:8px; padding:0 7px; font-size:11px;")
+        self.about = QLabel(self)
+        self.about.setStyleSheet("color:palette(placeholder-text); font-size:11px;")
+        self.jobs = QLabel(self)
+        self.jobs.setStyleSheet("color:palette(placeholder-text); font-size:11.5px;")
+        for widget in (dot, title, chip, self.about):
+            head.addWidget(widget)
+        head.addStretch(1)
+        head.addWidget(self.jobs)
+        box.addLayout(head)
+        charts = QHBoxLayout()
+        charts.setSpacing(12)
+        self.cpu, self.mem, self.gpu = Sparkline("CPU", self), Sparkline("Memory", self), Sparkline("GPU", self)
+        for chart in (self.cpu, self.mem, self.gpu):
+            chart.interval = interval or 0
+            chart.setVisible(interval is not None)
+            charts.addWidget(chart, 1)
+        self.gpu.setVisible(False)  # until a read finds one
+        box.addLayout(charts, 1)
         self.said = QLabel("not read: the login node of a queue" if interval is None else "", self)
-        self.said.setStyleSheet("color:palette(placeholder-text); font-size:10px;")
-        self.cpu.setVisible(interval is not None)
-        box.addWidget(self.cpu)
+        self.said.setStyleSheet("color:palette(placeholder-text); font-size:11px;")
+        self.said.setVisible(interval is None)
         box.addWidget(self.said)
+        self._describe(None)
+
+    def _describe(self, sample: Sample | None) -> None:
+        said = [self.address] if self.address else ["this computer", f"{os.cpu_count()} threads"]
+        if sample is not None and sample.mem_total_gb:
+            said.append(f"{sample.mem_total_gb:.0f} GB")
+        self.about.setText(" · ".join(said))
+
+    def set_jobs(self, active: int, cpus: int) -> None:
+        self.jobs.setText(f"{active} active job{'s' * (active != 1)}" + (f" · {cpus:,} CPUs in use" if cpus else ""))
 
     def set_checked(self, checked: bool) -> None:
         self.setProperty("checked", checked)
@@ -203,16 +254,18 @@ class _HostCard(QFrame):
         super().mouseReleaseEvent(event)
 
     def apply(self, sample: Sample) -> None:
+        self.said.setVisible(bool(sample.error))
         if sample.error:
             self.said.setText(sample.error)
             return
+        self._describe(sample)
         self.cpu.push(sample.cpu)
-        said = f"Mem {sample.mem_used_gb:.1f}/{sample.mem_total_gb:.0f} GB"
-        if sample.gpus:  # ponytail: the mean over the cards; one per card when a host has several that differ
+        self.mem.push(sample.mem, f"{sample.mem_used_gb:.1f}/{sample.mem_total_gb:.0f} GB")
+        if sample.gpus:  # ponytail: the mean over the cards; one chart per card when a host has several that differ
             util = sum(g[0] for g in sample.gpus) / len(sample.gpus)
-            used, total = sum(g[1] for g in sample.gpus) / 1024, sum(g[2] for g in sample.gpus) / 1024
-            said += f" · GPU {util:.0f}% {used:.1f}/{total:.0f} GB" + (f" ({len(sample.gpus)}×)" if len(sample.gpus) > 1 else "")
-        self.said.setText(said)
+            self.gpu.title = f"GPU {len(sample.gpus)}×"
+            self.gpu.push(util)
+            self.gpu.setVisible(True)
 
 
 class HostsStrip(QScrollArea):
@@ -236,9 +289,11 @@ class HostsStrip(QScrollArea):
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.NoFrame)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setFixedHeight(92)
-        self.setStyleSheet("QFrame#hostCard { background:palette(base); border:1px solid palette(mid); border-radius:8px; }"
+        self.setFixedHeight(132)
+        self.setStyleSheet("QScrollArea { background: transparent; } QScrollArea > QWidget > QWidget { background: transparent; }"
+                           "QFrame#hostCard { background:palette(base); border:1px solid palette(mid); border-radius:8px; }"
                            "QFrame#hostCard[checked=\"true\"] { border:2px solid palette(highlight); }")
+        self._jobs: list = []
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -254,6 +309,7 @@ class HostsStrip(QScrollArea):
         body = QWidget()
         row = QHBoxLayout(body)
         row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(10)
         self._cards.clear()
         try:
             listed = list(self.hosts())
@@ -265,7 +321,7 @@ class HostsStrip(QScrollArea):
             self._cards[name] = card = _HostCard(name, address, kind, executors, interval, body)
             card.set_checked(name == self._chosen)
             card.clicked.connect(self._choose)
-            row.addWidget(card)
+            row.addWidget(card, 145 if kind == "local" else 100)
             if interval is not None:
                 threading.Thread(target=self._read, args=(name, address, interval, stop),
                                  name=f"resources-{name}", daemon=True).start()
@@ -273,10 +329,29 @@ class HostsStrip(QScrollArea):
             empty = QLabel(failed or "No executor is on.", body)
             empty.setStyleSheet("color:palette(placeholder-text);")
             row.addWidget(empty)
-        row.addStretch(1)
+            row.addStretch(1)
         self.setWidget(body)
+        self.set_jobs(self._jobs)
         if self._chosen is not None and self._chosen not in self._cards:
             self._choose(self._chosen)  # it is gone: the filter goes with it
+
+    @property
+    def chosen(self) -> str | None:
+        """The host whose jobs are the only ones shown, if one is."""
+        return self._chosen
+
+    def clear_choice(self) -> None:
+        """No host checked, without saying so: the filter was dropped elsewhere."""
+        self._chosen = None
+        for card in self._cards.values():
+            card.set_checked(False)
+
+    def set_jobs(self, jobs) -> None:
+        """The jobs as polled: each card says how many of its executors' are active and their CPUs."""
+        self._jobs = jobs
+        for card in self._cards.values():
+            mine = [job for job in jobs if not job.is_terminal and job.executor in card.executors]
+            card.set_jobs(len(mine), sum(job.cpu_used or 0 for job in mine))
 
     def stop(self) -> None:
         self._stop.set()  # daemons: each ends at its next wake-up, an ssh call in flight included

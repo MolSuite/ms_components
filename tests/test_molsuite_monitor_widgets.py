@@ -7,9 +7,10 @@ import pytest
 
 pytest.importorskip("PySide6")
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
-from ms_components.ms_monitor.detail import JobDetail, layout_cells, ranks
+from ms_components.ms_monitor.detail import JobDetail, counts, grid_window, layout_cells
 from ms_components.ms_monitor.models import FailureState, JobMonitorState, ProjectMonitorState, TaskMonitorState
 from ms_components.ms_monitor.polling import _Speeds
 from ms_components.ms_monitor.widget import MolSuiteMonitorWidget
@@ -23,12 +24,15 @@ def _job(**changes) -> JobMonitorState:
     return JobMonitorState(**{**values, **changes})
 
 
-def test_the_grid_paints_the_worst_chunk_of_each_cell_and_pads_what_is_not_given_yet():
-    # pending 0, running 1, done 2, failed 3 → ranks pending 0, done 1, running 2, failed 3
-    assert ranks(bytes([2, 1, 3, 0]), 6, 1) == bytes([1, 2, 3, 0, 0, 0])
-    assert ranks(bytes([2, 2, 2, 1, 3, 2]), 6, 3) == bytes([1, 3])
-    assert layout_cells(40, 120, 60) == (12, 10, 1)  # few: big cells
-    assert layout_cells(10_000, 100, 50) == (1, 100, 2)  # more than pixels: two chunks to one
+def test_the_grid_shows_a_thousand_chunks_at_most_and_moves_on_as_the_work_does():
+    assert layout_cells(40, 120, 60) == (10, 2, 5)  # few: big cells, filled column by column
+    assert grid_window(bytes([2] * 900), 0) == 0  # all of them fit
+    work = bytes([2] * 999 + [1] + [0] * 2000)  # the furthest that began is at the window's end
+    assert grid_window(work, 0) == 500
+    assert grid_window(bytes([2] * 1400 + [1] + [0] * 1599), 500) == 500  # not yet: it holds still
+    assert grid_window(bytes([2] * 1500 + [0] * 1500), 500) == 1000  # 1,500 reached: back to 500 in
+    assert grid_window(bytes([2] * 2990 + [0] * 10), 1500) == 2000  # never past the last full window
+    assert counts(bytes([2, 2, 3, 1, 0, 0])) == [2, 1, 2, 1]
 
 
 def test_speed_is_that_of_the_last_minutes_and_goes_once_the_job_ends():
@@ -53,23 +57,24 @@ def test_the_detail_shows_the_numbers_the_tasks_and_the_failures_grouped():
                         tasks=tasks, chunk_states=bytes([2, 2, 3, 1, 1, 1, 1])))
 
     assert detail._left.value.text() == "10s"
-    assert detail._progress.value.text() == "38%" and "1 pending" in detail._progress.sub.text()
-    assert detail._bar.parts == (2, 4, 1, 1) and detail._speed.value.text() == "30.0/min"
-    assert detail._grid.isVisibleTo(detail) and detail._grid._n == 8
-    assert detail._tabs.tabText(0) == "Running (4)"
+    assert detail._progress.value.text() == "2 / 8" and detail._pct.text() == "38%" and "1 pending" in detail._legend.text()
+    assert detail._bar.parts == (2, 4, 1, 1) and (detail._speed.value.text(), detail._speed.unit.text()) == ("30.0", "chunks/min")
+    assert detail._grid.isVisibleTo(detail) and detail._grid.cells == bytes([2, 2, 3, 1, 1, 1, 1, 0])
+    assert detail._tabs.tabText(0) == "Running  4" and "1 slow" in detail._tab_meta.text()
     slow = detail._tasks.topLevelItem(3)
     assert (slow.text(1), slow.text(4)) == ("pc3", "40%") and slow.toolTip(0).startswith("slow:")
     assert not detail._tasks.topLevelItem(0).toolTip(0).startswith("slow:")
 
     other = TRACEBACK.replace("bad ligand", "no atoms")
     detail.set_failures([FailureState(1, TRACEBACK, "a"), FailureState(2, TRACEBACK, "b"), FailureState(1, other, "c")], 5)
-    top = [detail._errors.topLevelItem(i).text(0) for i in range(detail._errors.topLevelItemCount())]
+    top = [detail._errors.item(i).text() for i in range(detail._errors.count())]
     assert top == ["ValueError: bad ligand", "ValueError: no atoms", "… 2 more failed chunks not read"]
-    assert detail._errors.topLevelItem(0).childCount() == 2 and 'File "dock.py"' in detail._traceback.toPlainText()
-    assert detail._tabs.tabText(1) == "Errors (5)"
+    assert detail._errors.item(0).data(Qt.UserRole + 1) == 2 and 'File "dock.py"' in detail._traceback.toPlainText()
+    assert detail._tabs.tabText(1) == "Errors  5" and detail._failed.sub.text() == "2 error types"
 
     detail.set_job(_job(status="completed", engine_id=None))  # of another session: no grid, a note
     assert not detail._grid.isVisibleTo(detail) and "not run by this session" in detail._meta.text()
+    assert detail._fact["status"].text() == "completed"
 
 
 def test_monitor_widget_lists_filters_and_selects_the_jobs_and_empties_without_a_project():
@@ -94,7 +99,11 @@ def test_monitor_widget_lists_filters_and_selects_the_jobs_and_empties_without_a
     assert widget._jobs_view.visible_job_ids() == ["old"]
     widget._jobs_view.set_status_filter("all")
     widget._hosts.filter_changed.emit({"local"})  # a host card clicked: only its executors' jobs
-    assert widget._jobs_view.visible_job_ids() == ["abc123"]
+    assert widget._jobs_view.visible_job_ids() == ["abc123"] and not widget._filter_chip.isHidden()
+    widget._detail.executor_clicked.emit("ray")  # the detail's executor chip
+    assert widget._jobs_view.visible_job_ids() == ["old"] and widget._filter_chip.text().startswith("executor: ray")
+    widget._filter_chip.click()  # ✕: every job again
+    assert widget._jobs_view.visible_job_ids() == ["abc123", "old"] and widget._filter_chip.isHidden()
 
     widget.update_snapshot(ProjectMonitorState(has_project=False))
     assert widget._title_label.text() == "No active project" and not widget._jobs_view.jobs()

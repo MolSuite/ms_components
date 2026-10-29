@@ -130,7 +130,7 @@ app.aboutToQuit.connect(bridge.stop)   # stop polling before the workspace shuts
 
 ms.submit(slow_squares, executor="thread")
 
-monitor.resize(1100, 650)
+monitor.resize(1440, 880)
 monitor.show()
 try:
     app.exec()
@@ -138,8 +138,11 @@ finally:
     ms.shutdown()
 ```
 
-The strip on top shows the hosts of the executors that are on (CPU over time, memory, GPU);
-clicking one keeps only the jobs of its executors. A queue's login node is not read. Selecting a
-job shows its time left and speed over the last 5 minutes, its progress, its failures, a cell
-per chunk (only while the job runs in this session), its tasks in flight with the host of each,
-and its failures grouped by message.
+The header holds the tools (search, status, Resync, Cancel, Resume, Move to). Below it, a card
+per host of the executors that are on charts CPU, memory and GPU over time; clicking one (or
+the executor chip of a job) keeps only the jobs of its executors. A queue's login node is not
+read. Selecting a job shows its ETA and throughput over the last 5 minutes, its progress, its
+failures, and a cell per chunk while the job runs in this session. The grid holds 1,000 cells
+at most: past that, it moves 500 on each time the work reaches its end, and the chunks out of
+it are given as counts (`+1,500 done`, `+200 failed`). The tabs list the tasks in flight with
+the host of each, the failures grouped by message, and a summary of the job.
