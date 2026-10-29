@@ -165,9 +165,11 @@ def describe_host(address: str, env: str = "", packages=(), tools=None) -> str:
     tools = tools or {}
     python = f"{env.rstrip('/')}/bin/python" if env else ("" if address else sys.executable)
     script = "; ".join([
-        "export LC_ALL=C", "uname -srm", '(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME")',
+        "export LC_ALL=C", "uname -srm",
+        '(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME") || (v=$(sw_vers -productVersion 2>/dev/null) && echo "macOS $v")',
         'echo "CPUs: $(nproc 2>/dev/null || sysctl -n hw.ncpu)"',
-        "awk '/MemTotal/ {printf \"Memory: %.1f GB\\n\", $2/1048576}' /proc/meminfo 2>/dev/null",
+        "awk '/MemTotal/ {printf \"Memory: %.1f GB\\n\", $2/1048576}' /proc/meminfo 2>/dev/null"
+        " || sysctl -n hw.memsize | awk '{printf \"Memory: %.1f GB\\n\", $1/1073741824}'",  # macOS: no /proc
         "(nvidia-smi -L 2>/dev/null || echo 'GPUs: none seen by nvidia-smi')",
         "echo",
         *([f"if [ -x {shlex.quote(python)} ]; then {shlex.quote(python)} -c {shlex.quote(_VERSIONS)} "
