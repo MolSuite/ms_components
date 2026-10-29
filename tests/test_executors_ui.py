@@ -6,7 +6,7 @@ import time
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from ms_components.ms_executors import ExecutorsPanel, KeptPage, _value
+from ms_components.ms_executors import ExecutorsPanel, KeptPage, _Steps, _value
 
 
 class _Ray:
@@ -155,7 +155,9 @@ def test_a_host_is_given_the_programs_ticked_for_it_when_synced(tmp_path, monkey
         assert ms.settings_manager.settings.hosts["laptop"].install == ["unidock"]
 
         hosts.sync_button.click()
-        assert _until(lambda: not hosts.steps.isHidden()) and (hosts.steps.value(), hosts.steps.maximum()) == (1, 3)
+        assert _until(lambda: not hosts.steps.isHidden()) and (hosts.steps.bar.value(), hosts.steps.bar.maximum()) == (1, 3)
+        assert hosts.steps.label.text().startswith("preparing 192.168.1.2  ·  0:0")
+        assert hosts.steps.label.text().endswith("step 2 of 3")
         seen.set()
         assert _until(lambda: hosts.sync_button.isEnabled() and "ready" in hosts.report.toPlainText())
         assert asked == [("192.168.1.2", ["unidock"])] and "installing on 192.168.1.2" in hosts.report.toPlainText()
@@ -168,3 +170,15 @@ def test_a_host_is_given_the_programs_ticked_for_it_when_synced(tmp_path, monkey
     finally:
         ms.shutdown()
         app.processEvents()
+
+
+def test_the_bar_says_what_is_done_for_how_long_and_waits_with_nothing_to_count():
+    QApplication.instance() or QApplication([])
+    steps = _Steps(None)
+    assert not steps.take("a line for the log") and steps.isHidden()
+    assert steps.take("[0/0] starting lab") and steps.bar.maximum() == 0 and not steps.full()  # busy
+    assert steps.label.text() == "starting lab  ·  0:00"
+    steps._since -= 75  # a step of minutes
+    steps.take("[0/0] starting lab")
+    assert steps.label.text() == "starting lab  ·  1:15"
+    assert steps.take("[2/2] pc2: ready") and steps.full() and steps.label.text() == "pc2: ready  ·  0:00"
