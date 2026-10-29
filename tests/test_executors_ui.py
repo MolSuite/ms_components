@@ -44,6 +44,9 @@ def test_hosts_and_executors_are_kept_and_started_from_the_ui(tmp_path, monkeypa
         hosts, executors = KeptPage(ms, "hosts"), KeptPage(ms, "executors")
 
         assert not hosts._editors["address"].isEnabled() and not hosts.remove_button.isEnabled()  # `local`
+        hosts.check_button.click()  # `local`: what this machine is, with no ssh
+        assert _until(lambda: hosts.check_button.isEnabled())
+        assert hosts.report.toPlainText().startswith("Connected to this machine") and "ms_flow " in hosts.report.toPlainText()
         hosts.new_button.click()
         hosts.name.setText("laptop")
         hosts.save_button.click()

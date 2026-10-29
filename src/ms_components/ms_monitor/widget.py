@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QPushButton,
     QSplitter,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -20,6 +21,7 @@ from ms_components.ms_monitor.formatting import format_relative_time, format_thr
 from ms_components.ms_monitor.job_cards import JobCardList
 from ms_components.ms_monitor.models import ProjectMonitorState
 from ms_components.ms_monitor.palette import P
+from ms_components.ms_monitor.resources import ResourcesPanel, workspace_hosts
 
 
 class MolSuiteMonitorWidget(QWidget):
@@ -82,7 +84,7 @@ class MolSuiteMonitorWidget(QWidget):
         metrics_row = QHBoxLayout()
         metrics_row.setSpacing(10)
         self._active_jobs_card = MetricCard("ACTIVE JOBS", "0", subtitle="0 visible", parent=self)
-        self._throughput_card = MetricCard("THROUGHPUT", "-", subtitle="0 chunks running", parent=self)
+        self._throughput_card = MetricCard("THROUGHPUT", "-", subtitle="0 tasks running", parent=self)
         self._chunks_card = MetricCard("CHUNKS", "0", subtitle="0%", accent=P["ok"], parent=self)
         self._failures_card = MetricCard("FAILURES", "0", subtitle="0 ext. cancellers", accent=P["error"], parent=self)
         metrics_row.addWidget(self._active_jobs_card)
@@ -116,13 +118,17 @@ class MolSuiteMonitorWidget(QWidget):
 
         self._jobs_view = JobCardList(self)
         self._detail_panel = JobDetailPanel(parent=self)
+        self._resources = ResourcesPanel(getattr(bridge, "workspace", None), parent=self)
+        self._side = QTabWidget(self)
+        self._side.addTab(self._detail_panel, "Details")
+        self._side.addTab(self._resources, "Resources")
 
         # Horizontal split: jobs on the left, job detail on the right. Uses the
         # available width instead of stacking, so the panel stays usable when its
         # height is squeezed (e.g. docked below other panels).
         main_splitter = QSplitter(Qt.Horizontal, self)
         main_splitter.addWidget(self._jobs_view)
-        main_splitter.addWidget(self._detail_panel)
+        main_splitter.addWidget(self._side)
         main_splitter.setStretchFactor(0, 3)
         main_splitter.setStretchFactor(1, 2)
         main_splitter.setSizes([560, 440])
@@ -151,6 +157,7 @@ class MolSuiteMonitorWidget(QWidget):
             self._bridge.operator_action_failed.disconnect(self._handle_action_failure)
             self._bridge.bridge_error.disconnect(self._handle_bridge_error)
         self._bridge = bridge
+        self._resources.hosts = lambda: workspace_hosts(bridge.workspace)
         bridge.project_snapshot_updated.connect(self.update_snapshot)
         bridge.project_cleared.connect(self.clear_snapshot)
         bridge.sync_state_updated.connect(self._update_sync_state)
@@ -169,7 +176,7 @@ class MolSuiteMonitorWidget(QWidget):
         self._sync_label.setText("Sync: idle")
         self._action_label.setText("")
         self._active_jobs_card.set_value("0", "0 visible")
-        self._throughput_card.set_value("-", "0 chunks running")
+        self._throughput_card.set_value("-", "0 tasks running")
         self._chunks_card.set_value("0", "0%")
         self._failures_card.set_value("0", "0 ext. cancellers")
         self._jobs_view.clear()
@@ -195,18 +202,21 @@ class MolSuiteMonitorWidget(QWidget):
             f"External cancellers: {snapshot.external_cancellers}"
         )
 
-        # Cross-job aggregates — the summary row was previously just counts.
+        # Over the jobs that run, so the counts start again with each job instead of adding up
+        # every job still listed; the cards below keep what each one did.
         jobs = snapshot.jobs
-        total_eps = sum(j.throughput_eps for j in jobs if not j.is_terminal)
-        running_chunks = sum(j.chunks_running for j in jobs)
-        chunks_done = sum(j.chunks_done for j in jobs)
-        chunks_total = sum(j.chunks_total for j in jobs)
-        failures = sum(j.chunks_failed for j in jobs)
+        active = [j for j in jobs if not j.is_terminal]
+        total_eps = sum(j.throughput_eps for j in active)
+        tasks = sum(j.tasks_running for j in active)
+        cpus = sum(j.cpu_used for j in active)
+        chunks_done = sum(j.chunks_done for j in active)
+        chunks_total = sum(j.chunks_total for j in active)
+        failures = sum(j.chunks_failed for j in active)
         pct = (chunks_done / chunks_total * 100.0) if chunks_total else 0.0
 
         self._active_jobs_card.set_value(str(snapshot.jobs_active), f"{len(jobs)} visible")
         self._throughput_card.set_value(
-            format_throughput(total_eps), f"{running_chunks:,} chunks running")
+            format_throughput(total_eps), f"{tasks:,} tasks running" + (f" on {cpus:,} CPU" if cpus else ""))
         self._chunks_card.set_value(f"{chunks_done:,} / {chunks_total:,}", f"{pct:.0f}%")
         self._failures_card.set_value(
             f"{failures:,}", f"{snapshot.external_cancellers} ext. cancellers",
@@ -284,6 +294,7 @@ class MolSuiteMonitorWidget(QWidget):
 
     def _on_current_job_changed(self, *_args) -> None:
         # Triggered only by an explicit click on a job card → reload its detail once.
+        self._side.setCurrentWidget(self._detail_panel)
         self._load_detail()
 
     def _load_detail(self) -> None:

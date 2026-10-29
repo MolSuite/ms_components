@@ -65,7 +65,13 @@ def test_monitor_widget_shows_the_jobs_and_empties_without_a_project():
 
     assert widget._title_label.text() == "Screening"
     assert list(widget._jobs_view._cards) == ["abc123", "old"]
-    assert widget._chunks_card._value.text() == "5 / 8"
+    assert widget._chunks_card._value.text() == "1 / 4"  # the job that runs, not the ones listed before it
+    widget.update_snapshot(ProjectMonitorState(project_id="p", project_name="Screening", has_project=True, jobs_active=1,
+                                               jobs=[_job(chunks_running=28, tasks_running=14, cpu_used=14), done]))
+    assert widget._throughput_card._subtitle.text() == "14 tasks running on 14 CPU"
+    assert "14 ⚙" in widget._jobs_view._cards["abc123"]._counters_lbl.text()
+    widget._jobs_view._cards["old"].clicked.emit("old")
+    assert widget._jobs_view._cards["old"]._selected and "2px solid" in widget._jobs_view._cards["old"].styleSheet()
     assert widget._failures_card._value.text() == "1"
     widget._jobs_view.set_search_text("dock")
     widget._jobs_view.set_status_filter("completed")
@@ -73,3 +79,14 @@ def test_monitor_widget_shows_the_jobs_and_empties_without_a_project():
 
     widget.update_snapshot(ProjectMonitorState(has_project=False))
     assert widget._title_label.text() == "No active project" and not widget._jobs_view._cards
+
+
+def test_resources_parse_reads_cpu_as_the_change_between_two_reads():
+    from ms_components.ms_monitor.resources import parse
+
+    first = "cpu  100 0 100 800 0 0 0 0 0 0\nMemTotal: 16777216 kB\nMemAvailable: 4194304 kB\n"
+    sample, ticks = parse(first, None)
+    assert sample.cpu is None and (round(sample.mem), round(sample.mem_total_gb)) == (75, 16)
+    second = "cpu  400 0 100 1100 0 0 0 0 0 0\nMemTotal: 16777216 kB\nMemAvailable: 4194304 kB\n35, 512, 6144\n"
+    sample, _ = parse(second, ticks)
+    assert round(sample.cpu) == 50 and sample.gpus == [(35.0, 512.0, 6144.0)]
