@@ -33,6 +33,7 @@ def job_state(job, now: float) -> JobMonitorState:
         cpu_used=getattr(job, "cpu_used", 0),
         chunks_retried=job.chunks_retried,
         peak_mem_mb=job.peak_mem_mb,
+        usage=getattr(job, "usage", None) or {},  # ms_flow < 0.8 does not keep it
         throughput_eps=settled / elapsed if elapsed > 0 else 0.0,  # the mean; `_Speeds` gives the recent one
         started_at=datetime.fromtimestamp(job.started_at),
         finished_at=datetime.fromtimestamp(job.finished_at) if job.finished_at else None,

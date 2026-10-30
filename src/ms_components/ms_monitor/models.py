@@ -50,6 +50,7 @@ class JobMonitorState:
     cpu_used: int = 0  # the CPU tokens those tasks hold
     chunks_retried: int = 0
     peak_mem_mb: int = 0
+    usage: dict = field(default_factory=dict)  # what it used, kept once it ended: see ms_flow's JobSnapshot.usage
     throughput_eps: float = 0.0  # chunks settled per second over the last minutes; since it began once it ended
     throughput_history: list[float] = field(default_factory=list)  # the same, one value per few seconds
     started_at: datetime | None = None

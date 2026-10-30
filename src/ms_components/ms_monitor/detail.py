@@ -628,7 +628,7 @@ class JobDetail(QWidget):
         self._traceback.setPlainText("" if item is None else str(item.data(Qt.UserRole) or ""))
 
     _FACTS = ("key", "status", "executor", "started", "finished", "elapsed", "chunks", "retried", "throughput",
-              "peak memory", "in flight", "errors")
+              "peak memory", "CPU", "GPU", "in flight", "errors")
 
     def _build_summary(self) -> None:
         self._fact: dict[str, QLabel] = {}
@@ -661,11 +661,29 @@ class JobDetail(QWidget):
             f"{job.chunks_retried:,}",
             format_speed(job.throughput_eps) + ("" if job.is_terminal else " · last 5 min"),
             f"{job.peak_mem_mb:,} MB" if job.peak_mem_mb else "—",
+            *_used(job, (end - job.started_at).total_seconds() if job.started_at else 0.0),
             f"{job.tasks_running:,} tasks · {job.cpu_used:,} CPUs" if not job.is_terminal else "—",
             f"{self._error_types:,} types" if self._error_types else "none",
         )
         for key, value in zip(self._FACTS, values):
             self._fact[key].setText(value)
+
+
+def _used(job: JobMonitorState, seconds: float) -> tuple[str, str]:
+    """The CPU and GPU lines of a job's summary: what it kept busy, of what it held."""
+    usage = job.usage
+    if not usage or seconds <= 0:
+        return "—", "—"
+    cpu = gpu = "—"
+    if usage.get("peak_cpu"):
+        held = f"{usage['cpu_s'] / seconds:,.1f} held on average · {usage['peak_cpu']:g} at most"
+        busy = usage.get("busy_s")  # on this machine only: what it read while the job ran
+        cpu = held if busy is None else f"{busy / 3600:,.2f} CPU·h · {busy / seconds:,.1f} busy of " + held
+    if usage.get("peak_gpu"):
+        gpu = f"{usage['gpu_s'] / 3600:,.2f} GPU·h · {usage['peak_gpu']:g} at most"
+        if usage.get("vram_mb") is not None:
+            gpu += f" · {usage['vram_mb']:,} MB VRAM at most · {usage['gpu_util']:.0f} % busy on average"
+    return cpu, gpu
 
 
 __all__ = ["ChunkGrid", "GRID_MAX", "GRID_STEP", "JobDetail", "counts", "grid_window", "layout_cells", "reason"]
