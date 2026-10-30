@@ -550,7 +550,7 @@ class ProjectRowDelegate(QStyledItemDelegate):
                 painter.setBrush(QBrush(palette.color(QPalette.ColorRole.Highlight)))
                 painter.setPen(Qt.NoPen)
                 painter.drawRect(QRect(rect.left(), rect.top()+1, 3, rect.height()-1))
-            self._paint_name_col(painter, rect, project, palette)
+            self._paint_name_col(painter, rect, project, palette, option.font)
 
         elif col in (_COL_META, _COL_PATH, _COL_DATE):
             role = (
@@ -559,7 +559,7 @@ class ProjectRowDelegate(QStyledItemDelegate):
                 else QPalette.ColorRole.PlaceholderText
             )
             painter.setPen(QPen(palette.color(role)))
-            painter.setFont(QFont("", 9 if col == _COL_META else 8))
+            painter.setFont(self._font(option.font, 9 if col == _COL_META else 8))
             text = index.data(Qt.DisplayRole) or ""
             flags = Qt.AlignLeft | Qt.AlignVCenter
             if col == _COL_META:
@@ -568,10 +568,10 @@ class ProjectRowDelegate(QStyledItemDelegate):
                              flags, text)
 
         elif col == _COL_STAR:
-            self._paint_star(painter, rect, project, is_hover, palette)
+            self._paint_star(painter, rect, project, is_hover, palette, option.font)
 
         elif col == _COL_MENU:
-            self._paint_menu_btn(painter, rect, is_hover, palette)
+            self._paint_menu_btn(painter, rect, is_hover, palette, option.font)
 
         painter.restore()
 
@@ -581,6 +581,7 @@ class ProjectRowDelegate(QStyledItemDelegate):
         rect: QRect,
         project: ProjectItem,
         palette: QPalette,
+        base_font: QFont,
     ):
         # Avatar
         av_x  = rect.left() + 10
@@ -592,18 +593,18 @@ class ProjectRowDelegate(QStyledItemDelegate):
         painter.drawEllipse(av_r)
         tc = QColor("#202124") if color.lightness() > 150 else QColor("#ffffff")
         painter.setPen(tc)
-        painter.setFont(QFont("", 12, QFont.Bold))
+        painter.setFont(self._font(base_font, 12, QFont.Bold))
         painter.drawText(av_r, Qt.AlignCenter, (project.name or "?")[:1].upper())
 
         # Name
         tx = av_x + self._AVATAR + 10
-        painter.setFont(QFont("", 11, QFont.Bold))
+        painter.setFont(self._font(base_font, 11, QFont.Bold))
         painter.setPen(palette.color(QPalette.ColorRole.Text))
         painter.drawText(QRect(tx, rect.top()+8, rect.width()-tx-8, 20),
                          Qt.AlignLeft | Qt.AlignVCenter, project.name or "")
 
         # Project id
-        painter.setFont(QFont("", 8))
+        painter.setFont(self._font(base_font, 8))
         painter.setPen(palette.color(QPalette.ColorRole.PlaceholderText))
         painter.drawText(
             QRect(tx, rect.top() + 30, rect.width() - tx - 8, 16),
@@ -611,7 +612,16 @@ class ProjectRowDelegate(QStyledItemDelegate):
             f"ID: {project.id}",
         )
 
-    def _paint_star(self, painter, rect, project, is_hover, palette: QPalette):
+    @staticmethod
+    def _font(base_font: QFont, point_size: int, weight: QFont.Weight | None = None) -> QFont:
+        """Keep the application's typeface while adjusting hierarchy in the project rows."""
+        font = QFont(base_font)
+        font.setPointSize(point_size)
+        if weight is not None:
+            font.setWeight(weight)
+        return font
+
+    def _paint_star(self, painter, rect, project, is_hover, palette: QPalette, base_font: QFont):
         if project.favorite:
             favorite = theme_color("yellow")
             favorite_bg = QColor(favorite)
@@ -628,10 +638,10 @@ class ProjectRowDelegate(QStyledItemDelegate):
             painter.setPen(QPen(palette.color(QPalette.ColorRole.Text)))
         else:
             painter.setPen(QPen(palette.color(QPalette.ColorRole.PlaceholderText)))
-        painter.setFont(QFont("", 12))
+        painter.setFont(self._font(base_font, 12))
         painter.drawText(rect, Qt.AlignCenter, "★")
 
-    def _paint_menu_btn(self, painter, rect, is_hover, palette: QPalette):
+    def _paint_menu_btn(self, painter, rect, is_hover, palette: QPalette, base_font: QFont):
         if is_hover:
             bh = self._BTN_SIZE
             r  = rect.adjusted(3, (rect.height()-bh)//2, -3, -(rect.height()-bh)//2)
@@ -643,7 +653,7 @@ class ProjectRowDelegate(QStyledItemDelegate):
             if is_hover
             else QPalette.ColorRole.PlaceholderText
         )))
-        painter.setFont(QFont("", 13, QFont.Bold))
+        painter.setFont(self._font(base_font, 13, QFont.Bold))
         painter.drawText(rect, Qt.AlignCenter, "⋯")
 
     def editorEvent(self, event, model, option, index):

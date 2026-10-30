@@ -168,7 +168,7 @@ class _ElidedLabel(QLabel):
         return self._full
 
     def sizeHint(self) -> QSize:  # noqa: N802
-        return QSize(self.fontMetrics().horizontalAdvance(self._full) + 4, super().sizeHint().height())
+        return QSize(min(160, self.fontMetrics().horizontalAdvance(self._full) + 4), super().sizeHint().height())
 
     def minimumSizeHint(self) -> QSize:  # noqa: N802
         return QSize(0, super().minimumSizeHint().height())
@@ -309,7 +309,8 @@ class PymolControlBar(QFrame):
         self.context_label = _ElidedLabel("Generic", self)
         self.context_label.setObjectName("PymolSceneContext")
         self.context_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
-        self.context_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.context_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+        self.context_label.setMaximumWidth(160)
         self.context_label.setToolTip("Current molecular scene context.")
         outer.addWidget(self.context_label)
 
@@ -464,6 +465,14 @@ class PymolControlBar(QFrame):
         super().changeEvent(event)
         if event.type() == QEvent.Type.PaletteChange:
             self._refresh_toolbar_icons()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        # Reserve the tools' preferred width before giving space to the scene name.
+        margins = self.layout().contentsMargins()
+        available = (self.width() - margins.left() - margins.right()
+                     - self.layout().spacing() - self.toolbar.sizeHint().width())
+        self.context_label.setMaximumWidth(min(160, max(0, available)))
 
     @property
     def scene_context(self) -> PymolSceneContext:
