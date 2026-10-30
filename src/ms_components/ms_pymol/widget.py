@@ -215,7 +215,7 @@ class PymolControlBar(QFrame):
         bar.setContentsMargins(0, 0, 0, 0)
         bar.setIconSize(QSize(16, 16))
         bar.setToolButtonStyle(Qt.ToolButtonIconOnly)
-        outer.addWidget(bar, 1)
+        outer.addWidget(bar)
 
         selection_menu = QMenu("Selection", bar)
         selection_group = QActionGroup(selection_menu)
@@ -309,9 +309,10 @@ class PymolControlBar(QFrame):
         self.context_label = _ElidedLabel("Generic", self)
         self.context_label.setObjectName("PymolSceneContext")
         self.context_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
-        self.context_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        # Ignored: the tools keep their width and the scene name takes only what is left.
+        self.context_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self.context_label.setToolTip("Current molecular scene context.")
-        outer.addWidget(self.context_label)
+        outer.addWidget(self.context_label, 1)
 
         self._register_builtin_presets()
         self._sync_selection_mode()

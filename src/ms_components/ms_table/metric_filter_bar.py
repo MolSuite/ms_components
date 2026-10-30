@@ -127,7 +127,7 @@ class MetricFilterBar(QWidget):
         *,
         decimals: int = 3,
         default_value: float = 0.0,
-        empty_text: str = "No filters — everything is shown.",
+        empty_text: str = "No filters - everything is shown.",
     ):
         super().__init__(parent)
         self.setStyleSheet(CHIP_STYLE)

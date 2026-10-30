@@ -285,3 +285,22 @@ def test_the_context_label_counts_several_objects_and_never_widens_the_bar():
     assert bar.context_label.minimumSizeHint().width() == 0
     assert bar.context_label.width() <= 300
     bar.close()
+
+
+def test_long_scene_names_leave_room_for_the_toolbar_icons():
+    app = _app()
+    bar = PymolControlBar(FakeCmd())
+    target = "receptor_" + "long_structure_name_" * 30
+    bar.set_scene_context("receptor", target=target, selections={"receptor": target})
+    bar.show()
+
+    for width in (600, 334, 260, 600):
+        bar.resize(width, 40)
+        app.processEvents()
+        assert bar.width() == width
+        assert all(bar.toolbar.widgetForAction(action).isVisible()
+                   for action in bar.toolbar.actions())
+        assert f"Target: {target}" in bar.context_label.toolTip()
+        assert f"Receptor: {target}" in bar.context_label.toolTip()
+
+    bar.close()

@@ -360,12 +360,12 @@ def main():
 
     table = SmartTableView(db=db, config=config)
     table.row_double_clicked.connect(
-        lambda obj: print(f"Double click: Order #{obj.id} — {obj.product}")
+        lambda obj: print(f"Double click: Order #{obj.id} - {obj.product}")
     )
     layout.addWidget(table)
 
     window.setCentralWidget(central)
-    window.setWindowTitle("SmartTableView — Demo")
+    window.setWindowTitle("SmartTableView - Demo")
     window.resize(1100, 700)
     window.show()
 

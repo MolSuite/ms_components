@@ -338,13 +338,13 @@ class ActionBar(ContentBar):
         if total:
             self.progress.setRange(0, int(total))
             self.progress.setValue(min(done, int(total)))
-            headline = f"{stage} — {format_count(done)} / {format_count(total)} {unit}"
+            headline = f"{stage} - {format_count(done)} / {format_count(total)} {unit}"
             if eta_seconds is None:
                 eta_seconds = self._estimate_eta(done, int(total))
             parts.append("Estimating time…" if eta_seconds is None else format_eta(eta_seconds))
         else:
             self.progress.setRange(0, 0)
-            headline = f"{stage} — {format_count(done)} {unit}"
+            headline = f"{stage} - {format_count(done)} {unit}"
         if detail:
             parts.append(detail)
         self._show(headline, " · ".join(parts), failures)
