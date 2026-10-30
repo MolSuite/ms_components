@@ -168,7 +168,7 @@ class _ElidedLabel(QLabel):
         return self._full
 
     def sizeHint(self) -> QSize:  # noqa: N802
-        return QSize(min(160, self.fontMetrics().horizontalAdvance(self._full) + 4), super().sizeHint().height())
+        return QSize(self.fontMetrics().horizontalAdvance(self._full) + 4, super().sizeHint().height())
 
     def minimumSizeHint(self) -> QSize:  # noqa: N802
         return QSize(0, super().minimumSizeHint().height())
@@ -215,7 +215,7 @@ class PymolControlBar(QFrame):
         bar.setContentsMargins(0, 0, 0, 0)
         bar.setIconSize(QSize(16, 16))
         bar.setToolButtonStyle(Qt.ToolButtonIconOnly)
-        outer.addWidget(bar, 1)
+        outer.addWidget(bar)
 
         selection_menu = QMenu("Selection", bar)
         selection_group = QActionGroup(selection_menu)
@@ -309,10 +309,10 @@ class PymolControlBar(QFrame):
         self.context_label = _ElidedLabel("Generic", self)
         self.context_label.setObjectName("PymolSceneContext")
         self.context_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
-        self.context_label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
-        self.context_label.setMaximumWidth(160)
+        # Ignored: the tools keep their width and the scene name takes only what is left.
+        self.context_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self.context_label.setToolTip("Current molecular scene context.")
-        outer.addWidget(self.context_label)
+        outer.addWidget(self.context_label, 1)
 
         self._register_builtin_presets()
         self._sync_selection_mode()
@@ -465,14 +465,6 @@ class PymolControlBar(QFrame):
         super().changeEvent(event)
         if event.type() == QEvent.Type.PaletteChange:
             self._refresh_toolbar_icons()
-
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        # Reserve the tools' preferred width before giving space to the scene name.
-        margins = self.layout().contentsMargins()
-        available = (self.width() - margins.left() - margins.right()
-                     - self.layout().spacing() - self.toolbar.sizeHint().width())
-        self.context_label.setMaximumWidth(min(160, max(0, available)))
 
     @property
     def scene_context(self) -> PymolSceneContext:

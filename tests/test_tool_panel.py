@@ -125,7 +125,7 @@ def test_run_cycle_swaps_actions_locks_settings_and_restores():
     assert run.isHidden() and save.isHidden() and not bar.cancel_button.isHidden()
     assert not results.isHidden()
     assert not spin.isEnabled() and not scope.isEnabled()
-    assert bar.headline.text() == "Minimizing — 4 820 / 12 480 molecules"
+    assert bar.headline.text() == "Minimizing - 4 820 / 12 480 molecules"
     assert "≈ 3 min left" in bar.detail.text() and "12 failed" in bar.detail.text()
     assert (bar.progress.value(), bar.progress.maximum()) == (4820, 12480)
     assert run.parentWidget().width() == idle_width  # nothing on the left jumps
@@ -168,7 +168,7 @@ def test_unknown_total_is_indeterminate_and_signals_fire():
 
     bar.set_progress(4820, None, stage="Importing", unit="molecules", eta_seconds=60, failures=3)
     assert bar.progress.maximum() == 0
-    assert bar.headline.text() == "Importing — 4 820 molecules"
+    assert bar.headline.text() == "Importing - 4 820 molecules"
     assert "left" not in bar.detail.text()
 
     bar.cancel_button.click()
