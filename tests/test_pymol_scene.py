@@ -143,6 +143,8 @@ def test_scene_menu_lists_its_sections():
     add_scene_actions(menu, _Dock())
     titles = [action.text() for action in menu.actions() if action.text()]
     assert titles == ["Background", "Camera", "Render", "Surface", "Complex", "PyMOL Internal GUI"]
+    render = next(action.menu() for action in menu.actions() if action.text() == "Render")
+    assert [action.text() for action in render.actions()] == ["Shadows On", "Shadows Off", "Ray"]
 
 
 def test_the_control_bar_registers_every_pymol_preset():

@@ -10,11 +10,10 @@ from __future__ import annotations
 import math
 from collections import OrderedDict
 from collections.abc import Callable
-from pathlib import Path
 
 from PySide6.QtCore import QEvent, QObject, QTimer
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QFileDialog, QMenu, QMessageBox, QWidget
+from PySide6.QtWidgets import QMenu, QMessageBox, QWidget
 
 from .widget import COMPARISON_COLORS
 
@@ -383,13 +382,6 @@ def add_scene_actions(
         cmd.set("transparency", 0.55, name)
         cmd.zoom(f"({name} or {ligand})", 4)
 
-    def save_png(cmd) -> None:
-        filename, _filter = QFileDialog.getSaveFileName(
-            parent, "Save PyMOL Image", str(Path.home() / "pymol.png"), "PNG Images (*.png)"
-        )
-        if filename:
-            cmd.png(filename, ray=1)
-
     background = menu.addMenu("Background")
     for label, color in (("White", "white"), ("Black", "black"), ("Grey", "grey20")):
         menu_action(background, label, run("set the background", lambda cmd, c=color: cmd.bg_color(c)))
@@ -402,7 +394,6 @@ def add_scene_actions(
     menu_action(render, "Shadows On", run("set shadows", lambda cmd: cmd.set("ray_shadows", 1)))
     menu_action(render, "Shadows Off", run("set shadows", lambda cmd: cmd.set("ray_shadows", 0)))
     menu_action(render, "Ray", run("ray-trace", lambda cmd: cmd.ray()))
-    menu_action(render, "Save PNG…", run("save the PNG", save_png))
 
     surface = menu.addMenu("Surface")
     menu_action(surface, "Vacuum Electrostatics…", lambda: _vacuum_electrostatics(dock, parent),

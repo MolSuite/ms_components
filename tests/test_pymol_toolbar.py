@@ -6,6 +6,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from pydantic import AliasChoices, BaseModel, Field  # noqa: F401
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QComboBox, QFileDialog, QMenu, QToolButton
 from shiboken6 import delete, isValid
 
@@ -220,6 +221,8 @@ def test_pymol_toolbar_uses_menu_actions_and_hover_overflow():
     assert [action.text() for action in actions] == [
         "Selection", "Actions", "Display", "Hide", "Hydrogens", "Presets", "Export",
     ]
+    assert actions[-1] is bar.export_action
+    assert bar._toolbar_action_icons[bar.export_action] == "save.svg"
     assert all(action.text() and not action.icon().isNull() for action in actions)
     assert bar.selection_mode_action.menu() is not None
     assert bar.actions_action.menu() is not None
@@ -262,6 +265,27 @@ def test_pymol_toolbar_uses_menu_actions_and_hover_overflow():
     app.processEvents()
     assert shown
 
+    bar.close()
+
+
+def test_moving_export_after_app_controls_preserves_its_menu_button():
+    app = _app()
+    bar = PymolControlBar(FakeCmd())
+    bar.add_menu_action("Scene", QMenu(bar), icon_name="settings.svg")
+    bar.move_action_to_end(bar.export_action)
+    bar.resize(650, 40)
+    bar.show()
+    app.processEvents()
+
+    button = bar.toolbar.widgetForAction(bar.export_action)
+    assert bar.toolbar.actions()[-1] is bar.export_action
+    assert button.objectName() == "PymolToolbarButton"
+    assert button.popupMode() == QToolButton.InstantPopup
+    shown = []
+    bar.export_menu.aboutToShow.connect(lambda: shown.append(True))
+    QTimer.singleShot(20, bar.export_menu.close)
+    QTest.mouseClick(button, Qt.LeftButton, pos=button.rect().center())
+    assert shown == [True]
     bar.close()
 
 

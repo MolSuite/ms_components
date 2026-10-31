@@ -320,7 +320,7 @@ class PymolControlBar(QFrame):
             lambda checked=False: self._save_ray_traced_png()
         )
         self.export_action = self._add_toolbar_action(
-            "Export", "export.svg",
+            "Export", "save.svg",
             "Export the displayed structure as PDB or save a print-quality PNG.",
             menu=self.export_menu,
         )
@@ -425,12 +425,23 @@ class PymolControlBar(QFrame):
         self.toolbar.addAction(action)
         self._toolbar_action_icons[action] = icon_name
 
+        self._configure_action_button(action)
+        return action
+
+    def _configure_action_button(self, action: QAction) -> None:
         button = self.toolbar.widgetForAction(action)
         if isinstance(button, QToolButton):
             button.setObjectName("PymolToolbarButton")
-            if menu is not None:
+            if action.menu() is not None:
                 button.setPopupMode(QToolButton.InstantPopup)
-        return action
+
+    def move_action_to_end(self, action: QAction) -> None:
+        """Move an existing control, preserving its menu-button behavior."""
+        self.toolbar.removeAction(action)
+        self.toolbar.addAction(action)
+        # Qt creates a new QToolButton on reinsertion, losing its popup mode.
+        self._configure_action_button(action)
+        self._configure_overflow_button()
 
     def add_menu_action(
         self,
