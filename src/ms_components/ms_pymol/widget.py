@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -16,6 +17,7 @@ from PySide6.QtCore import QByteArray, QEvent, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QActionGroup, QGuiApplication, QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
+    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -306,6 +308,23 @@ class PymolControlBar(QFrame):
             menu=self.preset_menu,
         )
 
+        self.export_menu = QMenu("Export", bar)
+        self.export_pdb_action = self.export_menu.addAction("Save displayed complex as PDB…")
+        self.export_pdb_action.setToolTip("Export the displayed receptor and ligand as a PDB file.")
+        self.export_pdb_action.triggered.connect(
+            lambda checked=False: self._save_complex_pdb()
+        )
+        self.export_png_action = self.export_menu.addAction("Save ray-traced PNG…")
+        self.export_png_action.setToolTip("Save a ray-traced image at 300 dpi, sized for print.")
+        self.export_png_action.triggered.connect(
+            lambda checked=False: self._save_ray_traced_png()
+        )
+        self.export_action = self._add_toolbar_action(
+            "Export", "export.svg",
+            "Export the displayed structure as PDB or save a print-quality PNG.",
+            menu=self.export_menu,
+        )
+
         self.context_label = _ElidedLabel("Generic", self)
         self.context_label.setObjectName("PymolSceneContext")
         self.context_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
@@ -322,6 +341,69 @@ class PymolControlBar(QFrame):
         self._configure_overflow_button()
         if self._cmd is None:
             self.setEnabled(False)
+
+    def _export_selection(self) -> str:
+        """Prefer the visible complex's named components over an ambiguous `all` target."""
+        selections = dict(self._context.selections or {})
+        components = [
+            selections[role]
+            for role in ("receptor", "ligand")
+            if selections.get(role)
+        ]
+        if components:
+            return " or ".join(f"({selection})" for selection in components)
+        return str(self._context.target or "all").strip() or "all"
+
+    def _export_stem(self) -> str:
+        context = self._context
+        selections = dict(context.selections or {})
+        components = [
+            selections[role]
+            for role in ("receptor", "ligand")
+            if selections.get(role)
+        ]
+        label = (
+            "complex"
+            if len(components) > 1 or context.kind == "complex"
+            else (components[0] if components else context.target)
+        )
+        stem = re.sub(r"[^A-Za-z0-9._-]+", "_", str(label or context.kind or "pymol")).strip("._-")
+        return stem or "pymol"
+
+    def _save_complex_pdb(self) -> None:
+        filename, _selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Save displayed complex as PDB",
+            str(Path.home() / f"{self._export_stem()}.pdb"),
+            "PDB files (*.pdb)",
+        )
+        if not filename:
+            return
+        path = Path(filename)
+        if path.suffix.lower() != ".pdb":
+            path = path.with_suffix(".pdb")
+        selection = self._export_selection()
+        self._run_command(
+            "Export PDB",
+            lambda: self._cmd.save(str(path), selection=selection, state=-1, format="pdb"),
+        )
+
+    def _save_ray_traced_png(self) -> None:
+        filename, _selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Save ray-traced PyMOL image",
+            str(Path.home() / f"{self._export_stem()}.png"),
+            "PNG images (*.png)",
+        )
+        if not filename:
+            return
+        path = Path(filename)
+        if path.suffix.lower() != ".png":
+            path = path.with_suffix(".png")
+        self._run_command(
+            "Save PNG",
+            lambda: self._cmd.png(str(path), width="8in", dpi=300, ray=1),
+        )
 
     def _add_toolbar_action(
         self,

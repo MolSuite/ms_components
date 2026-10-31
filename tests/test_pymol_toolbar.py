@@ -6,7 +6,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from pydantic import AliasChoices, BaseModel, Field  # noqa: F401
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer
-from PySide6.QtWidgets import QApplication, QComboBox, QMenu, QToolButton
+from PySide6.QtWidgets import QApplication, QComboBox, QFileDialog, QMenu, QToolButton
 from shiboken6 import delete, isValid
 
 from ms_components.ms_pymol.widget import (
@@ -48,6 +48,12 @@ class FakeCmd:
 
     def center(self, target):
         self.calls.append(("center", target))
+
+    def save(self, filename, **kwargs):
+        self.calls.append(("save", filename, kwargs))
+
+    def png(self, filename, **kwargs):
+        self.calls.append(("png", filename, kwargs))
 
     def deselect(self):
         self.selected_atoms = 0
@@ -212,7 +218,7 @@ def test_pymol_toolbar_uses_menu_actions_and_hover_overflow():
     assert bar.toolbar.toolButtonStyle() == Qt.ToolButtonIconOnly
     actions = bar.toolbar.actions()
     assert [action.text() for action in actions] == [
-        "Selection", "Actions", "Display", "Hide", "Hydrogens", "Presets",
+        "Selection", "Actions", "Display", "Hide", "Hydrogens", "Presets", "Export",
     ]
     assert all(action.text() and not action.icon().isNull() for action in actions)
     assert bar.selection_mode_action.menu() is not None
@@ -229,6 +235,9 @@ def test_pymol_toolbar_uses_menu_actions_and_hover_overflow():
         "Everything", "Cartoon", "Sticks", "Lines", "Surface", "Spheres", "Ribbon", "Dots",
     ]
     assert bar.preset_action.menu() is not None
+    assert [action.text() for action in bar.export_menu.actions()] == [
+        "Save displayed complex as PDB…", "Save ray-traced PNG…",
+    ]
     assert bar.context_label.parent() is bar
     assert bar.context_label.text() == "Generic"
 
@@ -303,4 +312,36 @@ def test_long_scene_names_leave_room_for_the_toolbar_icons():
         assert f"Target: {target}" in bar.context_label.toolTip()
         assert f"Receptor: {target}" in bar.context_label.toolTip()
 
+    bar.close()
+
+
+def test_export_actions_save_the_displayed_complex_and_print_quality_image(monkeypatch, tmp_path):
+    _app()
+    cmd = FakeCmd()
+    bar = PymolControlBar(cmd)
+    bar.set_scene_context(
+        "complex",
+        target="all",
+        selections={"receptor": "complex_receptor_7", "ligand": "complex_ligand_7"},
+    )
+    paths = iter((tmp_path / "complex", tmp_path / "complex.png"))
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *_args: (str(next(paths)), ""))
+
+    bar.export_pdb_action.trigger()
+    bar.export_png_action.trigger()
+
+    assert cmd.calls[-2] == (
+        "save",
+        str(tmp_path / "complex.pdb"),
+        {
+            "selection": "(complex_receptor_7) or (complex_ligand_7)",
+            "state": -1,
+            "format": "pdb",
+        },
+    )
+    assert cmd.calls[-1] == (
+        "png",
+        str(tmp_path / "complex.png"),
+        {"width": "8in", "dpi": 300, "ray": 1},
+    )
     bar.close()
