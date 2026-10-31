@@ -34,6 +34,20 @@ def test_every_theme_meets_the_contrast_floors():
         except AssertionError as error:
             raise AssertionError(f"{name}: {error}") from None
 
+
+def test_hybrid_themes_use_github_surfaces_and_the_requested_accents():
+    light = THEMES["github_light"]
+    for name, source, highlight, accent in (
+        ("github_light_frappe", "catppuccin_frappe", "highlight", "accent"),
+        ("g", "dracula", "accent", "highlight"),
+    ):
+        theme = THEMES[name]
+        assert resolve(name) == name
+        for key in ("window", "base", "alternate_base", "text", "window_text"):
+            assert theme[key] == light[key]
+        for role, source_role in (("highlight", highlight), ("accent", accent)):
+            assert abs(QColor(theme[role]).hue() - QColor(THEMES[source][source_role]).hue()) <= 2
+
 def test_muted_and_disabled_text_read_as_different_levels():
     for name, theme in THEMES.items():
         window = QColor(theme["window"])
