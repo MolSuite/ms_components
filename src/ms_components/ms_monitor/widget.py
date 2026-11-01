@@ -171,6 +171,36 @@ class MolSuiteMonitorWidget(QWidget):
             self._restyle()
         super().changeEvent(event)
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.select_active_job()
+        if self._bridge is not None:
+            self._bridge.request_refresh()
+
+    def select_active_job(self) -> None:
+        """Focus running work when opened, keeping an already selected running job.
+
+        The poller orders jobs newest first within active and finished groups. Waiting work
+        is the fallback when nothing is running; with no active work, keep the selection.
+        """
+        jobs = self._jobs_view.jobs()
+        candidates = [job for job in jobs if job.status == "running"]
+        if not candidates:
+            candidates = [job for job in jobs if not job.is_terminal]
+        selected = self._selected_job()
+        if not candidates:
+            if selected is None and jobs:
+                self._jobs_view.select_job(jobs[0].job_id)
+            return
+        job_id = next((job.job_id for job in candidates if selected and job.job_id == selected.job_id),
+                      candidates[0].job_id)
+        if job_id not in self._jobs_view.visible_job_ids():
+            self._search_input.clear()
+            self._status_filter.setCurrentIndex(0)
+            self._filter(None, None, host=False)
+        self._jobs_view.select_job(job_id)
+        self._jobs_view.scrollToItem(self._jobs_view.currentItem())
+
     def attach_bridge(self, bridge) -> None:
         if self._bridge is bridge:
             return
@@ -232,6 +262,8 @@ class MolSuiteMonitorWidget(QWidget):
         self._jobs_view.set_jobs(snapshot.jobs)
         self._hosts.set_jobs(snapshot.jobs)
         self._rebuild_filters(snapshot)
+        if self._selected_job() is None:
+            self.select_active_job()
         self._show_selected()
 
     def _rebuild_filters(self, snapshot: ProjectMonitorState) -> None:
