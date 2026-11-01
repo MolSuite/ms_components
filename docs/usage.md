@@ -33,6 +33,9 @@ Widgets should read colours from the palette (`palette(window)`,
 changes. Non-Qt views such as PyMOL or pyqtgraph do not observe the palette and
 must be updated separately.
 
+`LF_light` keeps GitHub Light whole and makes violet the primary colour:
+selection, focus, links and accent.
+
 ## SmartTableView
 
 Define a SQLModel model, describe the columns, and provide a session provider.
