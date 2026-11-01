@@ -189,6 +189,36 @@ def test_monitor_opened_before_first_snapshot_selects_work_when_it_arrives():
         widget.close()
 
 
+def test_reopening_monitor_selects_running_work_from_the_first_fresh_snapshot():
+    app = QApplication.instance() or QApplication([])
+    widget = MolSuiteMonitorWidget()
+    done = _job(job_id="completed", status="completed")
+    widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[done]))
+    widget.show()
+    app.processEvents()
+    try:
+        widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[_job(), done]))
+        assert widget._selected_job_id() == "abc123"
+    finally:
+        widget.close()
+
+
+def test_manual_choice_after_opening_cancels_the_pending_fresh_snapshot_focus():
+    app = QApplication.instance() or QApplication([])
+    widget = MolSuiteMonitorWidget()
+    done = _job(job_id="completed", status="completed")
+    failed = _job(job_id="failed", status="failed")
+    widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[done, failed]))
+    widget.show()
+    app.processEvents()
+    try:
+        widget._jobs_view.select_job("failed")
+        widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[_job(), done, failed]))
+        assert widget._selected_job_id() == "failed"
+    finally:
+        widget.close()
+
+
 def test_monitor_keeps_finished_selection_without_active_work_and_falls_back_to_waiting():
     QApplication.instance() or QApplication([])
     widget = MolSuiteMonitorWidget()
