@@ -23,9 +23,10 @@ title_font = font("title")
 ```
 
 The shared registry also includes `github_light_frappe`, combining GitHub
-Light surfaces with Catppuccin Frappé accents, and `g`, which combines GitHub
-Light surfaces with swapped Dracula accents. Their accents are darkened where
-necessary for contrast on light surfaces.
+Light surfaces with Catppuccin Frappé accents, and `glen_light`, which combines
+GitHub Light surfaces with swapped Dracula accents: pink selection, purple links
+and accent. Their accents are darkened where necessary for contrast on light
+surfaces; `glen_light` keeps clear, saturated status hues.
 
 Widgets should read colours from the palette (`palette(window)`,
 `palette(highlight)`, …) instead of hard-coded hex values, so they follow theme
