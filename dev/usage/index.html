@@ -628,10 +628,17 @@ application, and re-applies them live to existing widgets.</p>
 <span class="n">warning</span> <span class="o">=</span> <span class="n">color</span><span class="p">(</span><span class="s2">"orange"</span><span class="p">)</span>    <span class="c1"># semantic accent from the live theme</span>
 <span class="n">title_font</span> <span class="o">=</span> <span class="n">font</span><span class="p">(</span><span class="s2">"title"</span><span class="p">)</span>
 </code></pre></div>
+<p>The shared registry also includes <code>github_light_frappe</code>, combining GitHub
+Light surfaces with Catppuccin Frappé accents, and <code>glen_light</code>, which combines
+GitHub Light surfaces with swapped Dracula accents: pink selection, purple links
+and accent. Their accents are darkened where necessary for contrast on light
+surfaces; <code>glen_light</code> keeps clear, saturated status hues.</p>
 <p>Widgets should read colours from the palette (<code>palette(window)</code>,
 <code>palette(highlight)</code>, …) instead of hard-coded hex values, so they follow theme
 changes. Non-Qt views such as PyMOL or pyqtgraph do not observe the palette and
 must be updated separately.</p>
+<p><code>LF_light</code> keeps GitHub Light whole and makes violet the primary colour:
+selection, focus, links and accent.</p>
 <h2 id="smarttableview">SmartTableView<a class="headerlink" href="#smarttableview" title="Permanent link">&para;</a></h2>
 <p>Define a SQLModel model, describe the columns, and provide a session provider.
 The table handles querying, filtering, sorting, and pagination.</p>

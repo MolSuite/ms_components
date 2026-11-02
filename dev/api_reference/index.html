@@ -1316,6 +1316,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#ms_components.ms_pymol.PymolControlBar.move_action_to_end" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;move_action_to_end
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#ms_components.ms_pymol.PymolControlBar.add_menu_action" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -3129,6 +3140,17 @@
   
     <nav class="md-nav" aria-label="PymolControlBar">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ms_components.ms_pymol.PymolControlBar.move_action_to_end" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;move_action_to_end
+      </span>
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#ms_components.ms_pymol.PymolControlBar.add_menu_action" class="md-nav__link">
@@ -10447,6 +10469,14 @@ dialog so Reload / Save / Close share one row).</p>
       </thead>
       <tbody>
             <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            move_action_to_end (ms_components.ms_pymol.PymolControlBar.move_action_to_end)" href="./#ms_components.ms_pymol.PymolControlBar.move_action_to_end">move_action_to_end</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>Move an existing control, preserving its menu-button behavior.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
               <td><code><a class="autorefs autorefs-internal" title="            add_menu_action (ms_components.ms_pymol.PymolControlBar.add_menu_action)" href="./#ms_components.ms_pymol.PymolControlBar.add_menu_action">add_menu_action</a></code></td>
               <td>
                 <div class="doc-md-description">
@@ -10477,9 +10507,7 @@ dialog so Reload / Save / Close share one row).</p>
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">193</span>
 <span class="normal">194</span>
 <span class="normal">195</span>
 <span class="normal">196</span>
@@ -10610,7 +10638,26 @@ dialog so Reload / Save / Close share one row).</p>
 <span class="normal">321</span>
 <span class="normal">322</span>
 <span class="normal">323</span>
-<span class="normal">324</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_cmd</span> <span class="o">=</span> <span class="n">cmd</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_context</span> <span class="o">=</span> <span class="n">PymolSceneContext</span><span class="p">()</span>
@@ -10728,6 +10775,23 @@ dialog so Reload / Save / Close share one row).</p>
         <span class="n">menu</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">preset_menu</span><span class="p">,</span>
     <span class="p">)</span>
 
+    <span class="bp">self</span><span class="o">.</span><span class="n">export_menu</span> <span class="o">=</span> <span class="n">QMenu</span><span class="p">(</span><span class="s2">"Export"</span><span class="p">,</span> <span class="n">bar</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">export_pdb_action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">export_menu</span><span class="o">.</span><span class="n">addAction</span><span class="p">(</span><span class="s2">"Save displayed complex as PDB…"</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">export_pdb_action</span><span class="o">.</span><span class="n">setToolTip</span><span class="p">(</span><span class="s2">"Export the displayed receptor and ligand as a PDB file."</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">export_pdb_action</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="k">lambda</span> <span class="n">checked</span><span class="o">=</span><span class="kc">False</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_save_complex_pdb</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">export_png_action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">export_menu</span><span class="o">.</span><span class="n">addAction</span><span class="p">(</span><span class="s2">"Save ray-traced PNG…"</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">export_png_action</span><span class="o">.</span><span class="n">setToolTip</span><span class="p">(</span><span class="s2">"Save a ray-traced image at 300 dpi, sized for print."</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">export_png_action</span><span class="o">.</span><span class="n">triggered</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span>
+        <span class="k">lambda</span> <span class="n">checked</span><span class="o">=</span><span class="kc">False</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_save_ray_traced_png</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">export_action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_toolbar_action</span><span class="p">(</span>
+        <span class="s2">"Export"</span><span class="p">,</span> <span class="s2">"save.svg"</span><span class="p">,</span>
+        <span class="s2">"Export the displayed structure as PDB or save a print-quality PNG."</span><span class="p">,</span>
+        <span class="n">menu</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">export_menu</span><span class="p">,</span>
+    <span class="p">)</span>
+
     <span class="bp">self</span><span class="o">.</span><span class="n">context_label</span> <span class="o">=</span> <span class="n">_ElidedLabel</span><span class="p">(</span><span class="s2">"Generic"</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">context_label</span><span class="o">.</span><span class="n">setObjectName</span><span class="p">(</span><span class="s2">"PymolSceneContext"</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">context_label</span><span class="o">.</span><span class="n">setAlignment</span><span class="p">(</span><span class="n">Qt</span><span class="o">.</span><span class="n">AlignVCenter</span> <span class="o">|</span> <span class="n">Qt</span><span class="o">.</span><span class="n">AlignRight</span><span class="p">)</span>
@@ -10763,6 +10827,43 @@ dialog so Reload / Save / Close share one row).</p>
 <div class="doc doc-object doc-function">
 
 
+<h4 id="ms_components.ms_pymol.PymolControlBar.move_action_to_end" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">move_action_to_end</span>
+
+
+<a href="#ms_components.ms_pymol.PymolControlBar.move_action_to_end" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">move_action_to_end</span><span class="p">(</span><span class="n">action</span><span class="p">:</span> <span class="n"><span title="PySide6.QtGui.QAction">QAction</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Move an existing control, preserving its menu-button behavior.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">move_action_to_end</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">:</span> <span class="n">QAction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Move an existing control, preserving its menu-button behavior."""</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">toolbar</span><span class="o">.</span><span class="n">removeAction</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">toolbar</span><span class="o">.</span><span class="n">addAction</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
+    <span class="c1"># Qt creates a new QToolButton on reinsertion, losing its popup mode.</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_configure_action_button</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_configure_overflow_button</span><span class="p">()</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h4 id="ms_components.ms_pymol.PymolControlBar.add_menu_action" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">add_menu_action</span>
 
@@ -10778,20 +10879,20 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">353</span>
-<span class="normal">354</span>
-<span class="normal">355</span>
-<span class="normal">356</span>
-<span class="normal">357</span>
-<span class="normal">358</span>
-<span class="normal">359</span>
-<span class="normal">360</span>
-<span class="normal">361</span>
-<span class="normal">362</span>
-<span class="normal">363</span>
-<span class="normal">364</span>
-<span class="normal">365</span>
-<span class="normal">366</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_menu_action</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_menu_action</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">menu</span><span class="p">:</span> <span class="n">QMenu</span><span class="p">,</span>
@@ -10829,25 +10930,25 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">368</span>
-<span class="normal">369</span>
-<span class="normal">370</span>
-<span class="normal">371</span>
-<span class="normal">372</span>
-<span class="normal">373</span>
-<span class="normal">374</span>
-<span class="normal">375</span>
-<span class="normal">376</span>
-<span class="normal">377</span>
-<span class="normal">378</span>
-<span class="normal">379</span>
-<span class="normal">380</span>
-<span class="normal">381</span>
-<span class="normal">382</span>
-<span class="normal">383</span>
-<span class="normal">384</span>
-<span class="normal">385</span>
-<span class="normal">386</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_action</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_action</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -10890,19 +10991,19 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">739</span>
-<span class="normal">740</span>
-<span class="normal">741</span>
-<span class="normal">742</span>
-<span class="normal">743</span>
-<span class="normal">744</span>
-<span class="normal">745</span>
-<span class="normal">746</span>
-<span class="normal">747</span>
-<span class="normal">748</span>
-<span class="normal">749</span>
-<span class="normal">750</span>
-<span class="normal">751</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">refresh_context_label</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">832</span>
+<span class="normal">833</span>
+<span class="normal">834</span>
+<span class="normal">835</span>
+<span class="normal">836</span>
+<span class="normal">837</span>
+<span class="normal">838</span>
+<span class="normal">839</span>
+<span class="normal">840</span>
+<span class="normal">841</span>
+<span class="normal">842</span>
+<span class="normal">843</span>
+<span class="normal">844</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">refresh_context_label</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Keep the compact context label useful without turning it into a second status bar."""</span>
     <span class="n">kind</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">kind</span> <span class="ow">or</span> <span class="s2">"generic"</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"_"</span><span class="p">,</span> <span class="s2">" "</span><span class="p">)</span><span class="o">.</span><span class="n">title</span><span class="p">()</span>
     <span class="n">target</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">target</span> <span class="ow">or</span> <span class="s2">"all"</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">"all"</span>
@@ -10950,7 +11051,8 @@ in the Complex actions; the default is carbons by role, heteroatoms by element.<
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/scene.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">328</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">327</span>
+<span class="normal">328</span>
 <span class="normal">329</span>
 <span class="normal">330</span>
 <span class="normal">331</span>
@@ -11037,16 +11139,7 @@ in the Complex actions; the default is carbons by role, heteroatoms by element.<
 <span class="normal">412</span>
 <span class="normal">413</span>
 <span class="normal">414</span>
-<span class="normal">415</span>
-<span class="normal">416</span>
-<span class="normal">417</span>
-<span class="normal">418</span>
-<span class="normal">419</span>
-<span class="normal">420</span>
-<span class="normal">421</span>
-<span class="normal">422</span>
-<span class="normal">423</span>
-<span class="normal">424</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_scene_actions</span><span class="p">(</span>
+<span class="normal">415</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_scene_actions</span><span class="p">(</span>
     <span class="n">menu</span><span class="p">:</span> <span class="n">QMenu</span><span class="p">,</span>
     <span class="n">dock</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -11104,13 +11197,6 @@ in the Complex actions; the default is carbons by role, heteroatoms by element.<
         <span class="n">cmd</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"transparency"</span><span class="p">,</span> <span class="mf">0.55</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
         <span class="n">cmd</span><span class="o">.</span><span class="n">zoom</span><span class="p">(</span><span class="sa">f</span><span class="s2">"(</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> or </span><span class="si">{</span><span class="n">ligand</span><span class="si">}</span><span class="s2">)"</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">save_png</span><span class="p">(</span><span class="n">cmd</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">filename</span><span class="p">,</span> <span class="n">_filter</span> <span class="o">=</span> <span class="n">QFileDialog</span><span class="o">.</span><span class="n">getSaveFileName</span><span class="p">(</span>
-            <span class="n">parent</span><span class="p">,</span> <span class="s2">"Save PyMOL Image"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">"pymol.png"</span><span class="p">),</span> <span class="s2">"PNG Images (*.png)"</span>
-        <span class="p">)</span>
-        <span class="k">if</span> <span class="n">filename</span><span class="p">:</span>
-            <span class="n">cmd</span><span class="o">.</span><span class="n">png</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">ray</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-
     <span class="n">background</span> <span class="o">=</span> <span class="n">menu</span><span class="o">.</span><span class="n">addMenu</span><span class="p">(</span><span class="s2">"Background"</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="p">((</span><span class="s2">"White"</span><span class="p">,</span> <span class="s2">"white"</span><span class="p">),</span> <span class="p">(</span><span class="s2">"Black"</span><span class="p">,</span> <span class="s2">"black"</span><span class="p">),</span> <span class="p">(</span><span class="s2">"Grey"</span><span class="p">,</span> <span class="s2">"grey20"</span><span class="p">)):</span>
         <span class="n">menu_action</span><span class="p">(</span><span class="n">background</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">run</span><span class="p">(</span><span class="s2">"set the background"</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">cmd</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">color</span><span class="p">:</span> <span class="n">cmd</span><span class="o">.</span><span class="n">bg_color</span><span class="p">(</span><span class="n">c</span><span class="p">)))</span>
@@ -11123,7 +11209,6 @@ in the Complex actions; the default is carbons by role, heteroatoms by element.<
     <span class="n">menu_action</span><span class="p">(</span><span class="n">render</span><span class="p">,</span> <span class="s2">"Shadows On"</span><span class="p">,</span> <span class="n">run</span><span class="p">(</span><span class="s2">"set shadows"</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">cmd</span><span class="p">:</span> <span class="n">cmd</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"ray_shadows"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)))</span>
     <span class="n">menu_action</span><span class="p">(</span><span class="n">render</span><span class="p">,</span> <span class="s2">"Shadows Off"</span><span class="p">,</span> <span class="n">run</span><span class="p">(</span><span class="s2">"set shadows"</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">cmd</span><span class="p">:</span> <span class="n">cmd</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"ray_shadows"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
     <span class="n">menu_action</span><span class="p">(</span><span class="n">render</span><span class="p">,</span> <span class="s2">"Ray"</span><span class="p">,</span> <span class="n">run</span><span class="p">(</span><span class="s2">"ray-trace"</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">cmd</span><span class="p">:</span> <span class="n">cmd</span><span class="o">.</span><span class="n">ray</span><span class="p">()))</span>
-    <span class="n">menu_action</span><span class="p">(</span><span class="n">render</span><span class="p">,</span> <span class="s2">"Save PNG…"</span><span class="p">,</span> <span class="n">run</span><span class="p">(</span><span class="s2">"save the PNG"</span><span class="p">,</span> <span class="n">save_png</span><span class="p">))</span>
 
     <span class="n">surface</span> <span class="o">=</span> <span class="n">menu</span><span class="o">.</span><span class="n">addMenu</span><span class="p">(</span><span class="s2">"Surface"</span><span class="p">)</span>
     <span class="n">menu_action</span><span class="p">(</span><span class="n">surface</span><span class="p">,</span> <span class="s2">"Vacuum Electrostatics…"</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="n">_vacuum_electrostatics</span><span class="p">(</span><span class="n">dock</span><span class="p">,</span> <span class="n">parent</span><span class="p">),</span>
@@ -11167,15 +11252,15 @@ in the Complex actions; the default is carbons by role, heteroatoms by element.<
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/scene.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">73</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">72</span>
+<span class="normal">73</span>
 <span class="normal">74</span>
 <span class="normal">75</span>
 <span class="normal">76</span>
 <span class="normal">77</span>
 <span class="normal">78</span>
 <span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">color_atoms</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">selection</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">carbon_color</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">80</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">color_atoms</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">selection</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">carbon_color</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Carbons in `carbon_color`, heteroatoms by element."""</span>
     <span class="n">selection</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">selection</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">selection</span><span class="p">:</span>
@@ -11209,7 +11294,8 @@ height only, so a tall, narrow panel cuts the sides off.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/scene.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 96</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 95</span>
+<span class="normal"> 96</span>
 <span class="normal"> 97</span>
 <span class="normal"> 98</span>
 <span class="normal"> 99</span>
@@ -11226,8 +11312,7 @@ height only, so a tall, narrow panel cuts the sides off.</p>
 <span class="normal">110</span>
 <span class="normal">111</span>
 <span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">frame</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">selection</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">buffer</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">113</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">frame</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">selection</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">buffer</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Move the camera so `selection` fits the panel in both directions. PyMOL's zoom fits the</span>
 <span class="sd">    height only, so a tall, narrow panel cuts the sides off."""</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -11270,7 +11355,8 @@ height only, so a tall, narrow panel cuts the sides off.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/scene.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">291</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">290</span>
+<span class="normal">291</span>
 <span class="normal">292</span>
 <span class="normal">293</span>
 <span class="normal">294</span>
@@ -11288,8 +11374,7 @@ height only, so a tall, narrow panel cuts the sides off.</p>
 <span class="normal">306</span>
 <span class="normal">307</span>
 <span class="normal">308</span>
-<span class="normal">309</span>
-<span class="normal">310</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">install_scene_memory</span><span class="p">(</span><span class="n">dock</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SceneMemory</span><span class="p">:</span>
+<span class="normal">309</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">install_scene_memory</span><span class="p">(</span><span class="n">dock</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SceneMemory</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""`dock.scene_memory`, created once, plus a "Keep style" toggle on the control bar."""</span>
     <span class="n">memory</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">dock</span><span class="p">,</span> <span class="s2">"scene_memory"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">memory</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -11333,9 +11418,9 @@ height only, so a tall, narrow panel cuts the sides off.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/scene.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">313</span>
-<span class="normal">314</span>
-<span class="normal">315</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_interacting</span><span class="p">(</span><span class="n">dock</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_interacting</span><span class="p">(</span><span class="n">dock</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""A mouse button is down on the canvas: a good moment not to redraw the scene."""</span>
     <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">dock</span><span class="p">,</span> <span class="s2">"scene_memory"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="s2">"interacting"</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
 </code></pre></div></td></tr></table></div>
@@ -11362,15 +11447,15 @@ height only, so a tall, narrow panel cuts the sides off.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/scene.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">45</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">44</span>
+<span class="normal">45</span>
 <span class="normal">46</span>
 <span class="normal">47</span>
 <span class="normal">48</span>
 <span class="normal">49</span>
 <span class="normal">50</span>
 <span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">object_list</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">selection</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="normal">52</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">object_list</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">selection</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Object names in `selection`; [] on a bad selection or a cmd without get_object_list."""</span>
     <span class="n">get_object_list</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="s2">"get_object_list"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">get_object_list</span><span class="p">):</span>
@@ -11403,7 +11488,8 @@ height only, so a tall, narrow panel cuts the sides off.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/scene.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">134</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">133</span>
+<span class="normal">134</span>
 <span class="normal">135</span>
 <span class="normal">136</span>
 <span class="normal">137</span>
@@ -11415,8 +11501,7 @@ height only, so a tall, narrow panel cuts the sides off.</p>
 <span class="normal">143</span>
 <span class="normal">144</span>
 <span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">prepare_scene</span><span class="p">(</span><span class="n">dock</span><span class="p">,</span> <span class="o">*</span><span class="n">objects</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">146</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">prepare_scene</span><span class="p">(</span><span class="n">dock</span><span class="p">,</span> <span class="o">*</span><span class="n">objects</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Before loading `objects`: clear the scene, or in an additive scene drop only those."""</span>
     <span class="n">cmd</span> <span class="o">=</span> <span class="n">dock</span><span class="o">.</span><span class="n">cmd</span>
     <span class="n">dock</span><span class="o">.</span><span class="n">_scene_replaced_slots</span> <span class="o">=</span> <span class="p">{}</span>
@@ -11454,14 +11539,14 @@ height only, so a tall, narrow panel cuts the sides off.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/scene.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">56</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">55</span>
+<span class="normal">56</span>
 <span class="normal">57</span>
 <span class="normal">58</span>
 <span class="normal">59</span>
 <span class="normal">60</span>
 <span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">select_atoms</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">selection</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="normal">62</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">select_atoms</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">selection</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Make the named selection; True when it holds atoms."""</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">cmd</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">selection</span><span class="p">)</span>
@@ -11496,7 +11581,8 @@ object. <code>restore_view=False</code> keeps the camera the caller just set.</p
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/scene.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">150</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">149</span>
+<span class="normal">150</span>
 <span class="normal">151</span>
 <span class="normal">152</span>
 <span class="normal">153</span>
@@ -11551,8 +11637,7 @@ object. <code>restore_view=False</code> keeps the camera the caller just set.</p
 <span class="normal">202</span>
 <span class="normal">203</span>
 <span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_scene_context</span><span class="p">(</span>
+<span class="normal">205</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">set_scene_context</span><span class="p">(</span>
     <span class="n">dock</span><span class="p">,</span>
     <span class="n">kind</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -11633,12 +11718,12 @@ object. <code>restore_view=False</code> keeps the camera the caller just set.</p
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">148</span>
 <span class="normal">149</span>
 <span class="normal">150</span>
-<span class="normal">151</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">associate_scene_objects</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">objects</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">reference</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">associate_scene_objects</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">objects</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">reference</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Keep generated interactions/geometry in their structure's comparison panel."""</span>
     <span class="n">slot</span> <span class="o">=</span> <span class="n">cmd</span><span class="o">.</span><span class="n">get_setting_int</span><span class="p">(</span><span class="s2">"grid_slot"</span><span class="p">,</span> <span class="n">reference</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">objects</span><span class="p">:</span>
