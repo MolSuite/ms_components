@@ -119,6 +119,122 @@ def test_monitor_widget_lists_filters_and_selects_the_jobs_and_empties_without_a
     assert widget._detail._name.text() == "Select a job"
 
 
+def test_opening_monitor_focuses_running_work_but_polling_keeps_manual_selection():
+    app = QApplication.instance() or QApplication([])
+    widget = MolSuiteMonitorWidget()
+    snapshot = ProjectMonitorState(project_id="p", has_project=True, jobs=[
+        _job(job_id="waiting", status="waiting"),
+        _job(job_id="running", name="P2Rank"),
+        _job(job_id="other-running"),
+        _job(job_id="completed", status="completed"),
+    ])
+    widget.update_snapshot(snapshot)
+    assert widget._selected_job_id() == "running"
+    widget.show()
+    app.processEvents()
+    try:
+        widget._jobs_view.select_job("completed")
+        widget.update_snapshot(snapshot)
+        assert widget._selected_job_id() == "completed"
+        widget.hide()
+        widget.show()
+        app.processEvents()
+        assert widget._selected_job_id() == "running"
+        assert widget._detail._name.text() == "P2Rank"
+        assert widget._cancel_button.isEnabled()
+
+        widget._jobs_view.select_job("other-running")
+        widget.hide()
+        widget.show()
+        app.processEvents()
+        assert widget._selected_job_id() == "other-running"
+    finally:
+        widget.close()
+
+
+def test_opening_monitor_reveals_running_job_hidden_by_old_filters():
+    app = QApplication.instance() or QApplication([])
+    widget = MolSuiteMonitorWidget()
+    widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[
+        _job(job_id="running", name="P2Rank", executor="local"),
+        _job(job_id="completed", name="import", status="completed", executor="other"),
+    ]))
+    widget._jobs_view.select_job("completed")
+    widget._search_input.setText("import")
+    widget._status_filter.setCurrentIndex(widget._status_filter.findData("completed"))
+    widget._filter({"other"}, "executor: other", host=False)
+    widget.show()
+    app.processEvents()
+    try:
+        assert widget._selected_job_id() == "running"
+        assert "running" in widget._jobs_view.visible_job_ids()
+        assert widget._search_input.text() == ""
+        assert widget._status_filter.currentData() == "all"
+        assert widget._filter_chip.isHidden()
+    finally:
+        widget.close()
+
+
+def test_monitor_opened_before_first_snapshot_selects_work_when_it_arrives():
+    app = QApplication.instance() or QApplication([])
+    widget = MolSuiteMonitorWidget()
+    widget.show()
+    app.processEvents()
+    try:
+        widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[
+            _job(job_id="waiting", status="waiting"), _job(job_id="running"),
+        ]))
+        assert widget._selected_job_id() == "running"
+    finally:
+        widget.close()
+
+
+def test_reopening_monitor_selects_running_work_from_the_first_fresh_snapshot():
+    app = QApplication.instance() or QApplication([])
+    widget = MolSuiteMonitorWidget()
+    done = _job(job_id="completed", status="completed")
+    widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[done]))
+    widget.show()
+    app.processEvents()
+    try:
+        widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[_job(), done]))
+        assert widget._selected_job_id() == "abc123"
+    finally:
+        widget.close()
+
+
+def test_manual_choice_after_opening_cancels_the_pending_fresh_snapshot_focus():
+    app = QApplication.instance() or QApplication([])
+    widget = MolSuiteMonitorWidget()
+    done = _job(job_id="completed", status="completed")
+    failed = _job(job_id="failed", status="failed")
+    widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[done, failed]))
+    widget.show()
+    app.processEvents()
+    try:
+        widget._jobs_view.select_job("failed")
+        widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[_job(), done, failed]))
+        assert widget._selected_job_id() == "failed"
+    finally:
+        widget.close()
+
+
+def test_monitor_keeps_finished_selection_without_active_work_and_falls_back_to_waiting():
+    QApplication.instance() or QApplication([])
+    widget = MolSuiteMonitorWidget()
+    widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[
+        _job(job_id="completed", status="completed"), _job(job_id="failed", status="failed"),
+    ]))
+    widget._jobs_view.select_job("failed")
+    widget.select_active_job()
+    assert widget._selected_job_id() == "failed"
+    widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[
+        _job(job_id="waiting", status="waiting"), _job(job_id="failed", status="failed"),
+    ]))
+    widget.select_active_job()
+    assert widget._selected_job_id() == "waiting"
+
+
 def test_a_mac_is_read_without_proc(tmp_path):
     """Run the Mac half of the script with stand-ins for its `sysctl`, `ps` and `vm_stat`."""
     from ms_components.ms_monitor.resources import _MAC, parse

@@ -32,6 +32,7 @@ class MolSuiteMonitorWidget(QWidget):
         super().__init__(parent)
         self._bridge = None
         self._snapshot: ProjectMonitorState | None = None
+        self._select_active_on_snapshot = False
         # The failures of the selected job come from the journal: read again only when the job
         # changes or fails more, not each poll, so the list does not jump while it is read.
         self._failures_key = None
@@ -171,6 +172,39 @@ class MolSuiteMonitorWidget(QWidget):
             self._restyle()
         super().changeEvent(event)
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.select_active_job()
+        # A hidden monitor can still hold the previous poll. Focus once more when
+        # fresh data arrives, unless the user changes selection in the meantime.
+        self._select_active_on_snapshot = True
+        if self._bridge is not None:
+            self._bridge.request_refresh()
+
+    def select_active_job(self) -> None:
+        """Focus running work when opened, keeping an already selected running job.
+
+        The poller orders jobs newest first within active and finished groups. Waiting work
+        is the fallback when nothing is running; with no active work, keep the selection.
+        """
+        jobs = self._jobs_view.jobs()
+        candidates = [job for job in jobs if job.status == "running"]
+        if not candidates:
+            candidates = [job for job in jobs if not job.is_terminal]
+        selected = self._selected_job()
+        if not candidates:
+            if selected is None and jobs:
+                self._jobs_view.select_job(jobs[0].job_id)
+            return
+        job_id = next((job.job_id for job in candidates if selected and job.job_id == selected.job_id),
+                      candidates[0].job_id)
+        if job_id not in self._jobs_view.visible_job_ids():
+            self._search_input.clear()
+            self._status_filter.setCurrentIndex(0)
+            self._filter(None, None, host=False)
+        self._jobs_view.select_job(job_id)
+        self._jobs_view.scrollToItem(self._jobs_view.currentItem())
+
     def attach_bridge(self, bridge) -> None:
         if self._bridge is bridge:
             return
@@ -198,6 +232,7 @@ class MolSuiteMonitorWidget(QWidget):
 
     def clear_snapshot(self) -> None:
         self._snapshot = None
+        self._select_active_on_snapshot = False
         self._title_label.setText("No active project")
         self._summary_label.setText("Open a project to monitor jobs.")
         self._update_sync_state(None)
@@ -215,6 +250,8 @@ class MolSuiteMonitorWidget(QWidget):
         self._failures_key = None
 
     def update_snapshot(self, snapshot: ProjectMonitorState) -> None:
+        focus_active = self._select_active_on_snapshot
+        self._select_active_on_snapshot = False
         self._snapshot = snapshot
         if not snapshot.has_project:
             self.clear_snapshot()
@@ -232,6 +269,8 @@ class MolSuiteMonitorWidget(QWidget):
         self._jobs_view.set_jobs(snapshot.jobs)
         self._hosts.set_jobs(snapshot.jobs)
         self._rebuild_filters(snapshot)
+        if focus_active or self._selected_job() is None:
+            self.select_active_job()
         self._show_selected()
 
     def _rebuild_filters(self, snapshot: ProjectMonitorState) -> None:
@@ -298,6 +337,7 @@ class MolSuiteMonitorWidget(QWidget):
         self._bridge.resume_job(job_id, executor)
 
     def _on_current_job_changed(self, job_id) -> None:
+        self._select_active_on_snapshot = False
         if self._bridge is not None:
             self._bridge.select_job(job_id)
         self._show_selected()
