@@ -22,10 +22,19 @@ warning = color("orange")    # semantic accent from the live theme
 title_font = font("title")
 ```
 
+The shared registry also includes `github_light_frappe`, combining GitHub
+Light surfaces with Catppuccin Frappé accents, and `glen_light`, which combines
+GitHub Light surfaces with swapped Dracula accents: pink selection, purple links
+and accent. Their accents are darkened where necessary for contrast on light
+surfaces; `glen_light` keeps clear, saturated status hues.
+
 Widgets should read colours from the palette (`palette(window)`,
 `palette(highlight)`, …) instead of hard-coded hex values, so they follow theme
 changes. Non-Qt views such as PyMOL or pyqtgraph do not observe the palette and
 must be updated separately.
+
+`LF_light` keeps GitHub Light whole and makes violet the primary colour:
+selection, focus, links and accent.
 
 ## SmartTableView
 
