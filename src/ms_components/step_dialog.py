@@ -143,9 +143,16 @@ class StepRunnerDialog(QDialog):
             self._on_success()
         self.finished_ok.emit(ok)
 
+    # The run is not left behind by Esc or the window's close either: a blocking caller would go
+    # on (and give up its locks) while the steps still change things.
+    def reject(self) -> None:
+        if not self._worker.isRunning():
+            super().reject()
+
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt naming
         if self._worker.isRunning():
-            self._worker.wait(50)
+            event.ignore()
+            return
         super().closeEvent(event)
 
 

@@ -39,3 +39,25 @@ def test_a_failed_step_is_marked_and_opens_the_output():
 
     assert rows == ["✗  Download", "○  Verify"]
     assert dialog._log.isVisible() and "no network" in dialog._log.toPlainText()
+
+
+def test_neither_esc_nor_the_window_close_leave_a_run_that_still_goes_on():
+    import threading
+
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    release = threading.Event()
+    dialog = StepRunnerDialog("Install", [Step("download", call=lambda: release.wait(10) and "fetched")])
+    dialog.show()
+    dialog.start()
+    dialog.reject()
+    dialog.close()
+    assert dialog.isVisible()
+
+    loop = QEventLoop()
+    dialog.finished_ok.connect(loop.quit)
+    QTimer.singleShot(10000, loop.quit)
+    release.set()
+    loop.exec()
+    dialog._worker.wait(2000)
+    dialog.reject()
+    assert not dialog.isVisible()
