@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QLabel,
     QListWidget,
+    QMessageBox,
     QPlainTextEdit,
     QProgressBar,
     QVBoxLayout,
@@ -168,4 +169,29 @@ def run_steps_dialog(
     return dialog
 
 
-__all__ = ["StepRunnerDialog", "StepWorker", "run_steps_dialog"]
+def offer_unlock(parent: QWidget, error: BaseException | None) -> Callable[[], dict] | None:
+    """When `error` is, or was raised from, an `ms_env.Locked`, ask whether to remove that lock.
+    Returns what removes it, to be run off the GUI thread (it may go over ssh) before trying
+    again; nothing when the error is another or the user said no."""
+    try:
+        from ms_env import Locked, unlock
+    except ImportError:  # ponytail: an ms_env before 0.4.0 has no lock to offer; drop with the floor raised
+        return None
+    while error is not None and not isinstance(error, Locked):
+        error = error.__cause__ or error.__context__
+    if error is None:
+        return None
+    owner, where = error.owner, error.host.address or "this machine"
+    asked = QMessageBox.question(
+        parent, "Environment locked",
+        f"{error.prefix} on {where} is being changed by {owner.get('client', 'an unknown client')} "
+        f"(pid {owner.get('pid', '?')}) since {owner.get('since', '?')}.\n\n"
+        "Remove the lock only if that client has stopped: two clients changing one environment break it.\n\n"
+        "Remove the lock and try again?",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+    if asked != QMessageBox.StandardButton.Yes:
+        return None
+    return lambda: unlock(error.prefix, error.host)
+
+
+__all__ = ["StepRunnerDialog", "StepWorker", "offer_unlock", "run_steps_dialog"]
