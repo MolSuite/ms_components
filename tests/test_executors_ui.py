@@ -182,3 +182,40 @@ def test_the_bar_says_what_is_done_for_how_long_and_waits_with_nothing_to_count(
     steps.take("[0/0] starting lab")
     assert steps.label.text() == "starting lab  ·  1:15"
     assert steps.take("[2/2] pc2: ready") and steps.full() and steps.label.text() == "pc2: ready  ·  0:00"
+
+
+def test_a_sync_stopped_by_a_lock_left_behind_unlocks_it_when_told_and_tries_again(tmp_path, monkeypatch):
+    import json
+
+    from ms_env import prefix_lock
+    from ms_flow.api import Workspace
+    from PySide6.QtWidgets import QMessageBox
+
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setenv("MOLSUITE_HOME", str(tmp_path / "home"))
+    prefix, lock = str(tmp_path / "env"), tmp_path / "env.ms-env-lock"
+    lock.mkdir()
+    (lock / "owner.json").write_text(json.dumps({"client": "elsewhere", "pid": 7, "since": "today"}))
+    asked = []
+    monkeypatch.setattr(QMessageBox, "question", lambda _parent, _title, text, *_: (
+        asked.append(text), QMessageBox.StandardButton.Yes)[1])
+    ms = Workspace(app_id="ui")
+
+    def prepare(address, busy, on_line):
+        try:
+            with prefix_lock(prefix):
+                return "/far/env"
+        except Exception as error:
+            raise RuntimeError("could not install") from error  # as the app wraps it
+
+    ms.host_env = prepare
+    try:
+        ms.save_host("laptop", address="192.168.1.2")
+        hosts = KeptPage(ms, "hosts")
+        hosts.reload(select="laptop")
+        hosts.sync_button.click()
+        assert _until(lambda: "ready" in hosts.report.toPlainText())
+        assert len(asked) == 1 and "elsewhere" in asked[0] and not lock.exists()
+    finally:
+        ms.shutdown()
+        app.processEvents()

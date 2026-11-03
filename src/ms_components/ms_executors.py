@@ -371,8 +371,9 @@ class KeptPage(QWidget):
 
         threading.Thread(target=work, name="host-check", daemon=True).start()
 
-    def _sync(self) -> None:
-        """`Workspace.host_env` for the host as it is saved: what the app prepares there, made as it is here."""
+    def _sync(self, *_, unlock=None) -> None:
+        """`Workspace.host_env` for the host as it is saved: what the app prepares there, made as it is here.
+        `unlock` first removes the lock of an environment there that the user said was left behind."""
         name = self.names.currentItem().text()
         host = self._kept()[name]
         if host.env:
@@ -388,9 +389,12 @@ class KeptPage(QWidget):
 
         def work() -> None:
             try:
+                if unlock is not None:
+                    unlock()
                 self._workspace.host_env(host.address, None, lambda line: self._synced.emit(line, False))
                 said = f"\n{name} is ready."
             except Exception as error:  # noqa: BLE001 - said in the page, where it was asked for
+                self._sync_error = error
                 said = f"\nCould not prepare {name}:\n{error}"
             self._synced.emit(said, True)
 
@@ -402,6 +406,14 @@ class KeptPage(QWidget):
         self.sync_button.setEnabled(last)
         if last:
             self.steps.setVisible(False)
+            error, self._sync_error = getattr(self, "_sync_error", None), None
+            if error is None:
+                return
+            from ms_components.step_dialog import offer_unlock  # ms_env is the `steps` extra; a sync has it
+
+            forced = offer_unlock(self, error)
+            if forced:
+                self._sync(unlock=forced)
 
     def _show_report(self, text: str) -> None:
         self.report.setPlainText(text)

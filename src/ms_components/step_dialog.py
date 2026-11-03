@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QLabel,
     QListWidget,
+    QMessageBox,
     QPlainTextEdit,
     QProgressBar,
     QVBoxLayout,
@@ -142,9 +143,16 @@ class StepRunnerDialog(QDialog):
             self._on_success()
         self.finished_ok.emit(ok)
 
+    # The run is not left behind by Esc or the window's close either: a blocking caller would go
+    # on (and give up its locks) while the steps still change things.
+    def reject(self) -> None:
+        if not self._worker.isRunning():
+            super().reject()
+
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt naming
         if self._worker.isRunning():
-            self._worker.wait(50)
+            event.ignore()
+            return
         super().closeEvent(event)
 
 
@@ -168,4 +176,27 @@ def run_steps_dialog(
     return dialog
 
 
-__all__ = ["StepRunnerDialog", "StepWorker", "run_steps_dialog"]
+def offer_unlock(parent: QWidget, error: BaseException | None) -> Callable[[], dict] | None:
+    """When `error` is, or was raised from, an `ms_env.Locked`, ask whether to remove that lock.
+    Returns what removes it, to be run off the GUI thread (it may go over ssh) before trying
+    again; nothing when the error is another or the user said no."""
+    from ms_env import Locked, unlock
+
+    while error is not None and not isinstance(error, Locked):
+        error = error.__cause__ or error.__context__
+    if error is None:
+        return None
+    owner, where = error.owner, error.host.address or "this machine"
+    asked = QMessageBox.question(
+        parent, "Environment locked",
+        f"{error.prefix} on {where} is being changed by {owner.get('client', 'an unknown client')} "
+        f"(pid {owner.get('pid', '?')}) since {owner.get('since', '?')}.\n\n"
+        "Remove the lock only if that client has stopped: two clients changing one environment break it.\n\n"
+        "Remove the lock and try again?",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+    if asked != QMessageBox.StandardButton.Yes:
+        return None
+    return lambda: unlock(error.prefix, error.host)
+
+
+__all__ = ["StepRunnerDialog", "StepWorker", "offer_unlock", "run_steps_dialog"]
