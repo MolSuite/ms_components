@@ -180,10 +180,8 @@ def offer_unlock(parent: QWidget, error: BaseException | None) -> Callable[[], d
     """When `error` is, or was raised from, an `ms_env.Locked`, ask whether to remove that lock.
     Returns what removes it, to be run off the GUI thread (it may go over ssh) before trying
     again; nothing when the error is another or the user said no."""
-    try:
-        from ms_env import Locked, unlock
-    except ImportError:  # ponytail: an ms_env before 0.4.0 has no lock to offer; drop with the floor raised
-        return None
+    from ms_env import Locked, unlock
+
     while error is not None and not isinstance(error, Locked):
         error = error.__cause__ or error.__context__
     if error is None:
