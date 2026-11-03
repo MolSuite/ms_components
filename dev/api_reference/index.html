@@ -2002,6 +2002,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#ms_components.step_dialog.offer_unlock" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;offer_unlock
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3822,6 +3833,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;run_steps_dialog
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ms_components.step_dialog.offer_unlock" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;offer_unlock
       </span>
     </span>
   </a>
@@ -9651,19 +9673,7 @@ goes to when nobody is named.</p>
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>src/ms_components/ms_executors.py</code></summary>
-                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">437</span>
-<span class="normal">438</span>
-<span class="normal">439</span>
-<span class="normal">440</span>
-<span class="normal">441</span>
-<span class="normal">442</span>
-<span class="normal">443</span>
-<span class="normal">444</span>
-<span class="normal">445</span>
-<span class="normal">446</span>
-<span class="normal">447</span>
-<span class="normal">448</span>
-<span class="normal">449</span>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">449</span>
 <span class="normal">450</span>
 <span class="normal">451</span>
 <span class="normal">452</span>
@@ -9686,7 +9696,19 @@ goes to when nobody is named.</p>
 <span class="normal">469</span>
 <span class="normal">470</span>
 <span class="normal">471</span>
-<span class="normal">472</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workspace</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workspace</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">setWindowTitle</span><span class="p">(</span><span class="s2">"Executors"</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">setModal</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
@@ -14646,6 +14668,14 @@ non-modal for everything else so HPC/cluster setup can run in the background.</p
                 </div>
               </td>
             </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            offer_unlock (ms_components.step_dialog.offer_unlock)" href="./#ms_components.step_dialog.offer_unlock">offer_unlock</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>When <code>error</code> is, or was raised from, an <code>ms_env.Locked</code>, ask whether to remove that lock.</p>
+                </div>
+              </td>
+            </tr>
       </tbody>
     </table>
 
@@ -14682,15 +14712,7 @@ non-modal for everything else so HPC/cluster setup can run in the background.</p
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/step_dialog.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">159</span>
 <span class="normal">160</span>
 <span class="normal">161</span>
 <span class="normal">162</span>
@@ -14699,7 +14721,15 @@ non-modal for everything else so HPC/cluster setup can run in the background.</p
 <span class="normal">165</span>
 <span class="normal">166</span>
 <span class="normal">167</span>
-<span class="normal">168</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_steps_dialog</span><span class="p">(</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_steps_dialog</span><span class="p">(</span>
     <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">steps</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Step</span><span class="p">],</span>
@@ -14717,6 +14747,73 @@ non-modal for everything else so HPC/cluster setup can run in the background.</p
         <span class="n">dialog</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
         <span class="n">dialog</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">dialog</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ms_components.step_dialog.offer_unlock" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">offer_unlock</span>
+
+
+<a href="#ms_components.step_dialog.offer_unlock" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">offer_unlock</span><span class="p">(</span><span class="n">parent</span><span class="p">:</span> <span class="n"><span title="PySide6.QtWidgets.QWidget">QWidget</span></span><span class="p">,</span> <span class="n">error</span><span class="p">:</span> <span class="n"><span title="BaseException">BaseException</span></span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="typing.Callable">Callable</span></span><span class="p">[[],</span> <span class="n"><span title="dict">dict</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>When <code>error</code> is, or was raised from, an <code>ms_env.Locked</code>, ask whether to remove that lock.
+Returns what removes it, to be run off the GUI thread (it may go over ssh) before trying
+again; nothing when the error is another or the user said no.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/ms_components/step_dialog.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">offer_unlock</span><span class="p">(</span><span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span><span class="p">,</span> <span class="n">error</span><span class="p">:</span> <span class="ne">BaseException</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="nb">dict</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""When `error` is, or was raised from, an `ms_env.Locked`, ask whether to remove that lock.</span>
+<span class="sd">    Returns what removes it, to be run off the GUI thread (it may go over ssh) before trying</span>
+<span class="sd">    again; nothing when the error is another or the user said no."""</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">ms_env</span><span class="w"> </span><span class="kn">import</span> <span class="n">Locked</span><span class="p">,</span> <span class="n">unlock</span>
+
+    <span class="k">while</span> <span class="n">error</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error</span><span class="p">,</span> <span class="n">Locked</span><span class="p">):</span>
+        <span class="n">error</span> <span class="o">=</span> <span class="n">error</span><span class="o">.</span><span class="n">__cause__</span> <span class="ow">or</span> <span class="n">error</span><span class="o">.</span><span class="n">__context__</span>
+    <span class="k">if</span> <span class="n">error</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">owner</span><span class="p">,</span> <span class="n">where</span> <span class="o">=</span> <span class="n">error</span><span class="o">.</span><span class="n">owner</span><span class="p">,</span> <span class="n">error</span><span class="o">.</span><span class="n">host</span><span class="o">.</span><span class="n">address</span> <span class="ow">or</span> <span class="s2">"this machine"</span>
+    <span class="n">asked</span> <span class="o">=</span> <span class="n">QMessageBox</span><span class="o">.</span><span class="n">question</span><span class="p">(</span>
+        <span class="n">parent</span><span class="p">,</span> <span class="s2">"Environment locked"</span><span class="p">,</span>
+        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">error</span><span class="o">.</span><span class="n">prefix</span><span class="si">}</span><span class="s2"> on </span><span class="si">{</span><span class="n">where</span><span class="si">}</span><span class="s2"> is being changed by </span><span class="si">{</span><span class="n">owner</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'client'</span><span class="p">,</span><span class="w"> </span><span class="s1">'an unknown client'</span><span class="p">)</span><span class="si">}</span><span class="s2"> "</span>
+        <span class="sa">f</span><span class="s2">"(pid </span><span class="si">{</span><span class="n">owner</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'pid'</span><span class="p">,</span><span class="w"> </span><span class="s1">'?'</span><span class="p">)</span><span class="si">}</span><span class="s2">) since </span><span class="si">{</span><span class="n">owner</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'since'</span><span class="p">,</span><span class="w"> </span><span class="s1">'?'</span><span class="p">)</span><span class="si">}</span><span class="s2">.</span><span class="se">\n\n</span><span class="s2">"</span>
+        <span class="s2">"Remove the lock only if that client has stopped: two clients changing one environment break it.</span><span class="se">\n\n</span><span class="s2">"</span>
+        <span class="s2">"Remove the lock and try again?"</span><span class="p">,</span>
+        <span class="n">QMessageBox</span><span class="o">.</span><span class="n">StandardButton</span><span class="o">.</span><span class="n">Yes</span> <span class="o">|</span> <span class="n">QMessageBox</span><span class="o">.</span><span class="n">StandardButton</span><span class="o">.</span><span class="n">No</span><span class="p">,</span> <span class="n">QMessageBox</span><span class="o">.</span><span class="n">StandardButton</span><span class="o">.</span><span class="n">No</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">asked</span> <span class="o">!=</span> <span class="n">QMessageBox</span><span class="o">.</span><span class="n">StandardButton</span><span class="o">.</span><span class="n">Yes</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="k">lambda</span><span class="p">:</span> <span class="n">unlock</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">prefix</span><span class="p">,</span> <span class="n">error</span><span class="o">.</span><span class="n">host</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
