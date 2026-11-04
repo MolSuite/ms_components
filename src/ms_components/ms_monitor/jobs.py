@@ -40,6 +40,14 @@ def counts_label(job: JobMonitorState) -> str:
     return f"{job.chunks_done:,}/{total}{tail}"
 
 
+def badge_of(job) -> tuple[str, str]:
+    """The badge of a job and its colour: a running job whose other machine does not answer
+    waits for it."""
+    if job.unreachable and not job.is_terminal:
+        return "WAITING FOR HOST", P["warn"]
+    return job.status.replace("_", " ").upper(), status_color(job.status)
+
+
 class GlowBar(QWidget):
     def __init__(self, value=0.0, status="running", parent=None):
         super().__init__(parent)
@@ -146,10 +154,10 @@ class _JobRow(QStyledItemDelegate):
 
         # the status, an uppercase badge on the right
         p.setFont(tiny)
-        badge = job.status.replace("_", " ").upper()
+        badge, hue = badge_of(job)
         bw = p.fontMetrics().horizontalAdvance(badge) + 12
         brect = QRectF(right - bw, top + 1, bw, 16)
-        hue = QColor(status_color(job.status))
+        hue = QColor(hue)
         back = QColor(hue)
         back.setAlphaF(0.13)
         p.setBrush(back)
@@ -291,4 +299,4 @@ class JobList(QListWidget):
             self.item(i).setHidden(not shown)
 
 
-__all__ = ["GlowBar", "JOB_HUES", "JobList", "counts_label", "status_color"]
+__all__ = ["GlowBar", "JOB_HUES", "JobList", "badge_of", "counts_label", "status_color"]

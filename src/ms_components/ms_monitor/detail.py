@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
 )
 
 from ms_components.ms_monitor.formatting import format_duration, format_speed
-from ms_components.ms_monitor.jobs import status_color
+from ms_components.ms_monitor.jobs import badge_of, status_color
 from ms_components.ms_monitor.models import FailureState, JobMonitorState
 from ms_components.ms_monitor.palette import P
 from ms_components.theme import font
@@ -465,9 +465,11 @@ class JobDetail(QWidget):
             return
         hue = status_color(job.status)
         self._name.setText(job.name or job.job_id[:8])
-        self._badge.setText(job.status.replace("_", " ").upper())
-        back = QColor(hue)
-        self._badge.setStyleSheet(f"color:{hue}; background:rgba({back.red()},{back.green()},{back.blue()},30);"
+        badge, badge_hue = badge_of(job)
+        self._badge.setText(badge)
+        self._badge.setToolTip(job.unreachable)
+        back = QColor(badge_hue)
+        self._badge.setStyleSheet(f"color:{badge_hue}; background:rgba({back.red()},{back.green()},{back.blue()},30);"
                                   " border-radius:4px; padding:1px 6px; font-size:10.5px; font-weight:650;")
         self._chip.setText(job.executor or "")
         self._chip.setVisible(bool(job.executor))
@@ -518,6 +520,8 @@ class JobDetail(QWidget):
             said.append(f"started {job.started_at:%H:%M} · elapsed {format_duration((end - job.started_at).total_seconds())}")
         if not job.is_terminal and job.tasks_running:
             said.append(f"{job.tasks_running:,} tasks" + (f" · {job.cpu_used:,} CPUs" if job.cpu_used else ""))
+        if job.unreachable and not job.is_terminal:
+            said.append(job.unreachable)
         if job.engine_id is None:
             said.append("not run by this session")
         return " · ".join(said)
