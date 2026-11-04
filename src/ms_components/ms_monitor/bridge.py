@@ -144,6 +144,20 @@ class MolSuiteMonitorBridge(QObject):
         self.operator_action_succeeded.emit("cancel_job", job_id)
         return True
 
+    def reconnect_job(self, job_id: str) -> bool:
+        """Ask the other machine of a job that waits for it again now."""
+        job = self._visible_job(job_id)
+        if job is None or job.engine_id is None or not job.unreachable:
+            self._emit_action_failed("reconnect_job", f"Job '{job_id}' is not waiting for a host here.")
+            return False
+        try:
+            self._workspace.engine.reconnect(job.engine_id)
+        except Exception as exc:
+            self._emit_action_failed("reconnect_job", str(exc))
+            return False
+        self.operator_action_succeeded.emit("reconnect_job", job_id)
+        return True
+
     def job_destinations(self, job_id: str) -> list[str]:
         """The executors the job recorded as `job_id` may be continued on: none for a job that
         cannot be submitted again."""

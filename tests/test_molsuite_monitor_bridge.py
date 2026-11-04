@@ -118,6 +118,35 @@ def test_cancel_reaches_the_engine(ms, tmp_path):
     assert bridge.refresh_now().jobs[0].status == "canceled"
 
 
+def test_a_job_whose_host_does_not_answer_says_so_and_is_asked_again(ms, tmp_path):
+    from ms_flow.engine import ThreadExecutor
+    from ms_components.ms_monitor.widget import MolSuiteMonitorWidget
+
+    class Far(ThreadExecutor):  # what a RemoteExecutor tells of its other machine
+        unreachable, asked = "far has not answered since 10:00: Connection refused", 0
+
+        def reconnect(self):
+            self.asked += 1
+
+    _open(ms, tmp_path)
+    far = Far(2)
+    ms.engine.register("far", far)
+    bridge = MolSuiteMonitorBridge(workspace=ms, poll_ms=50)
+    widget = MolSuiteMonitorWidget()
+    widget.attach_bridge(bridge)
+    GATE.clear()
+    ms.submit(halves, executor="far")
+    state = _visible(bridge)
+    widget.update_snapshot(bridge.current_snapshot)
+    widget._jobs_view.select_job(state.job_id)
+
+    assert state.unreachable == far.unreachable
+    assert widget._detail._badge.text() == "WAITING FOR HOST" and not widget._reconnect_button.isHidden()
+    widget._reconnect_button.click()
+    assert far.asked == 1
+    GATE.set()
+
+
 def test_a_job_is_moved_while_it_runs_from_the_buttons_of_the_monitor(ms, tmp_path, monkeypatch):
     from ms_components.ms_monitor.widget import MolSuiteMonitorWidget
 
