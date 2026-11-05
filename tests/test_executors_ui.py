@@ -219,3 +219,37 @@ def test_a_sync_stopped_by_a_lock_left_behind_unlocks_it_when_told_and_tries_aga
     finally:
         ms.shutdown()
         app.processEvents()
+
+
+def test_connect_asks_what_ssh_asks_and_keeps_the_host_by_its_name(tmp_path, monkeypatch):
+    import ms_env
+    from PySide6.QtWidgets import QInputDialog
+    from ms_flow.api import Workspace
+
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setenv("MOLSUITE_HOME", str(tmp_path / "home"))
+    typed = iter([("me@login.hpc:2222", True), ("s3cret", True)])
+    monkeypatch.setattr(QInputDialog, "getText", lambda *asked, **named: next(typed))
+    monkeypatch.setattr(QMessageBox, "question", lambda *asked: QMessageBox.StandardButton.Yes)
+    answers = []
+
+    def connect(name, target, ask):  # what ssh would ask, and how it would end
+        answers.extend([target, ask("Are you sure you want to continue connecting (yes/no/[fingerprint])?"),
+                        ask("me@login.hpc's password:")])
+        return "session"
+
+    monkeypatch.setattr(ms_env, "connect", connect)
+    ms = Workspace(app_id="ui")
+    try:
+        hosts = KeptPage(ms, "hosts")
+        assert not hosts.connect_button.isVisibleTo(hosts)  # `local`
+        hosts.new_button.click()
+        hosts.name.setText("cluster")
+        hosts.connect_button.click()
+        assert _until(lambda: "cluster" in ms.settings_manager.settings.hosts)
+        assert answers == ["me@login.hpc:2222", "yes", "s3cret"]
+        assert ms.settings_manager.settings.hosts["cluster"].address == "cluster"
+        assert "8 hours" in hosts.report.toPlainText() and hosts.connect_button.isEnabled()
+    finally:
+        ms.shutdown()
+        app.processEvents()

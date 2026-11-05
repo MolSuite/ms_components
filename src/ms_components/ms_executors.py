@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGridLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -195,6 +196,8 @@ class KeptPage(QWidget):
     changed = Signal()
     _checked = Signal(str)
     _synced = Signal(str, bool)  # a line said there, and whether it is the last
+    _question = Signal(str)  # what ssh asks while connecting, to answer here
+    _connected = Signal(str, bool)  # what came of it, and whether it got in
 
     def __init__(self, workspace, table: str, parent: QWidget | None = None, *, packages=("ms_flow", "ms_env"),
                  default_env: str = "", programs=()):
@@ -237,6 +240,11 @@ class KeptPage(QWidget):
             self.check_button.setToolTip("Log in to it and say what it is and what it has: system, CPUs, GPUs, "
                                          "the environment of the app and its packages, the tools named.")
             self.check_button.clicked.connect(self._check)
+            self.connect_button = QPushButton("Connect…", self)
+            self.connect_button.setToolTip("Log in to it once with its password: the app puts a key of its own there, "
+                                           "so jobs get in alone. The password is kept nowhere.")
+            self.connect_button.clicked.connect(self._connect)
+            foot.addWidget(self.connect_button)
             foot.addWidget(self.check_button)
             self.sync_button = QPushButton("Sync", self)
             self.sync_button.setToolTip("Install there, or bring up to date, the environment of the app and the "
@@ -251,6 +259,9 @@ class KeptPage(QWidget):
             self._right.addWidget(self.report, 8)  # the room the stretch below has while nothing is said
             self._checked.connect(self._show_report)
             self._synced.connect(self._sync_said)
+            self._question.connect(self._answer)
+            self._connected.connect(self._connect_said)
+            self._answered, self._answer_given = threading.Event(), None
         foot.addWidget(self.save_button)
         self._right.addStretch(1)
         self._right.addLayout(foot)
@@ -315,6 +326,7 @@ class KeptPage(QWidget):
             self.report.setVisible(False)
             self.steps.setVisible(False)
             self.sync_button.setVisible(bool(name) and name != "local" and getattr(self._workspace, "host_env", None) is not None)
+            self.connect_button.setVisible(name != "local")
         self._right.insertWidget(0, body)
 
     def _only_of_kind(self) -> None:
@@ -370,6 +382,59 @@ class KeptPage(QWidget):
             self._checked.emit(said)
 
         threading.Thread(target=work, name="host-check", daemon=True).start()
+
+    def _connect(self) -> None:
+        """`ms_env.connect` the host by the name in the form, to the machine asked for; its address
+        becomes that name, saved."""
+        name = self.name.text().strip()
+        if not name:
+            self.said.setText("Name the host first: ssh will know the machine by that name.")
+            return
+        address = self._editors["address"].text().strip()
+        target, ok = QInputDialog.getText(self, "Connect", "Log in to (user@machine, or user@machine:port):",
+                                          text=address if "@" in address else "")
+        if not ok or not target.strip():
+            return
+        self.connect_button.setEnabled(False)
+        self._show_report(f"Logging in to {target.strip()}…")
+
+        def work() -> None:
+            from ms_env import connect  # ms_env is the `steps` extra
+
+            try:
+                how = connect(name, target, self._ask)
+            except Exception as error:  # noqa: BLE001 - said in the page, where it was asked for
+                self._connected.emit(f"Could not connect to {target.strip()}:\n{error}", False)
+                return
+            self._connected.emit(
+                f"`{name}` gets in with a key of its own from now on." if how == "key" else
+                f"`{name}` asks for more than a key, so the login stays open for 8 hours: jobs go through it. "
+                "Connect again when it ends.", True)
+
+        threading.Thread(target=work, name="host-connect", daemon=True).start()
+
+    def _ask(self, question: str) -> str | None:
+        """What the user answers to `question`, asked on the GUI thread; called on another one."""
+        self._answered.clear()
+        self._question.emit(question)
+        self._answered.wait()
+        return self._answer_given
+
+    def _answer(self, question: str) -> None:
+        if "(yes/no" in question:  # whether to trust the machine's key: ssh takes "yes"
+            asked = QMessageBox.question(self, "Connect", question)
+            self._answer_given = "yes" if asked == QMessageBox.StandardButton.Yes else None
+        else:  # a password or a code: not shown while typed
+            text, ok = QInputDialog.getText(self, "Connect", question, QLineEdit.EchoMode.Password)
+            self._answer_given = text if ok else None
+        self._answered.set()
+
+    def _connect_said(self, text: str, got_in: bool) -> None:
+        self.connect_button.setEnabled(True)
+        if got_in:  # saving shows the form again: what came of it is said after
+            self._editors["address"].setText(self.name.text().strip())
+            self._save()
+        self._show_report(text)
 
     def _sync(self, *_, unlock=None) -> None:
         """`Workspace.host_env` for the host as it is saved: what the app prepares there, made as it is here.
