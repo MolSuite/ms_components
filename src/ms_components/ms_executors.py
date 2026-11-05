@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDoubleSpinBox,
+    QFileDialog,
     QFormLayout,
     QGridLayout,
     QHBoxLayout,
@@ -41,8 +42,18 @@ from PySide6.QtWidgets import (
 )
 
 
-def _editor(field, value: Any, parent: QWidget, names=()) -> QWidget:
+# Fields written a line each: a queue's `module` commands and the site's own lines.
+_LINES = ("modules", "setup")
+
+
+def _editor(field, value: Any, parent: QWidget, names=(), lines: bool = False) -> QWidget:
     annotation, options = field.annotation, get_args(field.annotation)
+    if lines:
+        editor = QPlainTextEdit("\n".join(value or []) if isinstance(value, list) else str(value or ""), parent)
+        editor.setProperty("lines", list if get_origin(annotation) is list else str)
+        editor.setPlaceholderText("load gcc/12" if get_origin(annotation) is list else "export OMP_NUM_THREADS=1")
+        editor.setMaximumHeight(90)
+        return editor
     if get_origin(annotation) in (Union, types.UnionType) and options == (bool, type(None)):
         editor = QComboBox(parent)
         for text, data in (("Automatic", None), ("Yes", True), ("No", False)):
@@ -91,6 +102,10 @@ def _value(editor: QWidget) -> Any:
     if isinstance(editor, QListWidget):
         items = [editor.item(row) for row in range(editor.count())]
         return [item.data(Qt.ItemDataRole.UserRole) for item in items if item.checkState() == Qt.CheckState.Checked]
+    if isinstance(editor, QPlainTextEdit) and editor.property("lines") is list:
+        return [line.strip() for line in editor.toPlainText().splitlines() if line.strip()]
+    if isinstance(editor, QPlainTextEdit) and editor.property("lines") is str:
+        return editor.toPlainText().strip()
     if isinstance(editor, QPlainTextEdit):
         pairs = (line.partition("=") for line in editor.toPlainText().splitlines() if "=" in line)
         return {key.strip(): path.strip() for key, _, path in pairs}
@@ -262,6 +277,12 @@ class KeptPage(QWidget):
             self._question.connect(self._answer)
             self._connected.connect(self._connect_said)
             self._answered, self._answer_given = threading.Event(), None
+        if table == "executors":
+            self.site_button = QPushButton("Read site script…", self)
+            self.site_button.setToolTip("Fill the fields of a queue from a job script of the site: its #SBATCH lines, "
+                                        "its module commands and the lines that prepare the environment.")
+            self.site_button.clicked.connect(self._read_site)
+            foot.addWidget(self.site_button)
         foot.addWidget(self.save_button)
         self._right.addStretch(1)
         self._right.addLayout(foot)
@@ -304,7 +325,7 @@ class KeptPage(QWidget):
         self._editors = {}
         for key, field in self._model.model_fields.items():
             names = self._programs if key == "install" else hosts
-            editor = self._editors[key] = _editor(field, getattr(entry, key, None), body, names)
+            editor = self._editors[key] = _editor(field, getattr(entry, key, None), body, names, key in _LINES)
             editor.setToolTip(field.description or "")
             form.addRow(field.title or key.replace("_", " ").capitalize(), editor)
         if "install" in self._editors:  # this machine has its programs from the app's own settings
@@ -335,7 +356,30 @@ class KeptPage(QWidget):
             only = (field.json_schema_extra or {}).get("kind")
             self._form.setRowVisible(self._editors[key], only in (None, kind))
         self._form.labelForField(self._editors["hosts"]).setText("Login node" if kind == "queue" else "Hosts")
+        self.site_button.setVisible(kind == "queue")
         self._one_host()
+
+    def _read_site(self) -> None:
+        """The fields of the queue as a site's script says them (`ms_flow.site_script.read`); saved when
+        the user saves."""
+        from ms_flow.site_script import read
+
+        path, _ = QFileDialog.getOpenFileName(self, "Read site script", "", "Job scripts (*.sh *.slurm *.sbatch);;All files (*)")
+        if not path:
+            return
+        with open(path, encoding="utf-8", errors="replace") as script:
+            fields = read(script.read())
+        dropped = fields.pop("dropped")
+        for key, value in fields.items():
+            editor = self._editors.get(key)
+            if isinstance(editor, QPlainTextEdit):
+                editor.setPlainText("\n".join(value) if isinstance(value, list) else value)
+            elif isinstance(editor, (QSpinBox, QDoubleSpinBox)):
+                editor.setValue(value)
+            elif isinstance(editor, QLineEdit):
+                editor.setText(value)
+        self.said.setText("Read; save to keep it." + (" Left out (the job runs ms_flow's runner, and sets these itself): "
+                                                     + "; ".join(dropped) if dropped else ""))
 
     def _one_host(self, ticked: QListWidgetItem | None = None) -> None:
         """A queue is asked through one machine, its login node, and has nothing to do with

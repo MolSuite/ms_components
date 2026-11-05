@@ -67,7 +67,7 @@ def test_hosts_and_executors_are_kept_and_started_from_the_ui(tmp_path, monkeypa
         executors.new_button.click()
         kind, ticks = executors._editors["kind"], executors._editors["hosts"]
         assert [kind.itemData(i) for i in range(kind.count())] == ["ray", "queue"]
-        assert executors._editors["scheduler"].isHidden()
+        assert executors._editors["scheduler"].isHidden() and executors._editors["modules"].isHidden()
         for row in range(ticks.count()):
             ticks.item(row).setCheckState(Qt.CheckState.Checked)
         kind.setCurrentIndex(kind.findData("queue"))
@@ -250,6 +250,40 @@ def test_connect_asks_what_ssh_asks_and_keeps_the_host_by_its_name(tmp_path, mon
         assert answers == ["me@login.hpc:2222", "yes", "s3cret"]
         assert ms.settings_manager.settings.hosts["cluster"].address == "cluster"
         assert "8 hours" in hosts.report.toPlainText() and hosts.connect_button.isEnabled()
+    finally:
+        ms.shutdown()
+        app.processEvents()
+
+
+def test_a_queue_is_filled_from_a_site_script(tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+    from ms_flow.api import Workspace
+
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setenv("MOLSUITE_HOME", str(tmp_path / "home"))
+    script = tmp_path / "site.sh"
+    script.write_text("#!/bin/bash\n#SBATCH -p gpu\n#SBATCH --cpus-per-task=16\n#SBATCH --qos=long\n"
+                      "module purge\nmodule load gcc/12\nexport OMP_NUM_THREADS=1\nsrun ./dock\n")
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *asked: (str(script), ""))
+    ms = Workspace(app_id="ui")
+    try:
+        ms.save_host("hpc", address="login")
+        page = KeptPage(ms, "executors")
+        assert not page.site_button.isVisibleTo(page)  # `local`: a pool, no queue
+        page.new_button.click()
+        page.name.setText("hpc")
+        page._editors["kind"].setCurrentIndex(page._editors["kind"].findData("queue"))
+        hosts = page._editors["hosts"]
+        for row in range(hosts.count()):
+            hosts.item(row).setCheckState(Qt.CheckState.Checked if hosts.item(row).data(Qt.ItemDataRole.UserRole) == "hpc"
+                                          else Qt.CheckState.Unchecked)
+        assert page.site_button.isVisibleTo(page)
+        page.site_button.click()
+        assert "srun ./dock" in page.said.text()  # left out: it runs the site's program
+        page.save_button.click()
+        kept = ms.settings_manager.settings.executors["hpc"]
+        assert (kept.partition, kept.cpus, kept.modules) == ("gpu", 16, ["purge", "load gcc/12"])
+        assert kept.setup == "#SBATCH --qos=long\nexport OMP_NUM_THREADS=1"
     finally:
         ms.shutdown()
         app.processEvents()
