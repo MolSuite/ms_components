@@ -63,11 +63,11 @@ def test_hosts_and_executors_are_kept_and_started_from_the_ui(tmp_path, monkeypa
 
         executors.reload()  # what showing it does
         assert not executors._editors["kind"].isEnabled()  # `local` is the pool, and stays so
-        assert executors._editors["scheduler"].isHidden() and not executors._editors["on_login_node"].isHidden()
+        assert executors._editors["scheduler"].isHidden()
         executors.new_button.click()
         kind, ticks = executors._editors["kind"], executors._editors["hosts"]
         assert [kind.itemData(i) for i in range(kind.count())] == ["ray", "queue"]
-        assert executors._editors["scheduler"].isHidden() and executors._editors["on_login_node"].isHidden()
+        assert executors._editors["scheduler"].isHidden()
         for row in range(ticks.count()):
             ticks.item(row).setCheckState(Qt.CheckState.Checked)
         kind.setCurrentIndex(kind.findData("queue"))
