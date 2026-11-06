@@ -689,7 +689,6 @@ class JobDetail(QWidget):
             f"{job.chunks_done:,} done · {job.chunks_failed:,} failed · {job.chunks_total:,} in all",
             f"{job.chunks_retried:,}",
             format_speed(job.throughput_eps) + ("" if job.is_terminal else " · last 5 min"),
-            f"{job.peak_mem_mb:,} MB" if job.peak_mem_mb else "—",
             *_used(job, (end - job.started_at).total_seconds() if job.started_at else 0.0),
             f"{job.tasks_running:,} tasks · {job.cpu_used:,} CPUs" if not job.is_terminal else "—",
             f"{self._error_types:,} types" if self._error_types else "none",
@@ -698,11 +697,15 @@ class JobDetail(QWidget):
             self._fact[key].setText(value)
 
 
-def _used(job: JobMonitorState, seconds: float) -> tuple[str, str]:
-    """The CPU and GPU lines of a job's summary: what it kept busy, of what it held."""
-    usage = job.usage
+def _used(job: JobMonitorState, seconds: float) -> tuple[str, str, str]:
+    """The memory, CPU and GPU lines of a job's summary: what it kept busy, of what it held. A
+    campaign's job in a queue: what the queue's accounting says it used there."""
+    usage, memory = job.usage, f"{job.peak_mem_mb:,} MB" if job.peak_mem_mb else "—"
+    queue = (usage or {}).get("queue")
+    if queue:
+        return _queue_used(queue, memory)
     if not usage or seconds <= 0:
-        return "—", "—"
+        return memory, "—", "—"
     cpu = gpu = "—"
     if usage.get("peak_cpu"):
         held = f"{usage['cpu_s'] / seconds:,.1f} held on average · {usage['peak_cpu']:g} at most"
@@ -712,7 +715,24 @@ def _used(job: JobMonitorState, seconds: float) -> tuple[str, str]:
         gpu = f"{usage['gpu_s'] / 3600:,.2f} GPU·h · {usage['peak_gpu']:g} at most"
         if usage.get("vram_mb") is not None:
             gpu += f" · {usage['vram_mb']:,} MB VRAM at most · {usage['gpu_util']:.0f} % busy on average"
-    return cpu, gpu
+    return memory, cpu, gpu
+
+
+def _queue_used(queue: dict, memory: str) -> tuple[str, str, str]:
+    """`_used` of a job in a queue, as seff says it: the CPU time over what was held, the memory
+    over what was asked for. Final once it ended there, else so far."""
+    so_far = "" if queue.get("final") else " so far"
+    there = f"in the queue (job {queue.get('job')}){so_far}"
+    cpu_s, cpus, wall = queue.get("cpu_s"), queue.get("cpus"), queue.get("wall_s")
+    cpu = f"{there}: —"
+    if cpu_s is not None:
+        cpu = f"{there}: {cpu_s / 3600:,.2f} CPU·h"
+        if cpus and wall:
+            cpu += f" · {cpu_s / (cpus * wall):.0%} of {cpus:,} CPUs busy over {format_duration(wall)}"
+    peak, asked = queue.get("peak_mem_mb"), queue.get("mem_mb")
+    if peak is not None:
+        memory = f"{peak:,.0f} MB at most{f' of {asked:,.0f} MB asked for' if asked else ''}, {there} · {memory} here"
+    return memory, cpu, "—"
 
 
 __all__ = ["ChunkGrid", "GRID_MAX", "GRID_STEP", "JobDetail", "counts", "grid_window", "layout_cells", "reason"]

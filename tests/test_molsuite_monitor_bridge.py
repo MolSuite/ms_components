@@ -126,6 +126,8 @@ def test_a_job_whose_host_does_not_answer_says_so_and_is_asked_again(ms, tmp_pat
         unreachable, asked = "far has not answered since 10:00: Connection refused", 0
         note = "waiting in the queue (job 7)"  # what a campaign says it is at
         steps = ((1000.0, "staging its elements and their files here"), (1000.4, "waiting in the queue (job 7)"))
+        queue_usage = {"wall_s": 21.0, "cpu_s": 20.1, "cpus": 2, "peak_mem_mb": 209.8, "mem_mb": 800.0,
+                       "final": True, "job": "7"}  # what the queue's accounting says
 
         def reconnect(self):
             self.asked += 1
@@ -147,6 +149,9 @@ def test_a_job_whose_host_does_not_answer_says_so_and_is_asked_again(ms, tmp_pat
     steps = widget._detail._steps
     assert widget._detail._tabs.isTabVisible(3) and steps.topLevelItemCount() == 2
     assert [steps.topLevelItem(0).text(n) for n in (1, 2)] == ["0.4s", "staging its elements and their files here"]
+    facts = widget._detail._fact
+    assert facts["CPU"].text().startswith("in the queue (job 7): 0.01 CPU·h · 48% of 2 CPUs busy over")
+    assert facts["peak memory"].text().startswith("210 MB at most of 800 MB asked for, in the queue (job 7)")
     assert widget._detail._badge.text() == "WAITING FOR HOST" and not widget._reconnect_button.isHidden()
     widget._reconnect_button.click()
     assert far.asked == 1
