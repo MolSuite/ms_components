@@ -146,6 +146,10 @@ def test_a_job_whose_host_does_not_answer_says_so_and_is_asked_again(ms, tmp_pat
     assert widget._detail._badge.text() == "WAITING FOR HOST" and not widget._reconnect_button.isHidden()
     widget._reconnect_button.click()
     assert far.asked == 1
+    state.canceling, state.unreachable = True, ""  # what a campaign is while its queue lets it go
+    widget._detail.set_job(state)
+    widget._set_job_actions(state)
+    assert widget._detail._badge.text() == "CANCELING" and widget._cancel_button.text() == "Cancel now"
     GATE.set()
 
 

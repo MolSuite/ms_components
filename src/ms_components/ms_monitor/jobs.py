@@ -45,6 +45,8 @@ def badge_of(job) -> tuple[str, str]:
     waits for it."""
     if job.unreachable and not job.is_terminal:
         return "WAITING FOR HOST", P["warn"]
+    if job.canceling and not job.is_terminal:
+        return "CANCELING", P["warn"]
     return job.status.replace("_", " ").upper(), status_color(job.status)
 
 
