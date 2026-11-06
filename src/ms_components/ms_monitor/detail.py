@@ -433,9 +433,17 @@ class JobDetail(QWidget):
         self._facts.setColumnStretch(1, 1)
         self._facts.setRowStretch(len(self._FACTS), 1)
         self._build_summary()
+        self._steps = QTreeWidget(side)
+        self._steps.setHeaderLabels(["At", "Took", "Step"])
+        self._steps.setRootIsDecorated(False)
+        self._steps.setFrameShape(QFrame.NoFrame)
+        self._steps.header().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self._steps.header().setStretchLastSection(True)
         self._tabs.addTab(self._tasks, "Running")
         self._tabs.addTab(errors, "Errors")
         self._tabs.addTab(self._summary, "Summary")
+        self._tabs.addTab(self._steps, "Steps")
+        self._tabs.setTabVisible(3, False)  # only a job whose source says its steps (a campaign)
         self._errors.currentItemChanged.connect(self._show_traceback)
 
         work.addWidget(grid_panel)
@@ -462,6 +470,7 @@ class JobDetail(QWidget):
             self._tab_meta.setText("")
             self.set_failures([], 0)
             self._set_summary(None)
+            self._set_steps(None)
             return
         hue = status_color(job.status)
         self._name.setText(job.name or job.job_id[:8])
@@ -508,10 +517,24 @@ class JobDetail(QWidget):
         self._show_grid(job)
         self._set_tasks(job)
         self._set_summary(job)
+        self._set_steps(job)
 
     def set_color(self, color: str) -> None:
         """The job's own color, as the list paints it."""
         self._swatch.setStyleSheet(f"background:{color}; border-radius:3px;")
+
+    def _set_steps(self, job: JobMonitorState | None) -> None:
+        """Every step it went through, with how long it took: the next one's start, or now."""
+        steps = job.steps if job is not None else ()
+        self._tabs.setTabVisible(3, bool(steps))
+        if not steps or (steps == getattr(self, "_shown_steps", None) and job.is_terminal):
+            return
+        self._shown_steps = steps
+        end = job.finished_at.timestamp() if job.finished_at else datetime.now().timestamp()
+        self._steps.clear()
+        for (at, line), (until, _next) in zip(steps, [*steps[1:], (end, "")]):
+            self._steps.addTopLevelItem(QTreeWidgetItem([f"{datetime.fromtimestamp(at):%H:%M:%S}",
+                                                         _took(until - at), line]))
 
     def _meta_text(self, job: JobMonitorState) -> str:
         said = []
@@ -520,6 +543,8 @@ class JobDetail(QWidget):
             said.append(f"started {job.started_at:%H:%M} · elapsed {format_duration((end - job.started_at).total_seconds())}")
         if not job.is_terminal and job.tasks_running:
             said.append(f"{job.tasks_running:,} tasks" + (f" · {job.cpu_used:,} CPUs" if job.cpu_used else ""))
+        if job.note and not job.is_terminal:
+            said.append(job.note)
         if job.unreachable and not job.is_terminal:
             said.append(job.unreachable)
         if job.engine_id is None:
@@ -691,3 +716,8 @@ def _used(job: JobMonitorState, seconds: float) -> tuple[str, str]:
 
 
 __all__ = ["ChunkGrid", "GRID_MAX", "GRID_STEP", "JobDetail", "counts", "grid_window", "layout_cells", "reason"]
+
+
+def _took(seconds: float) -> str:
+    """A step's length: tenths under a minute, where the quick ones are."""
+    return f"{max(0.0, seconds):.1f}s" if seconds < 60 else format_duration(seconds)

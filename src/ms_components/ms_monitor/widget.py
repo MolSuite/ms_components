@@ -322,6 +322,10 @@ class MolSuiteMonitorWidget(QWidget):
     def _set_job_actions(self, job) -> None:
         stopped = job is not None and job.status in ("canceled", "interrupted")
         self._cancel_button.setEnabled(job is not None and not job.is_terminal)
+        forcing = job is not None and job.canceling and not job.is_terminal
+        self._cancel_button.setText("Cancel now" if forcing else "Cancel")
+        self._cancel_button.setToolTip("Stop waiting for its other machine: what is still there is left as it is"
+                                       if forcing else "Cancel the selected job")
         self._resume_button.setEnabled(stopped)
         self._reconnect_button.setVisible(job is not None and bool(job.unreachable) and not job.is_terminal)
         self._move_button.setEnabled(stopped or (job is not None and not job.is_terminal))

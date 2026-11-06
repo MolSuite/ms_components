@@ -124,6 +124,8 @@ def test_a_job_whose_host_does_not_answer_says_so_and_is_asked_again(ms, tmp_pat
 
     class Far(ThreadExecutor):  # what a RemoteExecutor tells of its other machine
         unreachable, asked = "far has not answered since 10:00: Connection refused", 0
+        note = "waiting in the queue (job 7)"  # what a campaign says it is at
+        steps = ((1000.0, "staging its elements and their files here"), (1000.4, "waiting in the queue (job 7)"))
 
         def reconnect(self):
             self.asked += 1
@@ -140,10 +142,18 @@ def test_a_job_whose_host_does_not_answer_says_so_and_is_asked_again(ms, tmp_pat
     widget.update_snapshot(bridge.current_snapshot)
     widget._jobs_view.select_job(state.job_id)
 
-    assert state.unreachable == far.unreachable
+    assert state.unreachable == far.unreachable and state.note == far.note
+    assert far.note in widget._detail._meta.text()
+    steps = widget._detail._steps
+    assert widget._detail._tabs.isTabVisible(3) and steps.topLevelItemCount() == 2
+    assert [steps.topLevelItem(0).text(n) for n in (1, 2)] == ["0.4s", "staging its elements and their files here"]
     assert widget._detail._badge.text() == "WAITING FOR HOST" and not widget._reconnect_button.isHidden()
     widget._reconnect_button.click()
     assert far.asked == 1
+    state.canceling, state.unreachable = True, ""  # what a campaign is while its queue lets it go
+    widget._detail.set_job(state)
+    widget._set_job_actions(state)
+    assert widget._detail._badge.text() == "CANCELING" and widget._cancel_button.text() == "Cancel now"
     GATE.set()
 
 
