@@ -49,6 +49,7 @@ class JobMonitorState:
     tasks_running: int = 0  # what runs now, one worker each; <= chunks_running
     cpu_used: int = 0  # the CPU tokens those tasks hold
     unreachable: str = ""  # what its other machine has not answered since, while it does not
+    note: str = ""  # what its source says it is at, while it runs (a campaign: in the queue, how far there)
     chunks_retried: int = 0
     peak_mem_mb: int = 0
     usage: dict = field(default_factory=dict)  # what it used, kept once it ended: see ms_flow's JobSnapshot.usage

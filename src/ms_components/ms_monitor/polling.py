@@ -32,6 +32,7 @@ def job_state(job, now: float) -> JobMonitorState:
         tasks_running=getattr(job, "tasks_running", job.chunks_inflight),
         cpu_used=getattr(job, "cpu_used", 0),
         unreachable=getattr(job, "unreachable", None) or "",
+        note=getattr(job, "note", None) or "",  # an older ms_flow does not say
         chunks_retried=job.chunks_retried,
         peak_mem_mb=job.peak_mem_mb,
         usage=getattr(job, "usage", None) or {},  # ms_flow < 0.8 does not keep it

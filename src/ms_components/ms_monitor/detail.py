@@ -520,6 +520,8 @@ class JobDetail(QWidget):
             said.append(f"started {job.started_at:%H:%M} · elapsed {format_duration((end - job.started_at).total_seconds())}")
         if not job.is_terminal and job.tasks_running:
             said.append(f"{job.tasks_running:,} tasks" + (f" · {job.cpu_used:,} CPUs" if job.cpu_used else ""))
+        if job.note and not job.is_terminal:
+            said.append(job.note)
         if job.unreachable and not job.is_terminal:
             said.append(job.unreachable)
         if job.engine_id is None:

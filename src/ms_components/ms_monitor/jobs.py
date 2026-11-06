@@ -36,7 +36,7 @@ def counts_label(job: JobMonitorState) -> str:
         took = (job.finished_at - job.started_at).total_seconds() if job.finished_at and job.started_at else None
         tail = "" if took is None else f" · took {format_duration(took)}"
     else:
-        tail = " · calculating…" if left is None else f" · {format_duration(left)} left"
+        tail = f" · {job.note or 'calculating…'}" if left is None else f" · {format_duration(left)} left"
     return f"{job.chunks_done:,}/{total}{tail}"
 
 
