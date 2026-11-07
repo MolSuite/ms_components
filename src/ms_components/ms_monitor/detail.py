@@ -38,7 +38,7 @@ from PySide6.QtWidgets import (
 
 from ms_components.ms_monitor.formatting import format_duration, format_speed
 from ms_components.ms_monitor.jobs import badge_of, status_color
-from ms_components.ms_monitor.models import FailureState, JobMonitorState
+from ms_components.ms_monitor.models import FailureState, JobMonitorState, TaskMonitorState
 from ms_components.ms_monitor.palette import P
 from ms_components.theme import font
 
@@ -422,7 +422,7 @@ class JobDetail(QWidget):
         self._traceback.setReadOnly(True)
         self._traceback.setLineWrapMode(QPlainTextEdit.NoWrap)
         self._traceback.setFont(font(mono=True))
-        errors = QSplitter(Qt.Vertical, side)
+        self._errors_tab = errors = QSplitter(Qt.Vertical, side)
         errors.addWidget(self._errors)
         errors.addWidget(self._traceback)
         errors.setSizes([260, 140])
@@ -433,9 +433,17 @@ class JobDetail(QWidget):
         self._facts.setColumnStretch(1, 1)
         self._facts.setRowStretch(len(self._FACTS), 1)
         self._build_summary()
+        self._steps = QTreeWidget(side)
+        self._steps.setHeaderLabels(["At", "Took", "Step"])
+        self._steps.setRootIsDecorated(False)
+        self._steps.setFrameShape(QFrame.NoFrame)
+        self._steps.header().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self._steps.header().setStretchLastSection(True)
         self._tabs.addTab(self._tasks, "Running")
         self._tabs.addTab(errors, "Errors")
         self._tabs.addTab(self._summary, "Summary")
+        self._tabs.addTab(self._steps, "Steps")
+        self._tabs.setTabVisible(self._tabs.indexOf(self._steps), False)  # only a job whose source says its steps (a campaign)
         self._errors.currentItemChanged.connect(self._show_traceback)
 
         work.addWidget(grid_panel)
@@ -458,10 +466,11 @@ class JobDetail(QWidget):
             self._bar.parts, self._trend.values = (0, 0, 0, 0), []
             self._show_grid(None)
             self._tasks.clear()
-            self._tabs.setTabText(0, "Running")
+            self._tabs.setTabText(self._tabs.indexOf(self._tasks), "Running")
             self._tab_meta.setText("")
             self.set_failures([], 0)
             self._set_summary(None)
+            self._set_steps(None)
             return
         hue = status_color(job.status)
         self._name.setText(job.name or job.job_id[:8])
@@ -508,10 +517,33 @@ class JobDetail(QWidget):
         self._show_grid(job)
         self._set_tasks(job)
         self._set_summary(job)
+        self._set_steps(job)
 
     def set_color(self, color: str) -> None:
         """The job's own color, as the list paints it."""
         self._swatch.setStyleSheet(f"background:{color}; border-radius:3px;")
+
+    def _set_steps(self, job: JobMonitorState | None) -> None:
+        """Every step it went through, with how long it took: the next one's start, or now. A job
+        with steps (a campaign) has them as its first tab, shown when it is chosen."""
+        steps = job.steps if job is not None else ()
+        at = self._tabs.indexOf(self._steps)
+        if bool(steps) != (at == 0):
+            self._tabs.removeTab(at)
+            at = self._tabs.insertTab(0 if steps else self._tabs.count(), self._steps, "Steps")
+        self._tabs.setTabVisible(at, bool(steps))
+        chosen = job.job_id if job is not None else None
+        if steps and chosen != getattr(self, "_steps_of", None):
+            self._tabs.setCurrentIndex(at)
+        self._steps_of = chosen if steps else None
+        if not steps or (steps == getattr(self, "_shown_steps", None) and job.is_terminal):
+            return
+        self._shown_steps = steps
+        end = job.finished_at.timestamp() if job.finished_at else datetime.now().timestamp()
+        self._steps.clear()
+        for (at, line), (until, _next) in zip(steps, [*steps[1:], (end, "")]):
+            self._steps.addTopLevelItem(QTreeWidgetItem([f"{datetime.fromtimestamp(at):%H:%M:%S}",
+                                                         _took(until - at), line]))
 
     def _meta_text(self, job: JobMonitorState) -> str:
         said = []
@@ -520,6 +552,8 @@ class JobDetail(QWidget):
             said.append(f"started {job.started_at:%H:%M} · elapsed {format_duration((end - job.started_at).total_seconds())}")
         if not job.is_terminal and job.tasks_running:
             said.append(f"{job.tasks_running:,} tasks" + (f" · {job.cpu_used:,} CPUs" if job.cpu_used else ""))
+        if job.note and not job.is_terminal:
+            said.append(job.note)
         if job.unreachable and not job.is_terminal:
             said.append(job.unreachable)
         if job.engine_id is None:
@@ -564,6 +598,10 @@ class JobDetail(QWidget):
 
     def _set_tasks(self, job: JobMonitorState) -> None:
         tasks = job.tasks
+        if not tasks and job.steps and not job.is_terminal:  # a campaign: its job in the queue, as its source says it
+            since = job.steps[-1][0]
+            tasks = [TaskMonitorState(job.note or job.steps[-1][1], host=job.executor, progress=job.progress,
+                                      seconds=max(0.0, datetime.now().timestamp() - since))]
         median = statistics.median(task.seconds for task in tasks) if len(tasks) >= 3 else None
         warn = QColor(P["warn"])
         while self._tasks.topLevelItemCount() > len(tasks):
@@ -582,7 +620,7 @@ class JobDetail(QWidget):
             for column in range(5):
                 item.setForeground(column, warn if late else self._tasks.palette().color(QPalette.ColorRole.Text))
             item.setToolTip(0, f"slow: {task.seconds / median:.1f}× the median" if late else task.input)
-        self._tabs.setTabText(0, f"Running  {len(tasks)}" if tasks else "Running")
+        self._tabs.setTabText(self._tabs.indexOf(self._tasks), f"Running  {len(tasks)}" if tasks else "Running")
         said = [f"{len(tasks)} running"] if tasks else []
         if median is not None:
             said.append(f"median {format_duration(median)}")
@@ -624,8 +662,9 @@ class JobDetail(QWidget):
         if self._errors.count():
             self._errors.setCurrentRow(0)
         count = failed + bool(job_error)
-        self._tabs.setTabText(1, f"Errors  {count:,}" if count else "Errors")
-        self._tabs.tabBar().setTabTextColor(1, QColor(P["error"]) if count else _pal().color(QPalette.ColorRole.Text))
+        errors = self._tabs.indexOf(self._errors_tab)
+        self._tabs.setTabText(errors, f"Errors  {count:,}" if count else "Errors")
+        self._tabs.tabBar().setTabTextColor(errors, QColor(P["error"]) if count else _pal().color(QPalette.ColorRole.Text))
         self._set_failed_kpi()
 
     def _show_traceback(self, item, _previous=None) -> None:
@@ -645,7 +684,7 @@ class JobDetail(QWidget):
         self._fact["key"].setFont(font(mono=True))
         copy = QPushButton("copy", self._summary)
         copy.setObjectName("xchip")
-        copy.clicked.connect(lambda: QGuiApplication.clipboard().setText(self._fact["key"].text()))
+        copy.clicked.connect(lambda: QGuiApplication.clipboard().setText(self._fact["key"].toolTip()))
         self._facts.addWidget(copy, 0, 2)
 
     def _set_summary(self, job: JobMonitorState | None) -> None:
@@ -664,20 +703,26 @@ class JobDetail(QWidget):
             f"{job.chunks_done:,} done · {job.chunks_failed:,} failed · {job.chunks_total:,} in all",
             f"{job.chunks_retried:,}",
             format_speed(job.throughput_eps) + ("" if job.is_terminal else " · last 5 min"),
-            f"{job.peak_mem_mb:,} MB" if job.peak_mem_mb else "—",
             *_used(job, (end - job.started_at).total_seconds() if job.started_at else 0.0),
             f"{job.tasks_running:,} tasks · {job.cpu_used:,} CPUs" if not job.is_terminal else "—",
             f"{self._error_types:,} types" if self._error_types else "none",
         )
         for key, value in zip(self._FACTS, values):
             self._fact[key].setText(value)
+        # a key is a long hash: its first characters say which one it is, the whole on hover and to copy
+        self._fact["key"].setText(job.job_id[:8] + "…" if len(job.job_id) > 9 else job.job_id)
+        self._fact["key"].setToolTip(job.job_id)
 
 
-def _used(job: JobMonitorState, seconds: float) -> tuple[str, str]:
-    """The CPU and GPU lines of a job's summary: what it kept busy, of what it held."""
-    usage = job.usage
+def _used(job: JobMonitorState, seconds: float) -> tuple[str, str, str]:
+    """The memory, CPU and GPU lines of a job's summary: what it kept busy, of what it held. A
+    campaign's job in a queue: what the queue's accounting says it used there."""
+    usage, memory = job.usage, f"{job.peak_mem_mb:,} MB" if job.peak_mem_mb else "—"
+    queue = (usage or {}).get("queue")
+    if queue:
+        return _queue_used(queue, memory)
     if not usage or seconds <= 0:
-        return "—", "—"
+        return memory, "—", "—"
     cpu = gpu = "—"
     if usage.get("peak_cpu"):
         held = f"{usage['cpu_s'] / seconds:,.1f} held on average · {usage['peak_cpu']:g} at most"
@@ -687,7 +732,29 @@ def _used(job: JobMonitorState, seconds: float) -> tuple[str, str]:
         gpu = f"{usage['gpu_s'] / 3600:,.2f} GPU·h · {usage['peak_gpu']:g} at most"
         if usage.get("vram_mb") is not None:
             gpu += f" · {usage['vram_mb']:,} MB VRAM at most · {usage['gpu_util']:.0f} % busy on average"
-    return cpu, gpu
+    return memory, cpu, gpu
+
+
+def _queue_used(queue: dict, memory: str) -> tuple[str, str, str]:
+    """`_used` of a job in a queue, as seff says it: the CPU time over what was held, the memory
+    over what was asked for. Final once it ended there, else so far."""
+    so_far = "" if queue.get("final") else " so far"
+    there = f"in the queue (job {queue.get('job')}){so_far}"
+    cpu_s, cpus, wall = queue.get("cpu_s"), queue.get("cpus"), queue.get("wall_s")
+    cpu = f"{there}: —"
+    if cpu_s is not None:
+        cpu = f"{there}: {cpu_s / 3600:,.2f} CPU·h"
+        if cpus and wall:
+            cpu += f" · {cpu_s / (cpus * wall):.0%} of {cpus:,} CPUs busy over {format_duration(wall)}"
+    peak, asked = queue.get("peak_mem_mb"), queue.get("mem_mb")
+    if peak is not None:
+        memory = f"{peak:,.0f} MB at most{f' of {asked:,.0f} MB asked for' if asked else ''}, {there} · {memory} here"
+    return memory, cpu, "—"
 
 
 __all__ = ["ChunkGrid", "GRID_MAX", "GRID_STEP", "JobDetail", "counts", "grid_window", "layout_cells", "reason"]
+
+
+def _took(seconds: float) -> str:
+    """A step's length: tenths under a minute, where the quick ones are."""
+    return f"{max(0.0, seconds):.1f}s" if seconds < 60 else format_duration(seconds)

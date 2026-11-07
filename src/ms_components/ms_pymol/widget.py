@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from ms_components.labels import ElidedLabel
 from ms_components.ms_dockwidget.widget import MSDockWidget
 from ms_components.opengl import pymol_context_error, pymol_surface_format
 
@@ -153,36 +154,6 @@ def associate_scene_objects(cmd, objects, *, reference: str) -> None:
             cmd.set("grid_slot", slot, obj)
 
 
-class _ElidedLabel(QLabel):
-    """A label that never widens its bar: what does not fit ends in an ellipsis."""
-
-    def __init__(self, text: str, parent=None) -> None:
-        super().__init__(parent)
-        self._full = ""
-        self.setText(text)
-
-    def setText(self, text: str) -> None:  # noqa: N802
-        self._full = str(text)
-        self.updateGeometry()
-        self._elide()
-
-    def text(self) -> str:
-        return self._full
-
-    def sizeHint(self) -> QSize:  # noqa: N802
-        return QSize(self.fontMetrics().horizontalAdvance(self._full) + 4, super().sizeHint().height())
-
-    def minimumSizeHint(self) -> QSize:  # noqa: N802
-        return QSize(0, super().minimumSizeHint().height())
-
-    def resizeEvent(self, event) -> None:  # noqa: N802
-        super().resizeEvent(event)
-        self._elide()
-
-    def _elide(self) -> None:
-        super().setText(self.fontMetrics().elidedText(self._full, Qt.ElideRight, self.width()))
-
-
 class PymolControlBar(QFrame):
     """Compact, reusable controls for an embedded PyMOL scene."""
 
@@ -325,7 +296,7 @@ class PymolControlBar(QFrame):
             menu=self.export_menu,
         )
 
-        self.context_label = _ElidedLabel("Generic", self)
+        self.context_label = ElidedLabel("Generic", self)
         self.context_label.setObjectName("PymolSceneContext")
         self.context_label.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
         # Ignored: the tools keep their width and the scene name takes only what is left.

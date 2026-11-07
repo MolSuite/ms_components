@@ -86,6 +86,28 @@ def test_the_detail_shows_the_numbers_the_tasks_and_the_failures_grouped():
     assert detail._fact["GPU"].text() == "0.50 GPU·h · 1 at most · 1,200 MB VRAM at most · 61 % busy on average"
 
 
+def test_a_campaign_shows_its_steps_first_its_queue_job_as_running_and_a_short_key():
+    QApplication.instance() or QApplication([])
+    detail = JobDetail()
+    key = "c5062d49f65d65e0c9abb4d53e1f00aa"
+    now = datetime.now().timestamp()
+    campaign = _job(job_id=key, executor="hpc", steps=((now - 60, "sending its files"), (now - 20, "running in the queue")),
+                    note="running in the queue (42): 3 of 8 done", progress=37.5)
+    detail.set_job(_job())  # a job of this machine first: Running is first
+    assert detail._tabs.indexOf(detail._tasks) == 0 and not detail._tabs.isTabVisible(detail._tabs.indexOf(detail._steps))
+    detail.set_job(campaign)
+    assert detail._tabs.indexOf(detail._steps) == 0 and detail._tabs.currentWidget() is detail._steps
+    row = detail._tasks.topLevelItem(0)
+    assert detail._tasks.topLevelItemCount() == 1 and row.text(0) == campaign.note and row.text(4) == "38%"
+    assert detail._tabs.tabText(detail._tabs.indexOf(detail._tasks)) == "Running  1"
+    assert detail._fact["key"].text() == "c5062d49…" and detail._fact["key"].toolTip() == key
+    detail._tabs.setCurrentWidget(detail._errors_tab)
+    detail.set_job(campaign)  # a poll of the same one keeps the tab chosen
+    assert detail._tabs.currentWidget() is detail._errors_tab
+    detail.set_job(_job())
+    assert detail._tabs.indexOf(detail._tasks) == 0 and detail._tabs.indexOf(detail._steps) == 3
+
+
 def test_monitor_widget_lists_filters_and_selects_the_jobs_and_empties_without_a_project():
     QApplication.instance() or QApplication([])
     widget = MolSuiteMonitorWidget()
@@ -252,7 +274,7 @@ def test_a_mac_is_read_without_proc(tmp_path):
     sample, _ = parse(text, None)
     assert (sample.cpu, round(sample.mem), round(sample.mem_total_gb)) == (20.0, 75, 16), text
 
-def test_the_hosts_are_listed_once_with_their_executors_and_a_queue_is_not_read():
+def test_the_hosts_are_listed_once_with_their_executors_and_a_queue_is_read_for_its_nodes():
     from ms_components.ms_monitor.resources import parse, workspace_hosts
 
     first = "cpu  100 0 100 800 0 0 0 0 0 0\nMemTotal: 16777216 kB\nMemAvailable: 4194304 kB\n"
@@ -274,8 +296,31 @@ def test_the_hosts_are_listed_once_with_their_executors_and_a_queue_is_not_read(
     assert workspace_hosts(workspace) == [
         ("local", "", "local", [], 5),
         ("pc2", "me@pc2", "ray", ["ray", "gpus"], 15),
-        ("hpc", "me@login", "queue", ["slurm"], None),
+        ("hpc", "me@login", "queue", ["slurm"], 30),
     ]
+
+
+def test_a_queue_is_read_from_what_it_says_of_its_nodes():
+    QApplication.instance() or QApplication([])
+    from ms_components.ms_monitor.resources import HostsStrip, _HostCard, _Reader
+
+    nodes = [{"name": "w1", "state": "mixed", "cpus": 4, "cpus_used": 3, "mem_gb": 8.0, "mem_used_gb": 2.0,
+              "gpus": 2, "gpus_used": 1, "load": 1.5, "partitions": ["debug"]},
+             {"name": "w2", "state": "down*", "cpus": 4, "cpus_used": 0, "mem_gb": 8.0, "mem_used_gb": 0.0,
+              "gpus": 0, "gpus_used": 0, "load": None, "partitions": ["debug"]}]
+    asked = []
+    workspace = SimpleNamespace(queue_nodes=lambda executor: asked.append(executor) or nodes)
+    ask = HostsStrip(workspace, hosts=lambda: [])._nodes("queue", ["slurm"])
+    sample = _Reader("me@nowhere.invalid", nodes=ask).read()  # ssh there would fail: the queue says it
+    assert asked == ["slurm"] and sample.error == ""
+    assert (sample.cpu, sample.mem, len(sample.gpus), sample.gpus[0][0]) == (37.5, 12.5, 2, 50.0)
+    card = _HostCard("hpc", "me@login", "queue", ["slurm"], 30)
+    card.apply(sample)
+    assert card.cpu.note == "3/8" and "2 nodes, 1 up" in card.about.text()
+    card.toggle.setChecked(True)
+    assert card.pages.currentIndex() == 1 and card.node_grid.rowCount() >= 2
+    assert _Reader("x", nodes=lambda: []).read().error == "the queue lists no nodes"
+    assert HostsStrip(workspace, hosts=lambda: [])._nodes("ray", ["ray"]) is None
 
 
 def test_a_host_under_a_ray_is_read_from_its_metrics_with_no_ssh():

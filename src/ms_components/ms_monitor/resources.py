@@ -6,7 +6,9 @@ through `ms_env.Host` (the system's `ssh`), with one command that prints `/proc/
 `/proc/meminfo` and `nvidia-smi`. The CPU in use is the change of `/proc/stat` between two reads, so the first
 read of a host shows none; a Mac, with no `/proc`, says it from `ps`, `sysctl` and `vm_stat`. Each host is read in its own thread, only while the strip is shown,
 every `interval` seconds: a few for this machine, more for one over the network. The login node
-of a queue is not read: what it uses says nothing of the nodes its jobs got.
+of a queue is not read (what it uses says nothing of the nodes its jobs got): its nodes are, from
+what the queue says it has taken of them (`Workspace.queue_nodes`), the whole of them in time or
+each one now.
 """
 from __future__ import annotations
 
@@ -21,12 +23,14 @@ from dataclasses import dataclass, field
 
 from PySide6.QtCore import QObject, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPalette, QPen
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QToolTip, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QScrollArea, QStackedWidget, QToolButton,
+                               QToolTip, QVBoxLayout, QWidget)
 
+from ms_components.labels import ElidedLabel
 from ms_components.theme import color
 
-# Seconds between two reads, by the kind of executor the host is under; a queue's is not read.
-INTERVALS = {"local": 5, "ray": 15}
+# Seconds between two reads, by the kind of executor the host is under.
+INTERVALS = {"local": 5, "ray": 15, "queue": 30}
 _HISTORY = 120  # reads kept per host: 10 min of this machine, 30 of one over the network
 
 _GPU_QUERY = "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits"
@@ -49,6 +53,20 @@ class Sample:
     gpus: list[tuple[float, float, float]] = field(default_factory=list)  # (util %, MiB used, MiB total)
     error: str = ""
     via: str = ""  # "Ray" when its metrics said it
+    nodes: list[dict] = field(default_factory=list)  # a queue's: see `ms_flow.remote.read_nodes`
+
+
+def from_nodes(nodes: list[dict]) -> Sample:
+    """A queue's nodes as one machine: the share of their CPUs, memory and cards its jobs have
+    taken (not what they use of it)."""
+    cpus, mem = sum(n["cpus"] for n in nodes), sum(n["mem_gb"] for n in nodes)
+    gpus = sum(n["gpus"] for n in nodes)
+    sample = Sample(cpu=100.0 * sum(n["cpus_used"] for n in nodes) / cpus if cpus else None, nodes=nodes,
+                    mem_used_gb=sum(n["mem_used_gb"] for n in nodes), mem_total_gb=mem, via="the queue")
+    sample.mem = 100.0 * sample.mem_used_gb / mem if mem else 0.0
+    if gpus:
+        sample.gpus = [(100.0 * sum(n["gpus_used"] for n in nodes) / gpus, 0.0, 0.0)] * gpus
+    return sample
 
 
 def parse_metrics(text: str) -> Sample:
@@ -115,9 +133,11 @@ def _local_gpus() -> list[tuple[float, float, float]]:
 class _Reader:
     """Reads one host; keeps what the next read needs."""
 
-    def __init__(self, address: str, metrics=None):
-        # `metrics()` gives the URL of the host's Ray metrics, or None while no Ray has it
+    def __init__(self, address: str, metrics=None, nodes=None):
+        # `metrics()` gives the URL of the host's Ray metrics, or None while no Ray has it;
+        # `nodes()`, those of the queue the host is the login node of
         self.address, self._ticks, self._psutil, self._metrics, self._url = address, None, None, metrics, None
+        self._nodes = nodes
         if not address:
             try:
                 import psutil
@@ -129,6 +149,9 @@ class _Reader:
 
     def read(self) -> Sample:
         try:
+            if self._nodes is not None:
+                nodes = self._nodes()
+                return from_nodes(nodes) if nodes else Sample(error="the queue lists no nodes")
             if self._psutil is not None:
                 memory = self._psutil.virtual_memory()
                 return Sample(self._psutil.cpu_percent(None), memory.percent, (memory.total - memory.available) / 1024**3,
@@ -254,24 +277,51 @@ class _HostCard(QFrame):
         title.setStyleSheet("font-weight:650; font-size:13px;")
         chip = QLabel(kind, self)
         chip.setStyleSheet("color:palette(placeholder-text); border:1px solid palette(mid); border-radius:8px; padding:0 7px; font-size:11px;")
-        self.about = QLabel(self)
+        self.about = ElidedLabel("", self)  # a long address gives way to the jobs and the button
         self.about.setStyleSheet("color:palette(placeholder-text); font-size:11px;")
         self.jobs = QLabel(self)
         self.jobs.setStyleSheet("color:palette(placeholder-text); font-size:11.5px;")
-        for widget in (dot, title, chip, self.about):
+        for widget in (dot, title, chip):
             head.addWidget(widget)
-        head.addStretch(1)
+        head.addWidget(self.about, 1)
         head.addWidget(self.jobs)
         box.addLayout(head)
-        charts = QHBoxLayout()
+        self.queue = kind == "queue"
+        self.pages = QStackedWidget(self)
+        page = QWidget(self.pages)
+        charts = QHBoxLayout(page)
+        charts.setContentsMargins(0, 0, 0, 0)
         charts.setSpacing(12)
-        self.cpu, self.mem, self.gpu = Sparkline("CPU", self), Sparkline("Memory", self), Sparkline("GPU", self)
+        taken = " taken" if self.queue else ""
+        self.cpu, self.mem, self.gpu = (Sparkline(f"CPU{taken}", page), Sparkline(f"Memory{taken}", page),
+                                        Sparkline(f"GPU{taken}", page))
         for chart in (self.cpu, self.mem, self.gpu):
             chart.interval = interval or 0
-            chart.setVisible(interval is not None)
             charts.addWidget(chart, 1)
         self.gpu.setVisible(False)  # until a read finds one
-        box.addLayout(charts, 1)
+        self.pages.addWidget(page)
+        self.pages.setVisible(interval is not None)
+        box.addWidget(self.pages, 1)
+        if self.queue:  # its nodes one by one, behind a button of its header
+            listed = QScrollArea(self.pages)
+            listed.setWidgetResizable(True)
+            listed.setFrameShape(QFrame.NoFrame)
+            listed.setStyleSheet("QScrollArea { background: transparent; } QScrollArea > QWidget > QWidget { background: transparent; }")
+            self.node_rows = QWidget(listed)
+            self.node_grid = QGridLayout(self.node_rows)
+            self.node_grid.setContentsMargins(0, 0, 4, 0)
+            self.node_grid.setHorizontalSpacing(14)
+            self.node_grid.setVerticalSpacing(1)
+            listed.setWidget(self.node_rows)
+            self.pages.addWidget(listed)
+            self.toggle = QToolButton(self)
+            self.toggle.setText("Nodes")
+            self.toggle.setCheckable(True)
+            self.toggle.setToolTip("Each node of the queue now, or all of them in time")
+            self.toggle.setCursor(Qt.ArrowCursor)
+            self.toggle.setStyleSheet("QToolButton { font-size:11px; padding:0 6px; }")
+            self.toggle.toggled.connect(lambda on: self.pages.setCurrentIndex(int(on)))
+            head.addWidget(self.toggle)
         self.said = QLabel("not read: the login node of a queue" if interval is None else "", self)
         self.said.setStyleSheet("color:palette(placeholder-text); font-size:11px;")
         self.said.setVisible(interval is None)
@@ -280,6 +330,11 @@ class _HostCard(QFrame):
 
     def _describe(self, sample: Sample | None) -> None:
         said = [self.address] if self.address else ["this computer", f"{os.cpu_count()} threads"]
+        if sample is not None and sample.nodes:
+            up = sum(not _down(node["state"]) for node in sample.nodes)
+            said.append(f"{len(sample.nodes)} node{'s' * (len(sample.nodes) != 1)}" + (f", {up} up" if up != len(sample.nodes) else ""))
+            self.about.setText(" · ".join(said))  # its CPUs and memory: on its charts
+            return
         if sample is not None and sample.mem_total_gb:
             said.append(f"{sample.mem_total_gb:.0f} GB")
         if sample is not None and sample.via:
@@ -305,13 +360,42 @@ class _HostCard(QFrame):
             self.said.setText(sample.error)
             return
         self._describe(sample)
-        self.cpu.push(sample.cpu)
+        if sample.nodes:
+            used, cpus = sum(node["cpus_used"] for node in sample.nodes), sum(node["cpus"] for node in sample.nodes)
+            self.cpu.push(sample.cpu, f"{used:,}/{cpus:,}")
+            self._list(sample.nodes)
+        else:
+            self.cpu.push(sample.cpu)
         self.mem.push(sample.mem, f"{sample.mem_used_gb:.1f}/{sample.mem_total_gb:.0f} GB")
         if sample.gpus:  # ponytail: the mean over the cards; one chart per card when a host has several that differ
             util = sum(g[0] for g in sample.gpus) / len(sample.gpus)
-            self.gpu.title = f"GPU {len(sample.gpus)}×"
+            self.gpu.title = f"GPU{' taken' if self.queue else ''} {len(sample.gpus)}×"
             self.gpu.push(util)
             self.gpu.setVisible(True)
+
+    def _list(self, nodes: list[dict]) -> None:
+        """One row for each node: its state, then what the queue's jobs have taken of it."""
+        while self.node_grid.count():
+            self.node_grid.takeAt(0).widget().deleteLater()
+        faint = "color:palette(placeholder-text); font-size:11px;"
+        for row, node in enumerate(nodes):
+            hue = "red" if _down(node["state"]) else "green" if node["state"] in ("idle", "up") else "blue"
+            cells = [("●", f"color:{color(hue).name()}; font-size:9px;"), (node["name"], "font-size:11.5px; font-weight:600;"),
+                     (node["state"], faint), (f"{node['cpus_used']}/{node['cpus']} CPUs", "font-size:11px;"),
+                     (f"{node['mem_used_gb']:.0f}/{node['mem_gb']:.0f} GB", "font-size:11px;"),
+                     (f"{node['gpus_used']}/{node['gpus']} GPUs" if node["gpus"] else "", "font-size:11px;"),
+                     ("" if node["load"] is None else f"load {node['load']:.2f}", faint)]
+            for column, (text, style) in enumerate(cells):
+                label = QLabel(text, self.node_rows)
+                label.setStyleSheet(style)
+                self.node_grid.addWidget(label, row, column)
+        self.node_grid.setColumnStretch(len(cells), 1)
+        self.node_grid.setRowStretch(len(nodes), 1)
+
+
+def _down(state: str) -> bool:
+    """Slurm's `down`, `drained`, `fail`, `not_responding` (with their `*`); Grid Engine's `down`."""
+    return any(word in state for word in ("down", "drain", "fail", "not_responding", "unknown"))
 
 
 class HostsStrip(QScrollArea):
@@ -369,7 +453,8 @@ class HostsStrip(QScrollArea):
             card.clicked.connect(self._choose)
             row.addWidget(card, 145 if kind == "local" else 100)
             if interval is not None:
-                threading.Thread(target=self._read, args=(name, address, interval, stop, self._metrics(name, kind, executors)),
+                threading.Thread(target=self._read, args=(name, address, interval, stop, self._metrics(name, kind, executors),
+                                                          self._nodes(kind, executors)),
                                  name=f"resources-{name}", daemon=True).start()
         if not listed:
             empty = QLabel(failed or "No executor is on.", body)
@@ -416,8 +501,15 @@ class HostsStrip(QScrollArea):
             return None
         return lambda: next((url for executor in executors if (url := ask(executor).get(name))), None)
 
-    def _read(self, name: str, address: str, interval: int, stop: threading.Event, metrics=None) -> None:
-        reader = _Reader(address, metrics)
+    def _nodes(self, kind: str, executors: list[str]):
+        """What gives the nodes of the queue a login host is of."""
+        ask = getattr(self._workspace, "queue_nodes", None)
+        if kind != "queue" or ask is None or not executors:
+            return None
+        return lambda: ask(executors[0])
+
+    def _read(self, name: str, address: str, interval: int, stop: threading.Event, metrics=None, nodes=None) -> None:
+        reader = _Reader(address, metrics, nodes)
         while not stop.is_set():
             began = time.monotonic()
             sample = reader.read()
@@ -434,7 +526,7 @@ class HostsStrip(QScrollArea):
 
 def workspace_hosts(workspace) -> list[tuple[str, str, str, list[str], int | None]]:
     """`(host, address, kind, executors, interval)` for every host of an executor that is on, with
-    every such executor it is in; this machine always. `interval` is None for a queue's login node."""
+    every such executor it is in; this machine always. A queue's login node is read for its nodes."""
     if workspace is None:
         return [("local", "", "local", [], INTERVALS["local"])]
     kept = workspace.settings_manager.settings.hosts
@@ -448,10 +540,10 @@ def workspace_hosts(workspace) -> list[tuple[str, str, str, list[str], int | Non
                 continue
             address = getattr(kept.get(name), "address", "") or ""
             kind = "local" if not address else executor["kind"]
-            rows[name] = [name, address, kind, [executor["name"]], INTERVALS.get(kind, INTERVALS["ray"]) if kind != "queue" else None]
+            rows[name] = [name, address, kind, [executor["name"]], INTERVALS.get(kind, INTERVALS["ray"])]
     if "local" not in rows:
         rows = {"local": ["local", "", "local", [], INTERVALS["local"]], **rows}
     return [tuple(row) for row in rows.values()]
 
 
-__all__ = ["HostsStrip", "INTERVALS", "Sample", "Sparkline", "parse", "parse_metrics", "workspace_hosts"]
+__all__ = ["HostsStrip", "INTERVALS", "Sample", "Sparkline", "from_nodes", "parse", "parse_metrics", "workspace_hosts"]

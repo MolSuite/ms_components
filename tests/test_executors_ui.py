@@ -99,8 +99,12 @@ def test_hosts_and_executors_are_kept_and_started_from_the_ui(tmp_path, monkeypa
         assert panel.buttons["lab"].text() == "Deactivate"
         assert "`local` works for `lab`" in panel.states["local"].text() and not panel.buttons["local"].isEnabled()
         executors.reload(select="lab")
-        executors.save_button.click()
+        executors.save_button.click()  # nothing that changes how it connects: taken as it runs
+        assert "is kept" in executors.said.text()
+        executors._editors["hosts"].item(1).setCheckState(Qt.CheckState.Unchecked)
+        executors.save_button.click()  # its hosts do
         assert "in use by `lab`" in executors.said.text()
+        executors.reload(select="lab")
         panel.buttons["lab"].click()
         assert _until(lambda: panel.states["lab"].text() == "Off" and panel.states["local"].text() == "On")
 
