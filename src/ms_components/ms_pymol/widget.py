@@ -168,7 +168,7 @@ class PymolControlBar(QFrame):
         self._grid_label_objects: set[str] = set()
         self._preset_objects: set[str] = set()
         self._comparison_layout = "grid"
-        self._hydrogen_mode = "none"
+        self._hydrogen_mode = "polar"
         self._presets: dict[str, PymolPresetSpec] = {}
         self.setObjectName("PymolControlBar")
 
@@ -265,12 +265,13 @@ class PymolControlBar(QFrame):
         )
 
         self.hydrogens_action = self._add_toolbar_action(
-            "Hydrogens", "hydrogens.svg",
-            "Hydrogens: hidden. Click to show all H in this PyMOL session.",
+            "Hydrogens", "hydrogens-polar.svg",
+            "Hydrogens: polar H on ligands (bonded to N, O or S). Click to hide all H in this PyMOL session.",
             self.toggle_hydrogens,
             checkable=True,
         )
-        self.hydrogens_action.setData("none")
+        self.hydrogens_action.setChecked(True)
+        self.hydrogens_action.setData("polar")
 
         self.preset_menu = QMenu("Presets", bar)
         self.preset_action = self._add_toolbar_action(
@@ -775,8 +776,8 @@ class PymolControlBar(QFrame):
         self.hydrogens_action.setData(mode)
         state, next_state = {
             "none": ("hidden", "show all H"),
-            "all": ("all H", "show only polar H"),
-            "polar": ("polar H only (bonded to N, O or S)", "hide all H"),
+            "all": ("all H", "show only the ligands' polar H"),
+            "polar": ("polar H on ligands only (bonded to N, O or S)", "hide all H"),
         }[mode]
         self.hydrogens_action.setToolTip(
             f"Hydrogens: {state}. Click to {next_state} in this PyMOL session."
@@ -784,7 +785,11 @@ class PymolControlBar(QFrame):
 
     def apply_hydrogen_visibility(self) -> bool:
         # Enforce the session policy before drawing, including externally loaded objects.
-        polar = "hydro and neighbor (elem N+O+S)"
+        # Polar H earn their place on a ligand. On a protein they are one stick per backbone
+        # N-H over the whole chain, which buries a cartoon, so the polar mode leaves a polymer
+        # alone and `all` is how a protonated protein gets checked. `organic` is PyMOL's own
+        # reading of which residues are the small molecules.
+        polar = "hydro and neighbor (elem N+O+S) and organic"
         shown = {"none": "", "all": "hydro", "polar": polar}[self._hydrogen_mode]
         hidden = {"none": "hydro", "all": "", "polar": f"hydro and not ({polar})"}[self._hydrogen_mode]
 

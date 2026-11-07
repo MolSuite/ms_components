@@ -68,9 +68,13 @@ def grid_scene():
 @pytest.mark.parametrize("clicks", [0, 1, 2])
 def test_hydrogen_modes_apply_globally_and_to_new_systems(grid_scene, clicks, monkeypatch):
     bar, cmd = grid_scene
-    cmd.fragment("gly", "ligand")
-    cmd.fragment("gly", "other_ligand")
-    cmd.show("sticks", "ligand or other_ligand")
+    for name in ("ligand", "other_ligand"):
+        cmd.fragment("gly", name)
+        # A bare fragment is a polymer residue to PyMOL; a ligand is what `organic` picks.
+        cmd.alter(name, "resn='LIG';hetatm=1")
+        cmd.sort(name)
+    cmd.fragment("ala", "receptor")
+    cmd.show("sticks", "ligand or other_ligand or receptor")
     cmd.select("sele", "ligand and elem C")
     bar.set_scene_context("ligand", target="ligand")
     atom_count = cmd.count_atoms("all")
@@ -78,19 +82,26 @@ def test_hydrogen_modes_apply_globally_and_to_new_systems(grid_scene, clicks, mo
     for _ in range(clicks):
         bar.hydrogens_action.trigger()
 
-    def check(obj):
-        expected = (0 if clicks == 0 else cmd.count_atoms(
-            f"{obj} and hydro" + (" and neighbor (elem N+O+S)" if clicks == 2 else "")
-        ))
-        assert cmd.count_atoms(f"{obj} and hydro and visible") == expected
-        if clicks == 2:
+    def check(obj, *, ligand: bool = True):
+        if clicks == 1:  # none: nothing anywhere
+            expected = 0
+        elif clicks == 2:  # all H, a protein's included -- how a protonated protein is checked
+            expected = cmd.count_atoms(f"{obj} and hydro")
+        elif ligand:  # polar, the default
+            expected = cmd.count_atoms(f"{obj} and hydro and neighbor (elem N+O+S)")
             assert 0 < expected < cmd.count_atoms(f"{obj} and hydro")
+        else:  # a protein keeps its backbone N-H out of the way
+            expected = 0
+        assert cmd.count_atoms(f"{obj} and hydro and visible") == expected
 
     check("ligand")
     check("other_ligand")
+    check("receptor", ligand=False)
     assert cmd.count_atoms("not hydro and rep sticks") == heavy_count
     assert cmd.count_atoms("all") == atom_count
     cmd.fragment("cys", "new_system")
+    cmd.alter("new_system", "resn='LIG';hetatm=1")
+    cmd.sort("new_system")
     cmd.show("spheres", "new_system")
     bar.apply_hydrogen_visibility()  # Same hook used immediately before the viewer draws.
     check("new_system")
