@@ -145,6 +145,11 @@ class SmartTableView(QWidget):
         self._active_popup: QWidget | None = None
 
         self._setup_ui()
+        # The deferred fill accesses the inner QTableView. Parenting its timer to
+        # that view cancels pending work as soon as the view is destroyed.
+        self._infinite_autofill_timer = QTimer(self._table)
+        self._infinite_autofill_timer.setSingleShot(True)
+        self._infinite_autofill_timer.timeout.connect(self._auto_fill_infinite_viewport)
         self._connect_signals()
         self._update_control_summaries()
         self._sync_header()
@@ -793,7 +798,7 @@ class SmartTableView(QWidget):
         if not self._is_infinite_mode() or self._infinite_autofill_scheduled:
             return
         self._infinite_autofill_scheduled = True
-        QTimer.singleShot(0, self._auto_fill_infinite_viewport)
+        self._infinite_autofill_timer.start(0)
 
     def _auto_fill_infinite_viewport(self) -> None:
         self._infinite_autofill_scheduled = False
