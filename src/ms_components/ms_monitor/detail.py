@@ -38,7 +38,7 @@ from PySide6.QtWidgets import (
 
 from ms_components.ms_monitor.formatting import format_duration, format_speed
 from ms_components.ms_monitor.jobs import badge_of, status_color
-from ms_components.ms_monitor.models import FailureState, JobMonitorState
+from ms_components.ms_monitor.models import FailureState, JobMonitorState, TaskMonitorState
 from ms_components.ms_monitor.palette import P
 from ms_components.theme import font
 
@@ -422,7 +422,7 @@ class JobDetail(QWidget):
         self._traceback.setReadOnly(True)
         self._traceback.setLineWrapMode(QPlainTextEdit.NoWrap)
         self._traceback.setFont(font(mono=True))
-        errors = QSplitter(Qt.Vertical, side)
+        self._errors_tab = errors = QSplitter(Qt.Vertical, side)
         errors.addWidget(self._errors)
         errors.addWidget(self._traceback)
         errors.setSizes([260, 140])
@@ -443,7 +443,7 @@ class JobDetail(QWidget):
         self._tabs.addTab(errors, "Errors")
         self._tabs.addTab(self._summary, "Summary")
         self._tabs.addTab(self._steps, "Steps")
-        self._tabs.setTabVisible(3, False)  # only a job whose source says its steps (a campaign)
+        self._tabs.setTabVisible(self._tabs.indexOf(self._steps), False)  # only a job whose source says its steps (a campaign)
         self._errors.currentItemChanged.connect(self._show_traceback)
 
         work.addWidget(grid_panel)
@@ -466,7 +466,7 @@ class JobDetail(QWidget):
             self._bar.parts, self._trend.values = (0, 0, 0, 0), []
             self._show_grid(None)
             self._tasks.clear()
-            self._tabs.setTabText(0, "Running")
+            self._tabs.setTabText(self._tabs.indexOf(self._tasks), "Running")
             self._tab_meta.setText("")
             self.set_failures([], 0)
             self._set_summary(None)
@@ -524,9 +524,18 @@ class JobDetail(QWidget):
         self._swatch.setStyleSheet(f"background:{color}; border-radius:3px;")
 
     def _set_steps(self, job: JobMonitorState | None) -> None:
-        """Every step it went through, with how long it took: the next one's start, or now."""
+        """Every step it went through, with how long it took: the next one's start, or now. A job
+        with steps (a campaign) has them as its first tab, shown when it is chosen."""
         steps = job.steps if job is not None else ()
-        self._tabs.setTabVisible(3, bool(steps))
+        at = self._tabs.indexOf(self._steps)
+        if bool(steps) != (at == 0):
+            self._tabs.removeTab(at)
+            at = self._tabs.insertTab(0 if steps else self._tabs.count(), self._steps, "Steps")
+        self._tabs.setTabVisible(at, bool(steps))
+        chosen = job.job_id if job is not None else None
+        if steps and chosen != getattr(self, "_steps_of", None):
+            self._tabs.setCurrentIndex(at)
+        self._steps_of = chosen if steps else None
         if not steps or (steps == getattr(self, "_shown_steps", None) and job.is_terminal):
             return
         self._shown_steps = steps
@@ -589,6 +598,10 @@ class JobDetail(QWidget):
 
     def _set_tasks(self, job: JobMonitorState) -> None:
         tasks = job.tasks
+        if not tasks and job.steps and not job.is_terminal:  # a campaign: its job in the queue, as its source says it
+            since = job.steps[-1][0]
+            tasks = [TaskMonitorState(job.note or job.steps[-1][1], host=job.executor, progress=job.progress,
+                                      seconds=max(0.0, datetime.now().timestamp() - since))]
         median = statistics.median(task.seconds for task in tasks) if len(tasks) >= 3 else None
         warn = QColor(P["warn"])
         while self._tasks.topLevelItemCount() > len(tasks):
@@ -607,7 +620,7 @@ class JobDetail(QWidget):
             for column in range(5):
                 item.setForeground(column, warn if late else self._tasks.palette().color(QPalette.ColorRole.Text))
             item.setToolTip(0, f"slow: {task.seconds / median:.1f}× the median" if late else task.input)
-        self._tabs.setTabText(0, f"Running  {len(tasks)}" if tasks else "Running")
+        self._tabs.setTabText(self._tabs.indexOf(self._tasks), f"Running  {len(tasks)}" if tasks else "Running")
         said = [f"{len(tasks)} running"] if tasks else []
         if median is not None:
             said.append(f"median {format_duration(median)}")
@@ -649,8 +662,9 @@ class JobDetail(QWidget):
         if self._errors.count():
             self._errors.setCurrentRow(0)
         count = failed + bool(job_error)
-        self._tabs.setTabText(1, f"Errors  {count:,}" if count else "Errors")
-        self._tabs.tabBar().setTabTextColor(1, QColor(P["error"]) if count else _pal().color(QPalette.ColorRole.Text))
+        errors = self._tabs.indexOf(self._errors_tab)
+        self._tabs.setTabText(errors, f"Errors  {count:,}" if count else "Errors")
+        self._tabs.tabBar().setTabTextColor(errors, QColor(P["error"]) if count else _pal().color(QPalette.ColorRole.Text))
         self._set_failed_kpi()
 
     def _show_traceback(self, item, _previous=None) -> None:
@@ -670,7 +684,7 @@ class JobDetail(QWidget):
         self._fact["key"].setFont(font(mono=True))
         copy = QPushButton("copy", self._summary)
         copy.setObjectName("xchip")
-        copy.clicked.connect(lambda: QGuiApplication.clipboard().setText(self._fact["key"].text()))
+        copy.clicked.connect(lambda: QGuiApplication.clipboard().setText(self._fact["key"].toolTip()))
         self._facts.addWidget(copy, 0, 2)
 
     def _set_summary(self, job: JobMonitorState | None) -> None:
@@ -695,6 +709,9 @@ class JobDetail(QWidget):
         )
         for key, value in zip(self._FACTS, values):
             self._fact[key].setText(value)
+        # a key is a long hash: its first characters say which one it is, the whole on hover and to copy
+        self._fact["key"].setText(job.job_id[:8] + "…" if len(job.job_id) > 9 else job.job_id)
+        self._fact["key"].setToolTip(job.job_id)
 
 
 def _used(job: JobMonitorState, seconds: float) -> tuple[str, str, str]:
