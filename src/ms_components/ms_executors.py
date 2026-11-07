@@ -263,7 +263,7 @@ class KeptPage(QWidget):
             foot.addWidget(self.check_button)
             self.sync_button = QPushButton("Sync", self)
             self.sync_button.setToolTip("Install there, or bring up to date, the environment of the app and the "
-                                        "programs ticked, as saved. What is already as it is here is left alone.")
+                                        "programs ticked (the form is saved first). What is already as it is here is left alone.")
             self.sync_button.clicked.connect(self._sync)
             foot.addWidget(self.sync_button)
             self.steps = _Steps(self)
@@ -395,20 +395,21 @@ class KeptPage(QWidget):
                 item.setCheckState(Qt.CheckState.Unchecked)
         ticks.blockSignals(False)
 
-    def _save(self) -> None:
+    def _save(self) -> bool:
         name = self.name.text().strip()
         if not self.name.isReadOnly() and name in self._kept():
             self.said.setText(f"`{name}` is kept already.")
-            return
+            return False
         fields = {key: _value(editor) for key, editor in self._editors.items() if not editor.isHidden()}
         try:
             getattr(self._workspace, f"save_{self._one}")(name, **fields)
         except (ValueError, RuntimeError) as error:
             self.said.setText(str(error))
-            return
+            return False
         self.reload(select=name)
         self.said.setText(f"`{name}` is kept.")
         self.changed.emit()
+        return True
 
     def _check(self) -> None:
         """What `describe_host` says of the host as the form has it now, saved or not."""
@@ -484,14 +485,16 @@ class KeptPage(QWidget):
         """`Workspace.host_env` for the host as it is saved: what the app prepares there, made as it is here.
         `unlock` first removes the lock of an environment there that the user said was left behind."""
         name = self.names.currentItem().text()
-        host = self._kept()[name]
-        if host.env:
-            self._show_report(f"`{name}` names its own environment, {host.env}: the app prepares nothing there.")
-            return
         users = [row["name"] for row in self._workspace.executors()
                  if row["state"] in ("on", "starting") and name in row["hosts"]]
         if users:  # what it runs would change under it
             self._show_report(f"`{name}` is in use by `{users[0]}`, which is active: deactivate it first.")
+            return
+        if unlock is None and not self._save():  # the form as it is now: its ticks are what gets installed
+            return
+        host = self._kept()[name]
+        if host.env:
+            self._show_report(f"`{name}` names its own environment, {host.env}: the app prepares nothing there.")
             return
         self.sync_button.setEnabled(False)
         self._show_report(f"Preparing {host.address}…")
@@ -552,7 +555,7 @@ class ExecutorsPanel(QDialog):
     """
 
     line, ended = Signal(str), Signal(str, str)
-    settings_requested = Signal()
+    settings_requested = Signal(str)  # the executor to open Settings on; "" for the pages
     _STATES = {"on": "On", "off": "Off", "starting": "Starting…", "blocked": "Blocked"}
 
     def __init__(self, workspace, parent: QWidget | None = None):
@@ -581,7 +584,7 @@ class ExecutorsPanel(QDialog):
         foot.addStretch(1)
         self.settings_button = QPushButton("Hosts and executors…", self)
         self.settings_button.setToolTip("They are made and changed in Settings.")
-        self.settings_button.clicked.connect(self.settings_requested.emit)
+        self.settings_button.clicked.connect(lambda: self.settings_requested.emit(""))
         foot.addWidget(self.settings_button)
         self._layout.addLayout(foot)
 
@@ -635,6 +638,11 @@ class ExecutorsPanel(QDialog):
             button.setToolTip(row["why"])
             button.clicked.connect(lambda _checked, name=name, stop=state == "on": self._do(name, stop))
             grid.addWidget(button, at, 5)
+            edit = QPushButton("Edit…", body)
+            edit.setToolTip("Its CPUs, memory, partition… in Settings; what does not change how it connects "
+                            "is changed while it is active too.")
+            edit.clicked.connect(lambda _checked, name=name: self.settings_requested.emit(name))
+            grid.addWidget(edit, at, 6)
         self._layout.insertWidget(0, body)
 
     def _default(self, name: str) -> None:
