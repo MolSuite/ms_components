@@ -9615,7 +9615,7 @@ environment the app prepares on a host that names none, under the home there;
         <span class="n">foot</span><span class="o">.</span><span class="n">addWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">check_button</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">sync_button</span> <span class="o">=</span> <span class="n">QPushButton</span><span class="p">(</span><span class="s2">"Sync"</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">sync_button</span><span class="o">.</span><span class="n">setToolTip</span><span class="p">(</span><span class="s2">"Install there, or bring up to date, the environment of the app and the "</span>
-                                    <span class="s2">"programs ticked, as saved. What is already as it is here is left alone."</span><span class="p">)</span>
+                                    <span class="s2">"programs ticked (the form is saved first). What is already as it is here is left alone."</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">sync_button</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sync</span><span class="p">)</span>
         <span class="n">foot</span><span class="o">.</span><span class="n">addWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sync_button</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">steps</span> <span class="o">=</span> <span class="n">_Steps</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
@@ -9701,10 +9701,7 @@ goes to when nobody is named.</p>
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>src/ms_components/ms_executors.py</code></summary>
-                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">558</span>
-<span class="normal">559</span>
-<span class="normal">560</span>
-<span class="normal">561</span>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">561</span>
 <span class="normal">562</span>
 <span class="normal">563</span>
 <span class="normal">564</span>
@@ -9736,7 +9733,10 @@ goes to when nobody is named.</p>
 <span class="normal">590</span>
 <span class="normal">591</span>
 <span class="normal">592</span>
-<span class="normal">593</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workspace</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="normal">593</span>
+<span class="normal">594</span>
+<span class="normal">595</span>
+<span class="normal">596</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workspace</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">setWindowTitle</span><span class="p">(</span><span class="s2">"Executors"</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">setModal</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
@@ -9762,7 +9762,7 @@ goes to when nobody is named.</p>
     <span class="n">foot</span><span class="o">.</span><span class="n">addStretch</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">settings_button</span> <span class="o">=</span> <span class="n">QPushButton</span><span class="p">(</span><span class="s2">"Hosts and executors…"</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">settings_button</span><span class="o">.</span><span class="n">setToolTip</span><span class="p">(</span><span class="s2">"They are made and changed in Settings."</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">settings_button</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">settings_requested</span><span class="o">.</span><span class="n">emit</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">settings_button</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings_requested</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="s2">""</span><span class="p">))</span>
     <span class="n">foot</span><span class="o">.</span><span class="n">addWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">settings_button</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_layout</span><span class="o">.</span><span class="n">addLayout</span><span class="p">(</span><span class="n">foot</span><span class="p">)</span>
 
@@ -10557,7 +10557,36 @@ dialog so Reload / Save / Close share one row).</p>
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">193</span>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
 <span class="normal">194</span>
 <span class="normal">195</span>
 <span class="normal">196</span>
@@ -10678,36 +10707,7 @@ dialog so Reload / Save / Close share one row).</p>
 <span class="normal">311</span>
 <span class="normal">312</span>
 <span class="normal">313</span>
-<span class="normal">314</span>
-<span class="normal">315</span>
-<span class="normal">316</span>
-<span class="normal">317</span>
-<span class="normal">318</span>
-<span class="normal">319</span>
-<span class="normal">320</span>
-<span class="normal">321</span>
-<span class="normal">322</span>
-<span class="normal">323</span>
-<span class="normal">324</span>
-<span class="normal">325</span>
-<span class="normal">326</span>
-<span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span>
-<span class="normal">335</span>
-<span class="normal">336</span>
-<span class="normal">337</span>
-<span class="normal">338</span>
-<span class="normal">339</span>
-<span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
-<span class="normal">343</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="normal">314</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_cmd</span> <span class="o">=</span> <span class="n">cmd</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_context</span> <span class="o">=</span> <span class="n">PymolSceneContext</span><span class="p">()</span>
@@ -10842,7 +10842,7 @@ dialog so Reload / Save / Close share one row).</p>
         <span class="n">menu</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">export_menu</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="bp">self</span><span class="o">.</span><span class="n">context_label</span> <span class="o">=</span> <span class="n">_ElidedLabel</span><span class="p">(</span><span class="s2">"Generic"</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">context_label</span> <span class="o">=</span> <span class="n">ElidedLabel</span><span class="p">(</span><span class="s2">"Generic"</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">context_label</span><span class="o">.</span><span class="n">setObjectName</span><span class="p">(</span><span class="s2">"PymolSceneContext"</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">context_label</span><span class="o">.</span><span class="n">setAlignment</span><span class="p">(</span><span class="n">Qt</span><span class="o">.</span><span class="n">AlignVCenter</span> <span class="o">|</span> <span class="n">Qt</span><span class="o">.</span><span class="n">AlignRight</span><span class="p">)</span>
     <span class="c1"># Ignored: the tools keep their width and the scene name takes only what is left.</span>
@@ -10892,13 +10892,13 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">438</span>
-<span class="normal">439</span>
-<span class="normal">440</span>
-<span class="normal">441</span>
-<span class="normal">442</span>
-<span class="normal">443</span>
-<span class="normal">444</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">move_action_to_end</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">:</span> <span class="n">QAction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">move_action_to_end</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">:</span> <span class="n">QAction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Move an existing control, preserving its menu-button behavior."""</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">toolbar</span><span class="o">.</span><span class="n">removeAction</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">toolbar</span><span class="o">.</span><span class="n">addAction</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
@@ -10929,20 +10929,20 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">446</span>
-<span class="normal">447</span>
-<span class="normal">448</span>
-<span class="normal">449</span>
-<span class="normal">450</span>
-<span class="normal">451</span>
-<span class="normal">452</span>
-<span class="normal">453</span>
-<span class="normal">454</span>
-<span class="normal">455</span>
-<span class="normal">456</span>
-<span class="normal">457</span>
-<span class="normal">458</span>
-<span class="normal">459</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_menu_action</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_menu_action</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">menu</span><span class="p">:</span> <span class="n">QMenu</span><span class="p">,</span>
@@ -10980,25 +10980,25 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">461</span>
-<span class="normal">462</span>
-<span class="normal">463</span>
-<span class="normal">464</span>
-<span class="normal">465</span>
-<span class="normal">466</span>
-<span class="normal">467</span>
-<span class="normal">468</span>
-<span class="normal">469</span>
-<span class="normal">470</span>
-<span class="normal">471</span>
-<span class="normal">472</span>
-<span class="normal">473</span>
-<span class="normal">474</span>
-<span class="normal">475</span>
-<span class="normal">476</span>
-<span class="normal">477</span>
-<span class="normal">478</span>
-<span class="normal">479</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_action</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_action</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -11041,19 +11041,19 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">832</span>
-<span class="normal">833</span>
-<span class="normal">834</span>
-<span class="normal">835</span>
-<span class="normal">836</span>
-<span class="normal">837</span>
-<span class="normal">838</span>
-<span class="normal">839</span>
-<span class="normal">840</span>
-<span class="normal">841</span>
-<span class="normal">842</span>
-<span class="normal">843</span>
-<span class="normal">844</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">refresh_context_label</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">803</span>
+<span class="normal">804</span>
+<span class="normal">805</span>
+<span class="normal">806</span>
+<span class="normal">807</span>
+<span class="normal">808</span>
+<span class="normal">809</span>
+<span class="normal">810</span>
+<span class="normal">811</span>
+<span class="normal">812</span>
+<span class="normal">813</span>
+<span class="normal">814</span>
+<span class="normal">815</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">refresh_context_label</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Keep the compact context label useful without turning it into a second status bar."""</span>
     <span class="n">kind</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">kind</span> <span class="ow">or</span> <span class="s2">"generic"</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"_"</span><span class="p">,</span> <span class="s2">" "</span><span class="p">)</span><span class="o">.</span><span class="n">title</span><span class="p">()</span>
     <span class="n">target</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">target</span> <span class="ow">or</span> <span class="s2">"all"</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">"all"</span>
@@ -11768,12 +11768,12 @@ object. <code>restore_view=False</code> keeps the camera the caller just set.</p
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">148</span>
-<span class="normal">149</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">149</span>
 <span class="normal">150</span>
 <span class="normal">151</span>
 <span class="normal">152</span>
-<span class="normal">153</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">associate_scene_objects</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">objects</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">reference</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">153</span>
+<span class="normal">154</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">associate_scene_objects</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">objects</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">reference</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Keep generated interactions/geometry in their structure's comparison panel."""</span>
     <span class="n">slot</span> <span class="o">=</span> <span class="n">cmd</span><span class="o">.</span><span class="n">get_setting_int</span><span class="p">(</span><span class="s2">"grid_slot"</span><span class="p">,</span> <span class="n">reference</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">objects</span><span class="p">:</span>
