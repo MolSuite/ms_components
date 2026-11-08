@@ -10707,14 +10707,15 @@ dialog so Reload / Save / Close share one row).</p>
 <span class="normal">311</span>
 <span class="normal">312</span>
 <span class="normal">313</span>
-<span class="normal">314</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="normal">314</span>
+<span class="normal">315</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmd</span><span class="p">,</span> <span class="n">parent</span><span class="p">:</span> <span class="n">QWidget</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_cmd</span> <span class="o">=</span> <span class="n">cmd</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_context</span> <span class="o">=</span> <span class="n">PymolSceneContext</span><span class="p">()</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_grid_label_objects</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_preset_objects</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_comparison_layout</span> <span class="o">=</span> <span class="s2">"grid"</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_hydrogen_mode</span> <span class="o">=</span> <span class="s2">"none"</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_hydrogen_mode</span> <span class="o">=</span> <span class="s2">"polar"</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_presets</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">PymolPresetSpec</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">setObjectName</span><span class="p">(</span><span class="s2">"PymolControlBar"</span><span class="p">)</span>
 
@@ -10811,12 +10812,13 @@ dialog so Reload / Save / Close share one row).</p>
     <span class="p">)</span>
 
     <span class="bp">self</span><span class="o">.</span><span class="n">hydrogens_action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_toolbar_action</span><span class="p">(</span>
-        <span class="s2">"Hydrogens"</span><span class="p">,</span> <span class="s2">"hydrogens.svg"</span><span class="p">,</span>
-        <span class="s2">"Hydrogens: hidden. Click to show all H in this PyMOL session."</span><span class="p">,</span>
+        <span class="s2">"Hydrogens"</span><span class="p">,</span> <span class="s2">"hydrogens-polar.svg"</span><span class="p">,</span>
+        <span class="s2">"Hydrogens: polar H on ligands (bonded to N, O or S). Click to hide all H in this PyMOL session."</span><span class="p">,</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">toggle_hydrogens</span><span class="p">,</span>
         <span class="n">checkable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">hydrogens_action</span><span class="o">.</span><span class="n">setData</span><span class="p">(</span><span class="s2">"none"</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">hydrogens_action</span><span class="o">.</span><span class="n">setChecked</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">hydrogens_action</span><span class="o">.</span><span class="n">setData</span><span class="p">(</span><span class="s2">"polar"</span><span class="p">)</span>
 
     <span class="bp">self</span><span class="o">.</span><span class="n">preset_menu</span> <span class="o">=</span> <span class="n">QMenu</span><span class="p">(</span><span class="s2">"Presets"</span><span class="p">,</span> <span class="n">bar</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">preset_action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_toolbar_action</span><span class="p">(</span>
@@ -10892,13 +10894,13 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">409</span>
-<span class="normal">410</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">410</span>
 <span class="normal">411</span>
 <span class="normal">412</span>
 <span class="normal">413</span>
 <span class="normal">414</span>
-<span class="normal">415</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">move_action_to_end</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">:</span> <span class="n">QAction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">415</span>
+<span class="normal">416</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">move_action_to_end</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">:</span> <span class="n">QAction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Move an existing control, preserving its menu-button behavior."""</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">toolbar</span><span class="o">.</span><span class="n">removeAction</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">toolbar</span><span class="o">.</span><span class="n">addAction</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
@@ -10929,8 +10931,7 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">417</span>
-<span class="normal">418</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">418</span>
 <span class="normal">419</span>
 <span class="normal">420</span>
 <span class="normal">421</span>
@@ -10942,7 +10943,8 @@ dialog so Reload / Save / Close share one row).</p>
 <span class="normal">427</span>
 <span class="normal">428</span>
 <span class="normal">429</span>
-<span class="normal">430</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_menu_action</span><span class="p">(</span>
+<span class="normal">430</span>
+<span class="normal">431</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_menu_action</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">menu</span><span class="p">:</span> <span class="n">QMenu</span><span class="p">,</span>
@@ -10980,8 +10982,7 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">432</span>
-<span class="normal">433</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">433</span>
 <span class="normal">434</span>
 <span class="normal">435</span>
 <span class="normal">436</span>
@@ -10998,7 +10999,8 @@ dialog so Reload / Save / Close share one row).</p>
 <span class="normal">447</span>
 <span class="normal">448</span>
 <span class="normal">449</span>
-<span class="normal">450</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_action</span><span class="p">(</span>
+<span class="normal">450</span>
+<span class="normal">451</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_action</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -11041,19 +11043,19 @@ dialog so Reload / Save / Close share one row).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ms_components/ms_pymol/widget.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">803</span>
-<span class="normal">804</span>
-<span class="normal">805</span>
-<span class="normal">806</span>
-<span class="normal">807</span>
-<span class="normal">808</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">808</span>
 <span class="normal">809</span>
 <span class="normal">810</span>
 <span class="normal">811</span>
 <span class="normal">812</span>
 <span class="normal">813</span>
 <span class="normal">814</span>
-<span class="normal">815</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">refresh_context_label</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">815</span>
+<span class="normal">816</span>
+<span class="normal">817</span>
+<span class="normal">818</span>
+<span class="normal">819</span>
+<span class="normal">820</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">refresh_context_label</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Keep the compact context label useful without turning it into a second status bar."""</span>
     <span class="n">kind</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">kind</span> <span class="ow">or</span> <span class="s2">"generic"</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"_"</span><span class="p">,</span> <span class="s2">" "</span><span class="p">)</span><span class="o">.</span><span class="n">title</span><span class="p">()</span>
     <span class="n">target</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">target</span> <span class="ow">or</span> <span class="s2">"all"</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">"all"</span>
