@@ -114,7 +114,15 @@ def test_hydrogen_action_cycles_global_modes_despite_a_selection():
 
     cmd.selected_atoms = 4
     assert bar.hydrogens_action.isCheckable()
+    assert bar.hydrogens_action.isChecked()
+    assert bar.hydrogens_action.data() == "polar"
+    assert "polar" in bar.hydrogens_action.toolTip()
+    polar_icon = bar._toolbar_action_icons[bar.hydrogens_action]
+    assert cmd.calls[-1] == ("show", "sticks", "hydro and neighbor (elem N+O+S) and organic")
+    bar.hydrogens_action.trigger()
     assert not bar.hydrogens_action.isChecked()
+    assert bar.hydrogens_action.data() == "none"
+    assert cmd.calls[-1] == ("hide", "everything", "hydro")
     bar.hydrogens_action.trigger()
     assert bar.hydrogens_action.isChecked()
     assert bar.hydrogens_action.data() == "all"
@@ -125,11 +133,8 @@ def test_hydrogen_action_cycles_global_modes_despite_a_selection():
     assert bar.hydrogens_action.data() == "polar"
     assert "polar" in bar.hydrogens_action.toolTip()
     assert bar._toolbar_action_icons[bar.hydrogens_action] != all_icon
-    assert cmd.calls[-1] == ("show", "sticks", "hydro and neighbor (elem N+O+S)")
-    bar.hydrogens_action.trigger()
-    assert not bar.hydrogens_action.isChecked()
-    assert bar.hydrogens_action.data() == "none"
-    assert cmd.calls[-1] == ("hide", "everything", "hydro")
+    assert bar._toolbar_action_icons[bar.hydrogens_action] == polar_icon
+    assert cmd.calls[-1] == ("show", "sticks", "hydro and neighbor (elem N+O+S) and organic")
     bar.close()
 
 
@@ -147,8 +152,8 @@ def test_hydrogen_action_reports_pymol_errors():
     cmd.show = fail
     bar.hydrogens_action.trigger()
     assert failures == ["Hydrogens: test failure"]
-    assert not bar.hydrogens_action.isChecked()
-    assert bar.hydrogens_action.data() == "none"
+    assert bar.hydrogens_action.isChecked()
+    assert bar.hydrogens_action.data() == "polar"
     bar.close()
 
 
