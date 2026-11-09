@@ -49,6 +49,24 @@ def test_speed_is_that_of_the_last_minutes_and_goes_once_the_job_ends():
     assert speeds._seen == {}
 
 
+def test_a_measured_job_has_the_speed_of_its_items_and_its_history_in_chunks():
+    speeds, job = _Speeds(), _job(chunks_done=0, chunks_failed=0, items_unit="records", items_done=0)
+    speeds.apply(job, 1000.0)
+    job = _job(chunks_done=10, chunks_failed=0, items_unit="records", items_done=300)
+    speeds.apply(job, 1010.0)
+    assert (job.throughput_eps, job.items_eps, job.throughput_history) == (1.0, 30.0, [1.0])
+
+
+def test_the_throughput_card_leads_with_chunks_and_says_the_items_under_them():
+    QApplication.instance() or QApplication([])
+    detail = JobDetail()
+    detail.set_job(_job(throughput_eps=2.0, items_unit="records", items_done=1200, items_total=5000, items_eps=64.0))
+    assert (detail._speed.value.text(), detail._speed.unit.text()) == ("2.0", "chunks/s")
+    assert detail._speed.sub.text() == "64.0 records/s · 1,200 / 5,000"
+    detail.set_job(_job(throughput_eps=2.0))  # one the application does not measure: as before
+    assert detail._speed.unit.text() == "chunks/s" and "tasks" in detail._speed.sub.text()
+
+
 def test_the_detail_shows_the_numbers_the_tasks_and_the_failures_grouped():
     QApplication.instance() or QApplication([])
     detail = JobDetail()

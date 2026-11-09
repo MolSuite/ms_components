@@ -57,6 +57,12 @@ class JobMonitorState:
     usage: dict = field(default_factory=dict)  # what it used, kept once it ended: see ms_flow's JobSnapshot.usage
     throughput_eps: float = 0.0  # chunks settled per second over the last minutes; since it began once it ended
     throughput_history: list[float] = field(default_factory=list)  # the same, one value per few seconds
+    # What the application counts in the job besides its chunks (records, files, frames...), when it
+    # says: see `MolSuiteMonitorBridge(measure=...)`. `items_unit` is "" for a job it does not measure.
+    items_unit: str = ""
+    items_done: int = 0
+    items_total: int = 0  # 0 when it does not say
+    items_eps: float = 0.0  # per second over the last minutes, like `throughput_eps`
     started_at: datetime | None = None
     finished_at: datetime | None = None
     tasks: list[TaskMonitorState] = field(default_factory=list)  # read only for the selected job

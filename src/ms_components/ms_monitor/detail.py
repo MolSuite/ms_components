@@ -507,9 +507,16 @@ class JobDetail(QWidget):
         self._bar.update()
         speed = format_speed(job.throughput_eps)
         number, _, unit = speed.partition("/")
-        cpu = f" · {job.cpu_used:,} CPUs" if job.cpu_used else ""
-        self._speed.set(number, f"{job.tasks_running:,} tasks{cpu}" if not job.is_terminal else "mean over the run",
-                        accent, unit=f"chunks/{unit}" if unit else "")
+        if job.items_unit:
+            # Chunks lead: they are what every job has. What they hold is the line under it, in
+            # the application's unit (tasks and CPUs are in the header already).
+            items = format_speed(job.items_eps).replace("/", f" {job.items_unit}/")
+            done = f"{job.items_done:,}" + (f" / {job.items_total:,}" if job.items_total else "")
+            sub = f"{items} · {done}" + (" · mean" if job.is_terminal else "")
+        else:
+            cpu = f" · {job.cpu_used:,} CPUs" if job.cpu_used else ""
+            sub = f"{job.tasks_running:,} tasks{cpu}" if not job.is_terminal else "mean over the run"
+        self._speed.set(number, sub, accent, unit=f"chunks/{unit}" if unit else "")
         self._trend.values = job.throughput_history
         self._trend.update()
         self._set_failed_kpi()
@@ -702,7 +709,8 @@ class JobDetail(QWidget):
             format_duration((end - job.started_at).total_seconds()) if job.started_at else "—",
             f"{job.chunks_done:,} done · {job.chunks_failed:,} failed · {job.chunks_total:,} in all",
             f"{job.chunks_retried:,}",
-            format_speed(job.throughput_eps) + ("" if job.is_terminal else " · last 5 min"),
+            format_speed(job.throughput_eps) + (f" · {format_speed(job.items_eps)} {job.items_unit}" if job.items_unit else "")
+            + ("" if job.is_terminal else " · last 5 min"),
             *_used(job, (end - job.started_at).total_seconds() if job.started_at else 0.0),
             f"{job.tasks_running:,} tasks · {job.cpu_used:,} CPUs" if not job.is_terminal else "—",
             f"{self._error_types:,} types" if self._error_types else "none",

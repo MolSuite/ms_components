@@ -36,11 +36,16 @@ class MolSuiteMonitorBridge(QObject):
         max_recent_jobs: int = MonitorConfig.model_fields["max_recent_jobs"].default,
         resume=None,
         destinations=None,
+        measure=None,
         parent: QObject | None = None,
     ) -> None:
         """`resume(job_id, executor or None)` and `destinations(job_id) -> names` are for an
         application that keeps its own rules of where a job may go: left out, the workspace
-        continues the job and every active executor is offered."""
+        continues the job and every active executor is offered.
+        `measure(job_id) -> {"done": int, "total": int, "unit": str} | None` is what the
+        application counts in a job besides its chunks (the records a chunk holds, say): the
+        monitor shows its rate in that unit. Called on the polling thread, every poll while the
+        job runs and once after it ends; None for a job it does not measure."""
         super().__init__(parent)
         self._workspace = workspace
         self._resume = resume or self._workspace_resume
@@ -52,6 +57,7 @@ class MolSuiteMonitorBridge(QObject):
             workspace=workspace,
             poll_ms=poll_ms,
             max_recent_jobs=max_recent_jobs,
+            measure=measure,
         )
         self._sync_state = MonitorSyncState()
         self._connect_poller(self._poller)
