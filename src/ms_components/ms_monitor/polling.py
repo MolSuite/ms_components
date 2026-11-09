@@ -45,7 +45,8 @@ def job_state(job, now: float) -> JobMonitorState:
 
 
 class _Speeds:
-    """What each running job settled over the last minutes: `(time, settled)` every few seconds."""
+    """What each running job settled over the last minutes: `(time, chunks settled, items done)`
+    every few seconds. The history is of the chunks."""
 
     def __init__(self) -> None:
         self._seen: dict[str, deque] = {}
@@ -55,13 +56,14 @@ class _Speeds:
             self._seen.pop(job.job_id, None)
             return
         seen = self._seen.setdefault(job.job_id, deque(maxlen=SPEED_WINDOW_S // _SPEED_STEP_S + 1))
+        point = (now, job.chunks_settled, job.items_done)
         if not seen or now - seen[-1][0] >= _SPEED_STEP_S:
-            seen.append((now, job.chunks_settled))
-        points = [*seen, (now, job.chunks_settled)]
-        (t0, s0), (t1, s1) = points[0], points[-1]
+            seen.append(point)
+        (t0, c0, i0), (t1, c1, i1) = seen[0], point
         if t1 - t0 >= _SPEED_STEP_S:  # until then the mean since it began stands
-            job.throughput_eps = (s1 - s0) / (t1 - t0)
-        job.throughput_history = [(b - a) / (u - t) for (t, a), (u, b) in zip(seen, list(seen)[1:]) if u > t]
+            job.throughput_eps = (c1 - c0) / (t1 - t0)
+            job.items_eps = (i1 - i0) / (t1 - t0)
+        job.throughput_history = [(b[1] - a[1]) / (b[0] - a[0]) for a, b in zip(seen, list(seen)[1:]) if b[0] > a[0]]
 
     def keep(self, job_ids) -> None:
         for job_id in self._seen.keys() - set(job_ids):
@@ -83,10 +85,13 @@ class MolSuiteMonitorPoller(QObject):
         workspace,
         poll_ms: int = 500,
         max_recent_jobs: int = 20,
+        measure=None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._workspace = workspace
+        self._measure = measure
+        self._measured: dict[str, dict] = {}  # the last word on a job that ended: asked no more
         # Only poll fast while jobs are active; back off hard when idle.
         self._active_poll_ms = max(100, poll_ms)
         self._idle_poll_ms = max(self._active_poll_ms, 3000)
@@ -155,6 +160,28 @@ class MolSuiteMonitorPoller(QObject):
         self._last_snapshot = snapshot
         self.project_snapshot_updated.emit(snapshot)
 
+    def _apply_measure(self, job: JobMonitorState, now: float) -> None:
+        """What the application counts in `job`, from `measure(job_id)`: `{"done", "total", "unit"}`
+        or None. A job that ended is asked once more and then kept."""
+        if self._measure is None:
+            return
+        said = self._measured.get(job.job_id)
+        if said is None:
+            try:
+                said = self._measure(job.job_id)
+            except Exception:  # noqa: BLE001 — a figure of the application must never stop the monitor
+                said = None
+            if not said or not said.get("unit"):
+                return
+            if job.is_terminal:
+                self._measured[job.job_id] = said
+        job.items_unit = str(said["unit"])
+        job.items_done = max(0, int(said.get("done") or 0))
+        job.items_total = max(0, int(said.get("total") or 0))
+        end = job.finished_at.timestamp() if job.finished_at else now
+        elapsed = end - job.started_at.timestamp() if job.started_at else 0.0
+        job.items_eps = job.items_done / elapsed if elapsed > 0 else 0.0  # the mean; `_Speeds` gives the recent one
+
     def _build_snapshot(self) -> ProjectMonitorState:
         workspace = self._workspace
         context = workspace.active_context
@@ -165,7 +192,10 @@ class MolSuiteMonitorPoller(QObject):
         jobs = [job_state(job, now) for job in workspace.jobs(self._max_recent_jobs)][::-1]
         jobs.sort(key=lambda job: job.is_terminal)  # stable: active first, newest first in each
         self._speeds.keep(job.job_id for job in jobs)
+        shown = {job.job_id for job in jobs}
+        self._measured = {job_id: said for job_id, said in self._measured.items() if job_id in shown}
         for job in jobs:
+            self._apply_measure(job, now)
             self._speeds.apply(job, now)
             if job.job_id == self.selected and not job.is_terminal:
                 job.tasks = [

@@ -204,3 +204,40 @@ def test_a_job_is_moved_while_it_runs_from_the_buttons_of_the_monitor(ms, tmp_pa
         QApplication.processEvents()
         time.sleep(0.01)
     assert heard[1][0] == "resume_job" and "already ended" in heard[1][1]
+
+
+def test_what_the_application_measures_is_shown_with_the_chunks(ms, tmp_path):
+    """`measure` names a unit and how many of it are done: asked while the job runs, once after."""
+    _open(ms, tmp_path)
+    asked, done = [], {"n": 3}
+
+    def measure(job_id):
+        asked.append(job_id)
+        return {"done": done["n"], "total": 12, "unit": "records"} if job_id == state_id[0] else None
+
+    state_id = [None]
+    bridge = MolSuiteMonitorBridge(workspace=ms, poll_ms=50, measure=measure)
+    GATE.clear()
+    job_id = ms.submit(halves, executor="thread")
+    state_id[0] = _visible(bridge).job_id
+    running = bridge.refresh_now().jobs[0]
+    assert (running.items_unit, running.items_done, running.items_total) == ("records", 3, 12)
+    assert running.items_eps > 0  # the mean since it began, until there are minutes to go by
+
+    GATE.set()
+    ms.engine.wait(job_id, 30)
+    done["n"] = 12
+    bridge.refresh_now()
+    calls = len(asked)
+    done["n"] = 99  # it ended: the last word stands
+    [ended] = bridge.refresh_now().jobs
+    assert (ended.items_done, len(asked)) == (12, calls)
+
+
+def test_a_job_the_application_does_not_measure_shows_its_chunks_alone(ms, tmp_path):
+    _open(ms, tmp_path)
+    bridge = MolSuiteMonitorBridge(workspace=ms, poll_ms=50, measure=lambda job_id: 1 / 0)
+    GATE.set()
+    ms.engine.wait(ms.submit(halves, executor="thread"), 30)
+    [state] = bridge.refresh_now().jobs
+    assert (state.items_unit, state.items_done, state.status) == ("", 0, "completed_with_errors")
