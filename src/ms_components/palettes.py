@@ -3,6 +3,10 @@
 Palette data from **qt-themes** by Beat Reichenbach (MIT, see `ms_components.theme`), stored
 here per QPalette role and nudged to the contrast floors that `tests/test_theme_contrast.py`
 enforces. How the keys become a QPalette: `ms_components.theme.build_palette`.
+The Spectrum family is inspired by Zensical's modern default/slate surfaces and
+primary/accent colors (https://zensical.org/docs/setup/colors/). Thanks to the
+Zensical contributors for the original palette design; these MolSuite adaptations
+use Qt roles and adjusted contrast, and are not official Zensical themes.
 
 Keys are the QPalette roles in snake_case, so a value is exactly what `palette(role)` returns
 in a stylesheet. What MolSuite asks of the roles Qt leaves loosely defined:
@@ -40,3 +44,48 @@ THEMES: dict[str, dict[str, str]] = {
     "nord": {"window": "#3b4252", "window_text": "#eceff4", "base": "#2e3440", "alternate_base": "#3b4252", "tooltip_base": "#2e3440", "tooltip_text": "#d8dee9", "placeholder_text": "#abafb8", "text": "#eceff4", "button": "#3b4252", "button_text": "#eceff4", "bright_text": "#0b0b0b", "light": "#2e3440", "midlight": "#2e3440", "mid": "#4c566a", "dark": "#525a6b", "shadow": "#878e9b", "highlight": "#81a1c1", "highlighted_text": "#2e3440", "link": "#88c0d0", "link_visited": "#88c0d0", "accent": "#88c0d0", "disabled_text": "#7c828e", "red": "#d89fa4", "orange": "#daa18f", "yellow": "#ebcb8b", "green": "#a3be8c", "cyan": "#88c0d0", "blue": "#97b2cc", "magenta": "#c3a5be"},
     "one_dark_two": {"window": "#282c34", "window_text": "#e6e6e6", "base": "#21252b", "alternate_base": "#282c34", "tooltip_base": "#21252b", "tooltip_text": "#969dab", "placeholder_text": "#919296", "text": "#e6e6e6", "button": "#282c34", "button_text": "#e6e6e6", "bright_text": "#191919", "light": "#1d1f23", "midlight": "#21252b", "mid": "#5b626d", "dark": "#4a505a", "shadow": "#6f7583", "highlight": "#62bac6", "highlighted_text": "#1d1f23", "link": "#eac786", "link_visited": "#eac786", "accent": "#eac786", "disabled_text": "#696b71", "red": "#e27881", "orange": "#e79c7e", "yellow": "#eac786", "green": "#98c379", "cyan": "#62bac6", "blue": "#71b9f4", "magenta": "#c88bda"},
 }
+
+# Light/dark accents adapted from Zensical's primary colors to >= 4.5:1 on Qt surfaces.
+_SPECTRUM_COLORS = {
+    "red": ("#bf4442", "#ef5956"),
+    "pink": ("#d41d5a", "#ed5487"),
+    "purple": ("#a544b6", "#c46fd3"),
+    "deep_purple": ("#7e56c2", "#a47bea"),
+    "indigo": ("#4051b5", "#588be9"),
+    "blue": ("#1871ba", "#2094f3"),
+    "light_blue": ("#0175aa", "#02a6f2"),
+    "cyan": ("#007989", "#00bdd6"),
+    "teal": ("#007c70", "#00bda4"),
+    "green": ("#367c38", "#71c174"),
+    "light_green": ("#56782e", "#8bc34b"),
+    "lime": ("#6a731d", "#cbdc38"),
+    "yellow": ("#786f1d", "#ffec3d"),
+    "amber": ("#8b6903", "#ffc105"),
+    "orange": ("#976315", "#ffa724"),
+    "deep_orange": ("#b54e2f", "#ff764d"),
+    "brown": ("#795649", "#c27a5f"),
+    "grey": ("#6e6e6e", "#8c8c8c"),
+    "blue_grey": ("#546d78", "#7c8f97"),
+    "black": ("#252629", "#898c93"),
+    "white": ("#6d6e70", "#e6e8ed"),
+}
+_SPECTRUM_LIGHT = {
+    **THEMES["github_light"],
+    "window": "#f5f6f8", "button": "#f5f6f8",
+    "alternate_base": "#fafbfc", "tooltip_base": "#fafbfc", "midlight": "#fafbfc",
+    "window_text": "#252629", "text": "#252629", "button_text": "#252629",
+    "dark": "#c5c7cc", "highlighted_text": "#ffffff",
+    "red": "#df1300", "orange": "#b25300", "blue": "#006fcf", "magenta": "#9535fa",
+}
+_SPECTRUM_DARK = {"window": "#16171a", "window_text": "#c6c7ca", "base": "#0b0c0f", "alternate_base": "#212226", "tooltip_base": "#212226", "tooltip_text": "#a5a8b0", "placeholder_text": "#a5a8b0", "text": "#c6c7ca", "button": "#16171a", "button_text": "#c6c7ca", "bright_text": "#0b0c0f", "light": "#0b0c0f", "midlight": "#212226", "mid": "#4e525c", "dark": "#393c44", "shadow": "#888d98", "highlight": "#00bda4", "highlighted_text": "#0b0c0f", "link": "#00ccb8", "link_visited": "#00ccb8", "accent": "#00bda4", "disabled_text": "#5f626b", "red": "#ff7b72", "orange": "#ffa657", "yellow": "#e3b341", "green": "#71c174", "cyan": "#56c8d8", "blue": "#79a9f5", "magenta": "#c98cdb"}
+SPECTRUM_THEMES: dict[str, dict[str, str]] = {"light": {}, "dark": {}}
+for _mode, _base in (("light", _SPECTRUM_LIGHT), ("dark", _SPECTRUM_DARK)):
+    for _color, _accents in _SPECTRUM_COLORS.items():
+        _name = f"spectrum_{_mode}_{_color}"
+        _accent = _accents[0 if _mode == "light" else 1]
+        _link = "#00ccb8" if (_mode, _color) == ("dark", "teal") else _accent
+        THEMES[_name] = {
+            **_base, "highlight": _accent, "accent": _accent,
+            "link": _link, "link_visited": _link,
+        }
+        SPECTRUM_THEMES[_mode][_color] = _name

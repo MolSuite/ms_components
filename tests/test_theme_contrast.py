@@ -1,6 +1,9 @@
+import pytest
 from PySide6.QtGui import QColor, QPalette
 
-from ms_components.theme import HUES, TONES, THEMES, base_qss, build_palette, contrast_ratio, resolve
+from ms_components.theme import (
+    HUES, TONES, THEMES, SPECTRUM_THEMES, base_qss, build_palette, contrast_ratio, is_dark, resolve,
+)
 
 def _floor(theme, key, minimum, *against):
     against = against or ("window", "base", "alternate_base")
@@ -49,6 +52,31 @@ def test_hybrid_themes_use_github_surfaces_and_the_requested_accents():
             assert abs(QColor(theme[role]).hue() - QColor(THEMES[source][source_role]).hue()) <= 2
 
 
+def test_spectrum_teal_carries_the_same_roles_and_readable_header_hints():
+    theme = THEMES["spectrum_dark_teal"]
+    assert resolve("zensical_teal") == "spectrum_dark_teal"
+    assert theme.keys() == THEMES["catppuccin_mocha"].keys()
+    assert all(QColor(value).isValid() for value in theme.values())
+    _floor(theme, "placeholder_text", 4.5, "dark")  # table toolbar metadata
+    _floor(theme, "shadow", 3.0, "dark")
+
+
+def test_spectrum_has_both_modes_for_every_primary_color():
+    assert set(SPECTRUM_THEMES) == {"light", "dark"}
+    assert len(SPECTRUM_THEMES["light"]) == 21
+    assert SPECTRUM_THEMES["light"].keys() == SPECTRUM_THEMES["dark"].keys()
+    for mode, colors in SPECTRUM_THEMES.items():
+        for color_name, name in colors.items():
+            theme = THEMES[name]
+            assert name == f"spectrum_{mode}_{color_name}"
+            assert resolve(name) == name
+            assert resolve(f"zensical_{mode}_{color_name}") == name
+            assert theme.keys() == THEMES["catppuccin_mocha"].keys()
+            assert all(QColor(value).isValid() for value in theme.values())
+            assert is_dark(theme) == (mode == "dark")
+    assert not any(name.startswith("zensical_") for name in THEMES)
+
+
 def test_muted_and_disabled_text_read_as_different_levels():
     for name, theme in THEMES.items():
         window = QColor(theme["window"])
@@ -67,13 +95,14 @@ def test_the_palette_carries_every_role_and_the_disabled_text():
     assert set(TONES) <= set(theme)
 
 
-def test_checkbox_and_radio_edges_reach_three_to_one():
+@pytest.mark.parametrize("name", ("catppuccin_mocha", "spectrum_dark_teal"))
+def test_checkbox_and_radio_edges_reach_three_to_one(name):
     from PySide6.QtWidgets import QApplication, QCheckBox, QRadioButton
 
     from ms_components.theme import apply_theme
 
     app = QApplication.instance() or QApplication([])
-    apply_theme("catppuccin_mocha", app)  # Fusion alone draws these near 1.5:1
+    apply_theme(name, app)  # Fusion alone draws these near 1.5:1
     window = app.palette().window().color()
     for box in (QCheckBox(), QRadioButton()):
         box.resize(box.sizeHint())
