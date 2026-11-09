@@ -36,6 +36,18 @@ must be updated separately.
 `LF_light` keeps GitHub Light whole and makes violet the primary colour:
 selection, focus, links and accent.
 
+**Spectrum** offers 21 primary colors in both light and dark modes, under
+`Spectrum themes → Light / Dark → Color` in `build_theme_menu()`. Use ids such as
+`spectrum_light_teal` or `spectrum_dark_blue` with `apply_theme()`. The settings
+theme combo uses the same grouped menu. Previous `zensical_*` preferences resolve
+to the corresponding Spectrum theme.
+
+Spectrum's colors are inspired by [Zensical](https://zensical.org/docs/setup/colors/).
+Thanks to the Zensical contributors for their original palette design. Spectrum
+adapts the colors to MolSuite's Qt roles and contrast requirements; it is an
+independent theme family. See the [contrast comparison](spectrum_contrast.md) for
+measured ratios and the remaining limitations in shared widget styles.
+
 ## SmartTableView
 
 Define a SQLModel model, describe the columns, and provide a session provider.

@@ -25,10 +25,10 @@ from __future__ import annotations
 from importlib.resources import files
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette, QPen
-from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle
+from PySide6.QtGui import QActionGroup, QColor, QFont, QFontDatabase, QPalette, QPen
+from PySide6.QtWidgets import QApplication, QComboBox, QMenu, QProxyStyle, QStyle
 
-from ms_components.palettes import DEFAULT_DARK, DEFAULT_LIGHT, THEMES
+from ms_components.palettes import DEFAULT_DARK, DEFAULT_LIGHT, THEMES, SPECTRUM_THEMES
 
 _current: dict[str, str] = THEMES[DEFAULT_DARK]
 
@@ -176,6 +176,10 @@ def build_palette(theme: dict[str, str]) -> QPalette:
 
 def resolve(name: str) -> str:
     """Resolve auto, retired and invalid names to an available concrete theme."""
+    if name == "zensical_teal":
+        name = "spectrum_dark_teal"
+    elif name.startswith("zensical_"):
+        name = name.replace("zensical_", "spectrum_", 1)
     if name != "auto":
         candidate = _REMOVED_THEME_FALLBACKS.get(name, name)
         return candidate if candidate in THEMES else DEFAULT_DARK
@@ -184,6 +188,47 @@ def resolve(name: str) -> str:
     hints = QApplication.styleHints()
     scheme = hints.colorScheme() if hints else Qt.ColorScheme.Unknown
     return DEFAULT_DARK if scheme == Qt.ColorScheme.Dark else DEFAULT_LIGHT
+
+
+def build_theme_menu(current: str = "auto", parent=None) -> QMenu:
+    """A single exclusive choice, with Spectrum grouped by mode and primary color."""
+    menu = QMenu(parent)
+    menu.setToolTipsVisible(True)
+    group = QActionGroup(menu)
+    group.setExclusive(True)
+    if current != "auto":
+        current = resolve(current)
+
+    def add(target, label, name):
+        action = target.addAction(label)
+        action.setData(name)
+        action.setCheckable(True)
+        action.setChecked(name == current)
+        group.addAction(action)
+
+    for name in ("auto", *THEMES):
+        if not name.startswith("spectrum_"):
+            add(menu, name.replace("_", " ").title(), name)
+    spectrum = menu.addMenu("Spectrum themes")
+    spectrum.menuAction().setToolTip(
+        "Inspired by Zensical (https://zensical.org/docs/setup/colors/). "
+        "Thanks to its contributors; adapted for MolSuite."
+    )
+    for mode, colors in SPECTRUM_THEMES.items():
+        submenu = spectrum.addMenu(mode.title())
+        for color_name, name in colors.items():
+            add(submenu, color_name.replace("_", " ").title(), name)
+    return menu
+
+
+class ThemeComboBox(QComboBox):
+    """The settings combo keeps its value API, but opens the grouped theme menu."""
+
+    def showPopup(self) -> None:
+        menu = build_theme_menu(self.currentData(), self)
+        menu.triggered.connect(lambda action: self.setCurrentIndex(self.findData(action.data())))
+        menu.exec(self.mapToGlobal(self.rect().bottomLeft()))
+        menu.deleteLater()
 
 
 #: The accents a widget can wear through `setProperty("tone", name)`.

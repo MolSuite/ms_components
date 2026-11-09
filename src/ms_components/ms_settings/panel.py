@@ -613,7 +613,11 @@ class AppSettingsPanel(QWidget):
     def _create_editor(entry: ConfigurationEntry, parent: QWidget) -> QWidget:
         annotation = entry.annotation
         if entry.choices:
-            editor = QComboBox(parent)
+            from ms_components.theme import THEMES, ThemeComboBox
+
+            theme_choices = all(isinstance(choice, str) for choice in entry.choices)
+            editor_type = ThemeComboBox if theme_choices and set(entry.choices) == {"auto", *THEMES} else QComboBox
+            editor = editor_type(parent)
             if entry.nullable:
                 editor.addItem("None", None)
             for choice in entry.choices:
