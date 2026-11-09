@@ -639,6 +639,16 @@ changes. Non-Qt views such as PyMOL or pyqtgraph do not observe the palette and
 must be updated separately.</p>
 <p><code>LF_light</code> keeps GitHub Light whole and makes violet the primary colour:
 selection, focus, links and accent.</p>
+<p><strong>Spectrum</strong> offers 21 primary colors in both light and dark modes, under
+<code>Spectrum themes → Light / Dark → Color</code> in <code>build_theme_menu()</code>. Use ids such as
+<code>spectrum_light_teal</code> or <code>spectrum_dark_blue</code> with <code>apply_theme()</code>. The settings
+theme combo uses the same grouped menu. Previous <code>zensical_*</code> preferences resolve
+to the corresponding Spectrum theme.</p>
+<p>Spectrum's colors are inspired by <a href="https://zensical.org/docs/setup/colors/">Zensical</a>.
+Thanks to the Zensical contributors for their original palette design. Spectrum
+adapts the colors to MolSuite's Qt roles and contrast requirements; it is an
+independent theme family. See the <a href="../spectrum_contrast/">contrast comparison</a> for
+measured ratios and the remaining limitations in shared widget styles.</p>
 <h2 id="smarttableview">SmartTableView<a class="headerlink" href="#smarttableview" title="Permanent link">&para;</a></h2>
 <p>Define a SQLModel model, describe the columns, and provide a session provider.
 The table handles querying, filtering, sorting, and pagination.</p>
