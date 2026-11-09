@@ -1,0 +1,892 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Reusable PySide6 components for MolSuite applications.">
+      
+      
+        <meta name="author" content="MolSuite authors">
+      
+      
+        <link rel="canonical" href="https://molsuite.github.io/ms_components/latest/spectrum_contrast/">
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.1.0">
+    
+    
+      
+        <title>Temas Spectrum y contraste teal frente a catppuccin_mocha - ms_components</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.4ab2de0c.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.b60ce83d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
+    <div data-md-component="skip">
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="ms_components" class="md-header__button md-logo" aria-label="ms_components" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ms_components
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Temas Spectrum y contraste teal frente a catppuccin_mocha
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <span class="md-visually-hidden">Search</span>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/MolSuite/ms_components" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    MolSuite/ms_components
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="ms_components" class="md-nav__button md-logo" aria-label="ms_components" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    ms_components
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/MolSuite/ms_components" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    MolSuite/ms_components
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Examples
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#texto-y-seleccion" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Texto y selección
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enlaces-y-colores-semanticos" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Enlaces y colores semánticos
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bordes-foco-y-superficies" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Bordes, foco y superficies
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#otros-estados-y-limites-encontrados" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Otros estados y límites encontrados
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validacion" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Validación
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+              
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+  
+  
+
+
+<h1 id="temas-spectrum-y-contraste-teal-frente-a-catppuccin_mocha">Temas Spectrum y contraste teal frente a <code>catppuccin_mocha</code><a class="headerlink" href="#temas-spectrum-y-contraste-teal-frente-a-catppuccin_mocha" title="Permanent link">&para;</a></h1>
+<p>Paleta oscura <code>spectrum_dark_teal</code> añadida a <code>src/ms_components/palettes.py</code>, con los mismos
+29 keywords que <code>catppuccin_mocha</code>. No faltaba ningún rol.</p>
+<p>La familia ahora ofrece 21 colores primarios en dos modos, con el menú
+<code>Spectrum themes → Light / Dark → Color</code>, tanto en el botón de tema de AMDockVS
+como en Ajustes. <code>build_theme_menu</code> y <code>ThemeComboBox</code> viven en <code>ms_components.theme</code>;
+ambos selectores comparten la misma jerarquía y mantienen una única selección.
+Las 42 variantes conservan las mismas claves y cumplen los mínimos de contraste
+exigidos por las pruebas de paletas. Solo cambian <code>highlight</code>, <code>accent</code>, <code>link</code> y
+<code>link_visited</code> al elegir otro color dentro del mismo modo.</p>
+<p>Los ids guardados son <code>spectrum_light_&lt;color&gt;</code> y <code>spectrum_dark_&lt;color&gt;</code>.
+Los nombres anteriores <code>zensical_light_&lt;color&gt;</code>, <code>zensical_dark_&lt;color&gt;</code> y
+<code>zensical_teal</code> se resuelven a sus equivalentes Spectrum, sin duplicarse en el menú.
+La selección global <code>Auto</code> conserva su comportamiento previo.</p>
+<p>Spectrum es una adaptación independiente para MolSuite. Agradecemos a los
+colaboradores de Zensical el diseño de las paletas originales que la inspiraron;
+no son temas oficiales de Zensical. El menú también muestra este reconocimiento
+en su tooltip.</p>
+<p>Referencia: <a href="https://zensical.org/docs/setup/colors/">colores de Zensical</a> y su
+<a href="https://zensical.org/docs/assets/stylesheets/modern/palette.b60ce83d.min.css">CSS modern</a>,
+consultados el 2026-11-08. Se conservan el enlace teal oscuro <code>#00ccb8</code> y el acento
+<code>#00bda4</code>; las superficies se inspiran en slate (<code>#0b0c0f</code>, <code>#16171a</code>, <code>#212226</code>).
+Los demás colores se adaptan a los roles de Qt y sus requisitos de contraste.
+En especial, los primarios claros (amarillo, lima, blanco, etc.) se oscurecen en
+modo Light para que funcionen como texto y foco sobre fondos claros. Se ofrece
+un color principal por variante, con su acento coordinado; no hay un selector
+independiente para combinar cualquier primario con cualquier acento.</p>
+<p>Los ratios se calcularon con <code>ms_components.theme.contrast_ratio</code> (luminancia relativa
+sRGB, WCAG), sin redondear antes de comprobar los límites. Los números de las tablas
+son ratios «n:1», redondeados a dos decimales. Se revisaron <code>theme.py</code>, <code>base.qss</code>,
+<code>ms_stepper.py</code>, la barra de herramientas de tablas y sus celdas de progreso.</p>
+<h2 id="texto-y-seleccion">Texto y selección<a class="headerlink" href="#texto-y-seleccion" title="Permanent link">&para;</a></h2>
+<p>Umbral de referencia: 4.5:1 para texto normal. Todas estas combinaciones del nuevo
+tema lo alcanzan, incluida la metadata de la barra de tablas sobre <code>dark</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Texto / fondo</th>
+<th style="text-align: right;">Mocha</th>
+<th style="text-align: right;">Teal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>window_text</code> / <code>window</code></td>
+<td style="text-align: right;">11.34</td>
+<td style="text-align: right;">10.60</td>
+</tr>
+<tr>
+<td><code>text</code> / <code>window</code></td>
+<td style="text-align: right;">11.34</td>
+<td style="text-align: right;">10.60</td>
+</tr>
+<tr>
+<td><code>text</code> / <code>base</code></td>
+<td style="text-align: right;">12.14</td>
+<td style="text-align: right;">11.57</td>
+</tr>
+<tr>
+<td><code>text</code> / <code>alternate_base</code></td>
+<td style="text-align: right;">11.34</td>
+<td style="text-align: right;">9.40</td>
+</tr>
+<tr>
+<td><code>button_text</code> / <code>button</code></td>
+<td style="text-align: right;">11.34</td>
+<td style="text-align: right;">10.60</td>
+</tr>
+<tr>
+<td><code>tooltip_text</code> / <code>tooltip_base</code></td>
+<td style="text-align: right;">6.22</td>
+<td style="text-align: right;">6.68</td>
+</tr>
+<tr>
+<td><code>text</code> / <code>dark</code></td>
+<td style="text-align: right;">6.31</td>
+<td style="text-align: right;">6.53</td>
+</tr>
+<tr>
+<td><code>placeholder_text</code> / <code>window</code></td>
+<td style="text-align: right;">4.62</td>
+<td style="text-align: right;">7.53</td>
+</tr>
+<tr>
+<td><code>placeholder_text</code> / <code>base</code></td>
+<td style="text-align: right;">4.95</td>
+<td style="text-align: right;">8.22</td>
+</tr>
+<tr>
+<td><code>placeholder_text</code> / <code>alternate_base</code></td>
+<td style="text-align: right;">4.62</td>
+<td style="text-align: right;">6.68</td>
+</tr>
+<tr>
+<td><code>placeholder_text</code> / <code>dark</code></td>
+<td style="text-align: right;">2.57</td>
+<td style="text-align: right;">4.64</td>
+</tr>
+<tr>
+<td><code>highlighted_text</code> / <code>highlight</code></td>
+<td style="text-align: right;">9.23</td>
+<td style="text-align: right;">8.21</td>
+</tr>
+</tbody>
+</table>
+<p>El QSS de tooltips usa <code>text</code> / <code>window</code>, además de los roles de tooltip nativos.
+<code>window_text</code> y <code>button_text</code> tienen el mismo valor que <code>text</code> en ambas paletas;
+sus combinaciones equivalentes tienen los mismos ratios.</p>
+<h2 id="enlaces-y-colores-semanticos">Enlaces y colores semánticos<a class="headerlink" href="#enlaces-y-colores-semanticos" title="Permanent link">&para;</a></h2>
+<p>Cada celda muestra los ratios sobre <code>window</code> / <code>base</code> / <code>alternate_base</code>, en ese
+orden. Todos superan 4.5:1; el mínimo del tema teal en este grupo es 6.25:1.</p>
+<table>
+<thead>
+<tr>
+<th>Keyword</th>
+<th style="text-align: right;">Mocha</th>
+<th style="text-align: right;">Teal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>link</code></td>
+<td style="text-align: right;">7.79 / 8.34 / 7.79</td>
+<td style="text-align: right;">8.82 / 9.62 / 7.82</td>
+</tr>
+<tr>
+<td><code>link_visited</code></td>
+<td style="text-align: right;">7.79 / 8.34 / 7.79</td>
+<td style="text-align: right;">8.82 / 9.62 / 7.82</td>
+</tr>
+<tr>
+<td><code>accent</code></td>
+<td style="text-align: right;">7.79 / 8.34 / 7.79</td>
+<td style="text-align: right;">7.52 / 8.21 / 6.67</td>
+</tr>
+<tr>
+<td><code>red</code></td>
+<td style="text-align: right;">7.08 / 7.58 / 7.08</td>
+<td style="text-align: right;">7.11 / 7.76 / 6.30</td>
+</tr>
+<tr>
+<td><code>orange</code></td>
+<td style="text-align: right;">9.27 / 9.92 / 9.27</td>
+<td style="text-align: right;">9.26 / 10.10 / 8.21</td>
+</tr>
+<tr>
+<td><code>yellow</code></td>
+<td style="text-align: right;">12.91 / 13.81 / 12.91</td>
+<td style="text-align: right;">9.21 / 10.05 / 8.17</td>
+</tr>
+<tr>
+<td><code>green</code></td>
+<td style="text-align: right;">11.03 / 11.81 / 11.03</td>
+<td style="text-align: right;">8.18 / 8.92 / 7.25</td>
+</tr>
+<tr>
+<td><code>cyan</code></td>
+<td style="text-align: right;">10.54 / 11.29 / 10.54</td>
+<td style="text-align: right;">9.09 / 9.92 / 8.06</td>
+</tr>
+<tr>
+<td><code>blue</code></td>
+<td style="text-align: right;">7.79 / 8.34 / 7.79</td>
+<td style="text-align: right;">7.52 / 8.20 / 6.66</td>
+</tr>
+<tr>
+<td><code>magenta</code></td>
+<td style="text-align: right;">8.07 / 8.64 / 8.07</td>
+<td style="text-align: right;">7.05 / 7.69 / 6.25</td>
+</tr>
+</tbody>
+</table>
+<h2 id="bordes-foco-y-superficies">Bordes, foco y superficies<a class="headerlink" href="#bordes-foco-y-superficies" title="Permanent link">&para;</a></h2>
+<p>Para bordes de controles y foco se usa 3:1. El mínimo de <code>shadow</code> sobre las tres
+superficies principales sube de 3.36 a 4.78; también alcanza 3:1 sobre <code>dark</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Elemento / superficie</th>
+<th style="text-align: right;">Mocha</th>
+<th style="text-align: right;">Teal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>highlight</code> / <code>window</code></td>
+<td style="text-align: right;">8.07</td>
+<td style="text-align: right;">7.52</td>
+</tr>
+<tr>
+<td><code>highlight</code> / <code>base</code></td>
+<td style="text-align: right;">8.64</td>
+<td style="text-align: right;">8.21</td>
+</tr>
+<tr>
+<td><code>highlight</code> / <code>alternate_base</code></td>
+<td style="text-align: right;">8.07</td>
+<td style="text-align: right;">6.67</td>
+</tr>
+<tr>
+<td><code>highlight</code> / <code>dark</code></td>
+<td style="text-align: right;">4.49</td>
+<td style="text-align: right;">4.63</td>
+</tr>
+<tr>
+<td><code>shadow</code> / <code>window</code></td>
+<td style="text-align: right;">3.36</td>
+<td style="text-align: right;">5.39</td>
+</tr>
+<tr>
+<td><code>shadow</code> / <code>base</code></td>
+<td style="text-align: right;">3.59</td>
+<td style="text-align: right;">5.88</td>
+</tr>
+<tr>
+<td><code>shadow</code> / <code>alternate_base</code></td>
+<td style="text-align: right;">3.36</td>
+<td style="text-align: right;">4.78</td>
+</tr>
+<tr>
+<td><code>shadow</code> / <code>dark</code></td>
+<td style="text-align: right;">1.87</td>
+<td style="text-align: right;">3.31</td>
+</tr>
+<tr>
+<td><code>dark</code> / <code>base</code></td>
+<td style="text-align: right;">1.92</td>
+<td style="text-align: right;">1.77</td>
+</tr>
+<tr>
+<td><code>dark</code> / <code>alternate_base</code></td>
+<td style="text-align: right;">1.80</td>
+<td style="text-align: right;">1.44</td>
+</tr>
+<tr>
+<td><code>mid</code> / <code>window</code></td>
+<td style="text-align: right;">2.46</td>
+<td style="text-align: right;">2.29</td>
+</tr>
+<tr>
+<td><code>highlight</code> / <code>midlight</code></td>
+<td style="text-align: right;">8.64</td>
+<td style="text-align: right;">6.67</td>
+</tr>
+<tr>
+<td><code>light</code> / <code>window</code></td>
+<td style="text-align: right;">1.14</td>
+<td style="text-align: right;">1.09</td>
+</tr>
+</tbody>
+</table>
+<p><code>dark</code> es la banda de cabecera: ambas paletas cumplen el mínimo decorativo de 1.4
+que exige el proyecto. <code>mid</code> son separadores decorativos y <code>light</code> es un rol de
+relieve nativo; no se interpretan aquí como texto ni como bordes de controles.
+<code>bright_text</code> conserva el rol nativo de Qt, sin pareja explícita en el QSS revisado;
+en teal coincide con <code>highlighted_text</code>.</p>
+<h2 id="otros-estados-y-limites-encontrados">Otros estados y límites encontrados<a class="headerlink" href="#otros-estados-y-limites-encontrados" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Texto / fondo</th>
+<th style="text-align: right;">Mocha</th>
+<th style="text-align: right;">Teal</th>
+<th>Uso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>highlighted_text</code> / <code>highlight</code> oscurecido con <code>darker(112)</code></td>
+<td style="text-align: right;">7.38</td>
+<td style="text-align: right;">6.59</td>
+<td>Hover de «siguiente» del stepper</td>
+</tr>
+<tr>
+<td><code>highlighted_text</code> / <code>red</code></td>
+<td style="text-align: right;">8.10</td>
+<td style="text-align: right;">7.76</td>
+<td>Indicador de error del stepper</td>
+</tr>
+<tr>
+<td><code>highlighted_text</code> / <code>orange</code></td>
+<td style="text-align: right;">10.59</td>
+<td style="text-align: right;">10.10</td>
+<td>Indicador de aviso del stepper</td>
+</tr>
+<tr>
+<td><code>highlighted_text</code> / <code>mid</code></td>
+<td style="text-align: right;">2.81</td>
+<td style="text-align: right;">2.50</td>
+<td>Toolbuttons pulsados/seleccionados con fondo <code>mid</code></td>
+</tr>
+<tr>
+<td><code>placeholder_text</code> / <code>mid</code></td>
+<td style="text-align: right;">1.88</td>
+<td style="text-align: right;">3.29</td>
+<td>«Siguiente» deshabilitado</td>
+</tr>
+<tr>
+<td><code>disabled_text</code> / <code>window</code></td>
+<td style="text-align: right;">2.65</td>
+<td style="text-align: right;">2.94</td>
+<td>Controles deshabilitados</td>
+</tr>
+<tr>
+<td><code>disabled_text</code> / <code>mid</code></td>
+<td style="text-align: right;">1.08</td>
+<td style="text-align: right;">1.28</td>
+<td>Selección deshabilitada de QPalette</td>
+</tr>
+</tbody>
+</table>
+<p>Los toolbuttons con texto <code>highlighted_text</code> y fondo <code>mid</code> quedan por debajo de
+4.5:1 en ambos temas: el QSS específico cambia el fondo, pero hereda el color del
+estado general. Los controles deshabilitados están exentos del umbral de texto
+activo; se mantiene la jerarquía <code>disabled_text</code> &lt; <code>placeholder_text</code> &lt; <code>text</code>.</p>
+<p>Las celdas de progreso mezclan <code>red</code> o <code>green</code> con <code>dark</code> usando alfa 150/255.
+Se comprobó con <code>QProgressBar.grab()</code> en Qt offscreen que el texto del estilo
+actual se aproxima a <code>text</code>, no a <code>highlighted_text</code>. El contraste calculado entre
+ese texto y el relleno compuesto es:</p>
+<table>
+<thead>
+<tr>
+<th>Texto / relleno compuesto</th>
+<th style="text-align: right;">Mocha</th>
+<th style="text-align: right;">Teal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code> / <code>red</code> alfa 150 sobre <code>dark</code></td>
+<td style="text-align: right;">2.71</td>
+<td style="text-align: right;">2.67</td>
+</tr>
+<tr>
+<td><code>text</code> / <code>green</code> alfa 150 sobre <code>dark</code></td>
+<td style="text-align: right;">1.95</td>
+<td style="text-align: right;">2.37</td>
+</tr>
+</tbody>
+</table>
+<p>Estas barras tampoco alcanzan 4.5:1 en ninguno de los temas. Alcanzar los mínimos
+de la paleta no garantiza el contraste de los colores mezclados por un widget.
+No se cambia el QSS compartido ni el renderizado de barras en este cambio de tema.</p>
+<h2 id="validacion">Validación<a class="headerlink" href="#validacion" title="Permanent link">&para;</a></h2>
+<p>Pruebas ejecutadas con el Python de conda <code>MSDD_312</code>, <code>PYTHONPATH=src</code> y
+<code>QT_QPA_PLATFORM=offscreen</code>: contraste de todas las paletas, igualdad de keywords,
+resolución del nombre nuevo, bordes renderizados de checkbox/radio en ambos temas,
+y compatibilidad de importación de paletas sin Qt. La ampliación añade pruebas de
+los 42 temas, la jerarquía del menú, exclusividad entre submenús, selección real en
+el popup de Ajustes, compatibilidad del editor genérico de configuración y
+persistencia de nombres nuevos/antiguos. También se verifica que seleccionar
+<code>Spectrum themes → Dark → Teal</code> en la ventana de AMDockVS aplica y guarda el tema.</p>
+<p><strong>29 pruebas pasaron</strong>: 20 de componentes y 9 de integración/persistencia en AMDockVS.
+<code>git diff --check</code> pasó en ambos repositorios. No se hizo revisión visual en pantalla;
+las comprobaciones de widgets se ejecutaron con Qt offscreen.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 MolSuite authors
+    </div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.code.copy","navigation.footer","navigation.path","navigation.sections","navigation.top","search.highlight","search.suggest"],"redirect":null,"search":"../assets/javascripts/workers/search.719e0d91.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d31f0ffa.min.js"></script>
+      
+    
+  </body>
+</html>
