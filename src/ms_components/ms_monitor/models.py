@@ -48,6 +48,7 @@ class JobMonitorState:
     chunks_running: int = 0  # taken and not settled: running, carried in a task, or being written
     tasks_running: int = 0  # what runs now, one worker each; <= chunks_running
     cpu_used: int = 0  # the CPU tokens those tasks hold
+    asked: dict = field(default_factory=dict)  # what it asked of a queue: nodes, cpus, memory_gb, gpus (each node)
     unreachable: str = ""  # what its other machine has not answered since, while it does not
     note: str = ""  # what its source says it is at, while it runs (a campaign: in the queue, how far there)
     canceling: bool = False  # canceled, waiting for its other machine to stop it there

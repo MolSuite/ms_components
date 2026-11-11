@@ -62,7 +62,13 @@ def test_the_throughput_card_leads_with_chunks_and_says_the_items_under_them():
     detail = JobDetail()
     detail.set_job(_job(throughput_eps=2.0, items_unit="records", items_done=1200, items_total=5000, items_eps=64.0))
     assert (detail._speed.value.text(), detail._speed.unit.text()) == ("2.0", "chunks/s")
-    assert detail._speed.sub.text() == "64.0 records/s · 1,200 / 5,000"
+    assert detail._speed.sub.text() == "64.0 records/s"
+    # How many are held is said under the chunks of the progress, and in the list of jobs.
+    assert (detail._progress.unit.text(), detail._progress.sub.text()) == ("chunks", "1,200 / 5,000 records")
+    from ms_components.ms_monitor.jobs import counts_label
+    assert counts_label(_job(items_unit="ligands", items_done=27, items_total=2703)).startswith("27/2,703 ligands")
+    detail.set_job(_job(throughput_eps=0.0, items_unit="ligands", items_done=0, items_total=9))  # none settled yet
+    assert detail._speed.sub.text() == "— ligands/min"
     detail.set_job(_job(throughput_eps=2.0))  # one the application does not measure: as before
     assert detail._speed.unit.text() == "chunks/s" and "tasks" in detail._speed.sub.text()
 
@@ -320,7 +326,7 @@ def test_the_hosts_are_listed_once_with_their_executors_and_a_queue_is_read_for_
 
 def test_a_queue_is_read_from_what_it_says_of_its_nodes():
     QApplication.instance() or QApplication([])
-    from ms_components.ms_monitor.resources import HostsStrip, _HostCard, _Reader
+    from ms_components.ms_monitor.resources import HostsStrip, _HostCard, _Reader, queue_asked
 
     nodes = [{"name": "w1", "state": "mixed", "cpus": 4, "cpus_used": 3, "mem_gb": 8.0, "mem_used_gb": 2.0,
               "gpus": 2, "gpus_used": 1, "load": 1.5, "partitions": ["debug"]},
@@ -334,9 +340,16 @@ def test_a_queue_is_read_from_what_it_says_of_its_nodes():
     assert (sample.cpu, sample.mem, len(sample.gpus), sample.gpus[0][0]) == (37.5, 12.5, 2, 50.0)
     card = _HostCard("hpc", "me@login", "queue", ["slurm"], 30)
     card.apply(sample)
-    assert card.cpu.note == "3/8" and "2 nodes, 1 up" in card.about.text()
-    card.toggle.setChecked(True)
-    assert card.pages.currentIndex() == 1 and card.node_grid.rowCount() >= 2
+    assert "2 nodes, 1 up" in card.about.text()
+    # A queue is shared: its card says what its jobs asked of it; the whole of it is on the ⓘ.
+    assert "CPUs 3/8" in card.info.toolTip() and "w2" in card.info.toolTip() and "1/2 GPUs" in card.info.toolTip()
+    jobs = [SimpleNamespace(asked={"nodes": 2, "cpus": 4, "memory_gb": 8, "gpus": 1}),
+            SimpleNamespace(asked={"cpus": 2, "gpus": "a100:1"}), SimpleNamespace(asked=None)]
+    asked_of = queue_asked(jobs)
+    assert asked_of == {"cpu": 10, "memory": 16, "gpu": 2}
+    card.set_jobs(3, 0, asked_of)
+    assert card.asked["cpu"].value.text() == "10 CPUs" and card.asked["gpu"].toolTip().startswith("GPUs asked")
+    assert not card.asked["cpu"].icon.pixmap().isNull()
     assert _Reader("x", nodes=lambda: []).read().error == "the queue lists no nodes"
     assert HostsStrip(workspace, hosts=lambda: [])._nodes("ray", ["ray"]) is None
 

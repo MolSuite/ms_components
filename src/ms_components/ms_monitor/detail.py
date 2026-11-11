@@ -496,7 +496,11 @@ class JobDetail(QWidget):
             self._left.set(format_duration(left), f"≈ {_clock(left)} · 5-min rate", hue)
         pct = 100.0 * job.chunks_settled / total if total else job.progress
         accent = _pal().color(QPalette.ColorRole.Highlight).name()
-        self._progress.set(f"{job.chunks_done:,} / {total:,}" if total else f"{job.chunks_done:,}", "", accent)
+        # What the chunks hold, in the application's unit, under the chunks every job has.
+        held = (f"{job.items_done:,}" + (f" / {job.items_total:,}" if job.items_total else "") + f" {job.items_unit}"
+                if job.items_unit else "")
+        self._progress.set(f"{job.chunks_done:,} / {total:,}" if total else f"{job.chunks_done:,}", held, accent,
+                           unit="chunks" if job.items_unit else "")
         self._pct.setText(f"{pct:.1f}%" if pct < 10 else f"{pct:.0f}%")
         self._pct.setStyleSheet(f"color:{accent}; font-weight:650; font-size:12px;")
         colors = _colors()
@@ -510,9 +514,9 @@ class JobDetail(QWidget):
         if job.items_unit:
             # Chunks lead: they are what every job has. What they hold is the line under it, in
             # the application's unit (tasks and CPUs are in the header already).
-            items = format_speed(job.items_eps).replace("/", f" {job.items_unit}/")
-            done = f"{job.items_done:,}" + (f" / {job.items_total:,}" if job.items_total else "")
-            sub = f"{items} · {done}" + (" · mean" if job.is_terminal else "")
+            items = format_speed(job.items_eps)
+            items = items.replace("/", f" {job.items_unit}/") if "/" in items else f"{items} {job.items_unit}/min"
+            sub = items + (" · mean" if job.is_terminal else "")
         else:
             cpu = f" · {job.cpu_used:,} CPUs" if job.cpu_used else ""
             sub = f"{job.tasks_running:,} tasks{cpu}" if not job.is_terminal else "mean over the run"

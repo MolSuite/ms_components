@@ -31,6 +31,7 @@ def job_state(job, now: float) -> JobMonitorState:
         # ms_flow < 0.7 does not tell them apart: every chunk in flight reads as running.
         tasks_running=getattr(job, "tasks_running", job.chunks_inflight),
         cpu_used=getattr(job, "cpu_used", 0),
+        asked=getattr(job, "asked", None) or {},  # an older ms_flow does not say
         unreachable=getattr(job, "unreachable", None) or "",
         note=getattr(job, "note", None) or "",  # an older ms_flow does not say
         canceling=getattr(job, "canceling", False),

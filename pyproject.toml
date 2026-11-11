@@ -52,7 +52,7 @@ Issues = "https://github.com/MolSuite/ms_components/issues"
 package-dir = { "" = "src" }
 
 [tool.setuptools.package-data]
-ms_components = ["*.qss", "ms_table/icons/*.svg", "ms_pymol/icons/*.svg", "ms_dockwidget/resources/icons/*"]
+ms_components = ["*.qss", "ms_table/icons/*.svg", "ms_pymol/icons/*.svg", "ms_monitor/icons/*.svg", "ms_dockwidget/resources/icons/*"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

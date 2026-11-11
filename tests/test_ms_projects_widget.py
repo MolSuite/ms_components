@@ -225,7 +225,16 @@ def test_the_host_open_project_is_handed_back_not_deleted(monkeypatch):
     widget.active_project_id = "p1"
     widget.active_project_delete_requested.connect(handed.append)
     try:
-        items = [SimpleNamespace(id="p1", name="Docking One"), SimpleNamespace(id="p2", name="Docking Two")]
+        items = [SimpleNamespace(id="p1", name="Docking One", path="/x/one"),
+                 SimpleNamespace(id="p2", name="Docking Two", path="/x/two")]
+        typed = []  # the open one goes only once its name is typed
+        monkeypatch.setattr("ms_components.ms_projects.widget.QInputDialog.getText",
+                            lambda *a, **k: (typed.pop(0), True))
+        monkeypatch.setattr("ms_components.ms_projects.widget.QMessageBox.information", lambda *a, **k: None)
+        typed.append("Docking")
+        widget._on_delete(items[:1])
+        assert handed == [] and deleted == []
+        typed.append("Docking One")
         widget._on_delete(items)
         assert handed == ["p1"] and deleted == ["p2"]
     finally:
