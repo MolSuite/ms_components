@@ -406,6 +406,7 @@ class JobDetail(QWidget):
         side_box.addWidget(self._tabs)
 
         self._tasks = QTreeWidget(side)
+        self._task_rows: list[tuple] = []  # what each row shows now, so a snapshot touches only what changed
         self._tasks.setHeaderLabels(["Input", "Host", "Attempt", "Elapsed", "Progress"])
         self._tasks.setRootIsDecorated(False)
         self._tasks.setUniformRowHeights(True)
@@ -466,6 +467,7 @@ class JobDetail(QWidget):
             self._bar.parts, self._trend.values = (0, 0, 0, 0), []
             self._show_grid(None)
             self._tasks.clear()
+            self._task_rows = []
             self._tabs.setTabText(self._tabs.indexOf(self._tasks), "Running")
             self._tab_meta.setText("")
             self.set_failures([], 0)
@@ -615,22 +617,35 @@ class JobDetail(QWidget):
                                       seconds=max(0.0, datetime.now().timestamp() - since))]
         median = statistics.median(task.seconds for task in tasks) if len(tasks) >= 3 else None
         warn = QColor(P["warn"])
-        while self._tasks.topLevelItemCount() > len(tasks):
-            self._tasks.takeTopLevelItem(self._tasks.topLevelItemCount() - 1)
-        while self._tasks.topLevelItemCount() < len(tasks):
-            self._tasks.addTopLevelItem(QTreeWidgetItem())
-        slow = 0
-        for at, task in enumerate(tasks):
-            item = self._tasks.topLevelItem(at)
+        plain = self._tasks.palette().color(QPalette.ColorRole.Text)
+        rows, slow = [], 0
+        for task in tasks:
             what = task.input + (f" +{task.chunks - 1}" if task.chunks > 1 else "")
-            for column, text in enumerate((what, task.host or "", str(task.attempt), format_duration(task.seconds),
-                                           "—" if task.progress is None else f"{task.progress:.0f}%")):
-                item.setText(column, text)
             late = median is not None and median > 0 and task.seconds > SLOW * median
             slow += late
-            for column in range(5):
-                item.setForeground(column, warn if late else self._tasks.palette().color(QPalette.ColorRole.Text))
-            item.setToolTip(0, f"slow: {task.seconds / median:.1f}× the median" if late else task.input)
+            rows.append(((what, task.host or "", str(task.attempt), format_duration(task.seconds),
+                          "—" if task.progress is None else f"{task.progress:.0f}%"),
+                         warn if late else plain,
+                         f"slow: {task.seconds / median:.1f}× the median" if late else task.input))
+        # Every Qt call from Python waits for the GIL, which the engine's threads keep busy on a
+        # big machine: rewrite only the cells that changed (mostly just the elapsed time).
+        while self._tasks.topLevelItemCount() > len(rows):
+            self._tasks.takeTopLevelItem(self._tasks.topLevelItemCount() - 1)
+        while self._tasks.topLevelItemCount() < len(rows):
+            self._tasks.addTopLevelItem(QTreeWidgetItem())
+        before = self._task_rows
+        for at, (texts, color, tip) in enumerate(rows):
+            item = self._tasks.topLevelItem(at)
+            old_texts, old_color, old_tip = before[at] if at < len(before) else ((None,) * 5, None, None)
+            for column, (text, old_text) in enumerate(zip(texts, old_texts)):
+                if text != old_text:
+                    item.setText(column, text)
+            if color != old_color:
+                for column in range(5):
+                    item.setForeground(column, color)
+            if tip != old_tip:
+                item.setToolTip(0, tip)
+        self._task_rows = rows
         self._tabs.setTabText(self._tabs.indexOf(self._tasks), f"Running  {len(tasks)}" if tasks else "Running")
         said = [f"{len(tasks)} running"] if tasks else []
         if median is not None:
