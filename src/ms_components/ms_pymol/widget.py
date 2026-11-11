@@ -979,6 +979,7 @@ class PymolControlBar(QFrame):
 
 class PymolDockWidget(MSDockWidget):
     side_panel_visibility_changed = Signal(bool)
+    _VIEWER_MIN_WIDTH = 240
 
     def __init__(self, title: str, manager, parent=None):
         super().__init__(title, manager, parent)
@@ -1000,13 +1001,12 @@ class PymolDockWidget(MSDockWidget):
         self._side_panel_widget: QWidget | None = None
         self._splitter = QSplitter(Qt.Horizontal, self)
         self._splitter.setChildrenCollapsible(False)
-        # The side container has a 220px minimum and the viewer had none, so in a narrow dock
-        # the panel took everything and the 3D view vanished. Floor the viewer instead.
-        self.pymol_widget.setMinimumWidth(240)
+        # Floor the viewer, or a narrow dock gives everything to the side panel and the 3D view
+        # vanishes; while the panel is open the floor rises to the panel's own width.
+        self.pymol_widget.setMinimumWidth(self._VIEWER_MIN_WIDTH)
         self._splitter.addWidget(self.pymol_widget)
 
         self._side_container = QWidget(self)
-        self._side_container.setMinimumWidth(220)
         self._side_container.setMaximumWidth(360)
         self._side_container.hide()
         self._side_layout = QVBoxLayout(self._side_container)
@@ -1094,6 +1094,8 @@ class PymolDockWidget(MSDockWidget):
         self._side_container.setVisible(visible)
         if self._side_panel_widget is not None:
             self._side_panel_widget.setVisible(visible)
+        panel_width = self._side_container.minimumSizeHint().width() if visible else 0
+        self.pymol_widget.setMinimumWidth(max(self._VIEWER_MIN_WIDTH, panel_width))
         if visible:
             self._splitter.setSizes([max(480, self.width() - 280), 280])
         else:
