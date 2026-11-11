@@ -12,13 +12,14 @@ each one now.
 """
 from __future__ import annotations
 
+import html
 import os
 import shutil
 import subprocess
 import threading
 import time
 import urllib.request
-from collections import deque
+from collections import Counter, deque
 from dataclasses import dataclass, field
 
 from pathlib import Path
@@ -49,6 +50,10 @@ _MAC = ("n=$(sysctl -n hw.ncpu); ps -A -o %cpu= | awk -v n=$n '{s += $1} END {pr
         "echo \"MemTotal: $(($(sysctl -n hw.memsize) / 1024)) kB\"; "
         "vm_stat | awk '/page size of/ {p = $8} /^Pages (free|inactive|speculative):/ {a += $NF} "
         "END {printf \"MemAvailable: %d kB\\n\", a * p / 1024}'")
+# What a host is, read once: the name of its CPU, its threads, the name of each card.
+_HARDWARE = ("grep -m1 'model name' /proc/cpuinfo 2>/dev/null || echo \"model name: $(sysctl -n machdep.cpu.brand_string)\"; "
+             "echo \"threads: $(nproc 2>/dev/null || sysctl -n hw.ncpu)\"; "
+             "nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | sed 's/^/gpu: /'; true")
 _SCRIPT = (f"if [ -r /proc/stat ]; then head -1 /proc/stat; grep -E '^(MemTotal|MemAvailable):' /proc/meminfo; "
            f"else {_MAC}; fi; {_GPU_QUERY} 2>/dev/null || true")
 
@@ -63,6 +68,38 @@ class Sample:
     error: str = ""
     via: str = ""  # "Ray" when its metrics said it
     nodes: list[dict] = field(default_factory=list)  # a queue's: see `ms_flow.remote.read_nodes`
+    hardware: dict = field(default_factory=dict)  # `cpu` (its name), `threads`, `gpus` (a name per card)
+
+
+def parse_hardware(text: str) -> dict:
+    """What `_HARDWARE` printed."""
+    said: dict = {"gpus": []}
+    for line in text.splitlines():
+        key, _, value = (part.strip() for part in line.partition(":"))
+        if key == "model name" and value:
+            said["cpu"] = value
+        elif key == "threads" and value.isdigit():
+            said["threads"] = int(value)
+        elif key == "gpu" and value:
+            said["gpus"].append(value)
+    return said
+
+
+def hardware_lines(sample: Sample) -> list[str]:
+    """What a machine has, for the hover of its card: CPU, memory, each kind of card."""
+    hardware, lines = sample.hardware, []
+    cpu = " · ".join(filter(None, (hardware.get("cpu", ""), f"{hardware['threads']} threads" if hardware.get("threads") else "")))
+    if cpu:
+        lines.append(f"<b>CPU</b> {html.escape(cpu)}")
+    if sample.mem_total_gb:
+        lines.append(f"<b>Memory</b> {sample.mem_total_gb:.0f} GB")
+    names = hardware.get("gpus") or []
+    cards = Counter()
+    for index in range(max(len(names), len(sample.gpus))):
+        total = sample.gpus[index][2] if index < len(sample.gpus) else 0.0
+        cards[(names[index] if index < len(names) else "GPU") + (f" · {total / 1024:.0f} GB" if total else "")] += 1
+    lines += [f"<b>GPU</b> {f'{n}× ' if n > 1 else ''}{html.escape(card)}" for card, n in cards.items()]
+    return lines
 
 
 def from_nodes(nodes: list[dict]) -> Sample:
@@ -89,9 +126,15 @@ def parse_metrics(text: str) -> Sample:
         if name in ("ray_node_gpus_utilization", "ray_node_gram_used", "ray_node_gram_available"):
             index = labels.split('GpuIndex="', 1)[-1].split('"', 1)[0]
             gpus.setdefault(index, {})[name] = float(value)
+            if 'GpuDeviceName="' in labels:
+                gpus[index]["name"] = labels.split('GpuDeviceName="', 1)[1].split('"', 1)[0]
         else:
             got.setdefault(name, float(value))
     sample = Sample(cpu=got.get("ray_node_cpu_utilization"), via="Ray")
+    if got.get("ray_node_cpu_count"):
+        sample.hardware["threads"] = int(got["ray_node_cpu_count"])
+    if any("name" in gpu for gpu in gpus.values()):
+        sample.hardware["gpus"] = [gpu.get("name", "GPU") for _index, gpu in sorted(gpus.items())]
     total = got.get("ray_node_mem_total", 0.0)
     if total:
         sample.mem_total_gb, sample.mem_used_gb = total / 1024**3, got.get("ray_node_mem_used", 0.0) / 1024**3
@@ -146,7 +189,7 @@ class _Reader:
         # `metrics()` gives the URL of the host's Ray metrics, or None while no Ray has it;
         # `nodes()`, those of the queue the host is the login node of
         self.address, self._ticks, self._psutil, self._metrics, self._url = address, None, None, metrics, None
-        self._nodes = nodes
+        self._nodes, self._hardware = nodes, None
         if not address:
             try:
                 import psutil
@@ -157,6 +200,25 @@ class _Reader:
                 pass
 
     def read(self) -> Sample:
+        sample = self._read()
+        if not sample.error and self._nodes is None:  # a queue's nodes say theirs
+            if self._hardware is None and sample.via != "Ray":  # Ray's metrics say it, with no ssh
+                self._hardware = self._read_hardware()
+            sample.hardware = {**(self._hardware or {}), **sample.hardware}
+        return sample
+
+    def _read_hardware(self) -> dict:
+        """Read once: a machine does not change its CPU. Nothing, if it cannot be read."""
+        try:
+            if not self.address:
+                return parse_hardware(subprocess.run(["sh", "-c", _HARDWARE], capture_output=True, text=True, timeout=10).stdout)
+            from ms_env import Host
+
+            return parse_hardware(Host(self.address).run(_HARDWARE, timeout=30).decode(errors="replace"))
+        except Exception:  # noqa: BLE001 - the hover only says less
+            return {}
+
+    def _read(self) -> Sample:
         try:
             if self._nodes is not None:
                 nodes = self._nodes()
@@ -282,8 +344,9 @@ class _HostCard(QFrame):
         self.setProperty("checked", False)
         self.setMinimumWidth(380)
         self.setCursor(Qt.PointingHandCursor)
-        self.setToolTip(f"{address or 'this computer'} · in {', '.join(self.executors) or 'no executor'}"
-                        + (f" · read every {interval}s" if interval else "") + "\nClick: only its jobs")
+        self._where = (f"{address or 'this computer'} · in {', '.join(self.executors) or 'no executor'}"
+                       + (f" · read every {interval}s" if interval else ""))
+        self._tip(None)
         box = QVBoxLayout(self)
         box.setContentsMargins(12, 8, 12, 10)
         box.setSpacing(6)
@@ -351,6 +414,13 @@ class _HostCard(QFrame):
             said.append(f"via {sample.via}")
         self.about.setText(" · ".join(said))
 
+    def _tip(self, sample: Sample | None) -> None:
+        """The hover of the card: where it is, then what it has (a queue: its nodes)."""
+        lines = [html.escape(self._where)]
+        if sample is not None:
+            lines += [queue_summary(sample.nodes)] if self.queue else hardware_lines(sample)
+        self.setToolTip("<br>".join(lines + ["<i>Click: only its jobs</i>"]))
+
     def set_jobs(self, active: int, cpus: int, asked: dict | None = None) -> None:
         self.jobs.setText(f"{active} active job{'s' * (active != 1)}" + (f" · {cpus:,} CPUs in use" if cpus else ""))
         if self.queue:
@@ -373,6 +443,7 @@ class _HostCard(QFrame):
             self.said.setText(sample.error)
             return
         self._describe(sample)
+        self._tip(sample)
         if self.queue:
             self.info.setToolTip(queue_summary(sample.nodes))
             return

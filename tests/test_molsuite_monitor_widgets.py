@@ -343,6 +343,7 @@ def test_a_queue_is_read_from_what_it_says_of_its_nodes():
     assert "2 nodes, 1 up" in card.about.text()
     # A queue is shared: its card says what its jobs asked of it; the whole of it is on the ⓘ.
     assert "CPUs 3/8" in card.info.toolTip() and "w2" in card.info.toolTip() and "1/2 GPUs" in card.info.toolTip()
+    assert "me@login" in card.toolTip() and "CPUs 3/8" in card.toolTip()  # the hover of the card says it too
     jobs = [SimpleNamespace(asked={"nodes": 2, "cpus": 4, "memory_gb": 8, "gpus": 1}),
             SimpleNamespace(asked={"cpus": 2, "gpus": "a100:1"}), SimpleNamespace(asked=None)]
     asked_of = queue_asked(jobs)
@@ -364,10 +365,11 @@ def test_a_host_under_a_ray_is_read_from_its_metrics_with_no_ssh():
             'ray_node_cpu_utilization{ip="10.0.0.2",SessionName="s"} 42.5\n'
             'ray_node_mem_used{ip="10.0.0.2"} 4294967296.0\n'
             'ray_node_mem_total{ip="10.0.0.2"} 17179869184.0\n'
-            'ray_node_gpus_utilization{GpuIndex="1",ip="10.0.0.2"} 80.0\n'
+            'ray_node_cpu_count{ip="10.0.0.2"} 12.0\n'
+            'ray_node_gpus_utilization{GpuDeviceName="NVIDIA A100",GpuIndex="1",ip="10.0.0.2"} 80.0\n'
             'ray_node_gram_used{GpuIndex="1",ip="10.0.0.2"} 2048.0\n'
             'ray_node_gram_available{GpuIndex="1",ip="10.0.0.2"} 4096.0\n'
-            'ray_node_gpus_utilization{GpuIndex="0",ip="10.0.0.2"} 20.0\n')
+            'ray_node_gpus_utilization{GpuDeviceName="NVIDIA A100",GpuIndex="0",ip="10.0.0.2"} 20.0\n')
 
     class Metrics(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -390,7 +392,24 @@ def test_a_host_under_a_ray_is_read_from_its_metrics_with_no_ssh():
             sample = reader.read()
             assert (sample.error, sample.via, sample.cpu, round(sample.mem), round(sample.mem_total_gb)) == ("", "Ray", 42.5, 25, 16)
             assert sample.gpus == [(20.0, 0.0, 0.0), (80.0, 2048.0, 6144.0)]
+            assert sample.hardware == {"threads": 12, "gpus": ["NVIDIA A100", "NVIDIA A100"]}  # read once, no ssh
         assert asked == ["ray"]  # the URL is kept while it answers
         assert HostsStrip(workspace, hosts=lambda: [])._metrics("pc2", "queue", ["slurm"]) is None
     finally:
         server.shutdown()
+
+
+def test_the_hover_of_a_host_says_its_cpu_memory_and_cards():
+    QApplication.instance() or QApplication([])
+    from ms_components.ms_monitor.resources import Sample, _HostCard, _Reader, parse_hardware
+
+    said = parse_hardware("model name\t: AMD Ryzen 7 3700X 8-Core Processor\nthreads: 16\n"
+                          "gpu: NVIDIA GeForce GTX 1660 SUPER\ngpu: NVIDIA GeForce GTX 1660 SUPER\n")
+    assert said == {"cpu": "AMD Ryzen 7 3700X 8-Core Processor", "threads": 16, "gpus": ["NVIDIA GeForce GTX 1660 SUPER"] * 2}
+    card = _HostCard("local", "", "local", [], 5)
+    card.apply(Sample(cpu=9.0, mem=20.0, mem_used_gb=9.0, mem_total_gb=47.0,
+                      gpus=[(1.0, 100.0, 6144.0)] * 2, hardware=said))
+    tip = card.toolTip()
+    assert "AMD Ryzen 7 3700X 8-Core Processor · 16 threads" in tip and "<b>Memory</b> 47 GB" in tip
+    assert "2× NVIDIA GeForce GTX 1660 SUPER · 6 GB" in tip and "Click: only its jobs" in tip
+    assert _Reader("").read().hardware.get("threads")  # this machine, read with no ssh
