@@ -62,7 +62,13 @@ def test_the_throughput_card_leads_with_chunks_and_says_the_items_under_them():
     detail = JobDetail()
     detail.set_job(_job(throughput_eps=2.0, items_unit="records", items_done=1200, items_total=5000, items_eps=64.0))
     assert (detail._speed.value.text(), detail._speed.unit.text()) == ("2.0", "chunks/s")
-    assert detail._speed.sub.text() == "64.0 records/s · 1,200 / 5,000"
+    assert detail._speed.sub.text() == "64.0 records/s"
+    # How many are held is said under the chunks of the progress, and in the list of jobs.
+    assert (detail._progress.unit.text(), detail._progress.sub.text()) == ("chunks", "1,200 / 5,000 records")
+    from ms_components.ms_monitor.jobs import counts_label
+    assert counts_label(_job(items_unit="ligands", items_done=27, items_total=2703)).startswith("27/2,703 ligands")
+    detail.set_job(_job(throughput_eps=0.0, items_unit="ligands", items_done=0, items_total=9))  # none settled yet
+    assert detail._speed.sub.text() == "— ligands/min"
     detail.set_job(_job(throughput_eps=2.0))  # one the application does not measure: as before
     assert detail._speed.unit.text() == "chunks/s" and "tasks" in detail._speed.sub.text()
 
@@ -320,7 +326,7 @@ def test_the_hosts_are_listed_once_with_their_executors_and_a_queue_is_read_for_
 
 def test_a_queue_is_read_from_what_it_says_of_its_nodes():
     QApplication.instance() or QApplication([])
-    from ms_components.ms_monitor.resources import HostsStrip, _HostCard, _Reader
+    from ms_components.ms_monitor.resources import HostsStrip, _HostCard, _Reader, queue_asked
 
     nodes = [{"name": "w1", "state": "mixed", "cpus": 4, "cpus_used": 3, "mem_gb": 8.0, "mem_used_gb": 2.0,
               "gpus": 2, "gpus_used": 1, "load": 1.5, "partitions": ["debug"]},
@@ -334,9 +340,22 @@ def test_a_queue_is_read_from_what_it_says_of_its_nodes():
     assert (sample.cpu, sample.mem, len(sample.gpus), sample.gpus[0][0]) == (37.5, 12.5, 2, 50.0)
     card = _HostCard("hpc", "me@login", "queue", ["slurm"], 30)
     card.apply(sample)
-    assert card.cpu.note == "3/8" and "2 nodes, 1 up" in card.about.text()
+    assert "2 nodes, 1 up" in card.about.text()
+    # A queue is shared: by default its card says what its jobs asked of it; "Nodes", each node.
+    assert card.pages.currentIndex() == 0 and not card.toggle.isChecked()
     card.toggle.setChecked(True)
-    assert card.pages.currentIndex() == 1 and card.node_grid.rowCount() >= 2
+    shown = [card.node_grid.itemAt(i).widget().text() for i in range(card.node_grid.count())]
+    assert card.pages.currentIndex() == 1 and {"w1", "w2", "down*", "3/4 CPUs", "1/2 GPUs"} <= set(shown)
+    card.toggle.setChecked(False)
+    assert card.pages.currentIndex() == 0
+    assert "me@login" in card.toolTip() and "CPUs 3/8" in card.toolTip()  # the hover of the card says it too
+    jobs = [SimpleNamespace(asked={"nodes": 2, "cpus": 4, "memory_gb": 8, "gpus": 1}),
+            SimpleNamespace(asked={"cpus": 2, "gpus": "a100:1"}), SimpleNamespace(asked=None)]
+    asked_of = queue_asked(jobs)
+    assert asked_of == {"cpu": 10, "memory": 16, "gpu": 2}
+    card.set_jobs(3, 0, asked_of)
+    assert card.asked["cpu"].value.text() == "10 CPUs" and card.asked["gpu"].toolTip().startswith("GPUs asked")
+    assert not card.asked["cpu"].icon.pixmap().isNull()
     assert _Reader("x", nodes=lambda: []).read().error == "the queue lists no nodes"
     assert HostsStrip(workspace, hosts=lambda: [])._nodes("ray", ["ray"]) is None
 
@@ -351,10 +370,11 @@ def test_a_host_under_a_ray_is_read_from_its_metrics_with_no_ssh():
             'ray_node_cpu_utilization{ip="10.0.0.2",SessionName="s"} 42.5\n'
             'ray_node_mem_used{ip="10.0.0.2"} 4294967296.0\n'
             'ray_node_mem_total{ip="10.0.0.2"} 17179869184.0\n'
-            'ray_node_gpus_utilization{GpuIndex="1",ip="10.0.0.2"} 80.0\n'
+            'ray_node_cpu_count{ip="10.0.0.2"} 12.0\n'
+            'ray_node_gpus_utilization{GpuDeviceName="NVIDIA A100",GpuIndex="1",ip="10.0.0.2"} 80.0\n'
             'ray_node_gram_used{GpuIndex="1",ip="10.0.0.2"} 2048.0\n'
             'ray_node_gram_available{GpuIndex="1",ip="10.0.0.2"} 4096.0\n'
-            'ray_node_gpus_utilization{GpuIndex="0",ip="10.0.0.2"} 20.0\n')
+            'ray_node_gpus_utilization{GpuDeviceName="NVIDIA A100",GpuIndex="0",ip="10.0.0.2"} 20.0\n')
 
     class Metrics(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -377,7 +397,24 @@ def test_a_host_under_a_ray_is_read_from_its_metrics_with_no_ssh():
             sample = reader.read()
             assert (sample.error, sample.via, sample.cpu, round(sample.mem), round(sample.mem_total_gb)) == ("", "Ray", 42.5, 25, 16)
             assert sample.gpus == [(20.0, 0.0, 0.0), (80.0, 2048.0, 6144.0)]
+            assert sample.hardware == {"threads": 12, "gpus": ["NVIDIA A100", "NVIDIA A100"]}  # read once, no ssh
         assert asked == ["ray"]  # the URL is kept while it answers
         assert HostsStrip(workspace, hosts=lambda: [])._metrics("pc2", "queue", ["slurm"]) is None
     finally:
         server.shutdown()
+
+
+def test_the_hover_of_a_host_says_its_cpu_memory_and_cards():
+    QApplication.instance() or QApplication([])
+    from ms_components.ms_monitor.resources import Sample, _HostCard, _Reader, parse_hardware
+
+    said = parse_hardware("model name\t: AMD Ryzen 7 3700X 8-Core Processor\nthreads: 16\n"
+                          "gpu: NVIDIA GeForce GTX 1660 SUPER\ngpu: NVIDIA GeForce GTX 1660 SUPER\n")
+    assert said == {"cpu": "AMD Ryzen 7 3700X 8-Core Processor", "threads": 16, "gpus": ["NVIDIA GeForce GTX 1660 SUPER"] * 2}
+    card = _HostCard("local", "", "local", [], 5)
+    card.apply(Sample(cpu=9.0, mem=20.0, mem_used_gb=9.0, mem_total_gb=47.0,
+                      gpus=[(1.0, 100.0, 6144.0)] * 2, hardware=said))
+    tip = card.toolTip()
+    assert "AMD Ryzen 7 3700X 8-Core Processor · 16 threads" in tip and "<b>Memory</b> 47 GB" in tip
+    assert "2× NVIDIA GeForce GTX 1660 SUPER · 6 GB" in tip and "Click: only its jobs" in tip
+    assert _Reader("").read().hardware.get("threads")  # this machine, read with no ssh

@@ -12,17 +12,21 @@ each one now.
 """
 from __future__ import annotations
 
+import html
 import os
 import shutil
 import subprocess
 import threading
 import time
 import urllib.request
-from collections import deque
+from collections import Counter, deque
 from dataclasses import dataclass, field
 
-from PySide6.QtCore import QObject, QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPalette, QPen
+from pathlib import Path
+
+from PySide6.QtCore import QByteArray, QObject, QPointF, QRectF, Qt, Signal
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPalette, QPen, QPixmap
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QScrollArea, QStackedWidget, QToolButton,
                                QToolTip, QVBoxLayout, QWidget)
 
@@ -33,6 +37,12 @@ from ms_components.theme import color
 INTERVALS = {"local": 5, "ray": 15, "queue": 30}
 _HISTORY = 120  # reads kept per host: 10 min of this machine, 30 of one over the network
 
+_ICONS = Path(__file__).with_name("icons")
+# What a queue's jobs ask of it, shown as an icon, a number and what it is on hover.
+_ASKED = (("cpu", "CPUs", "CPUs asked of the queue by its active jobs (CPUs of each node times its nodes)"),
+          ("memory", "GB", "Memory asked of the queue by its active jobs (of each node times its nodes)"),
+          ("gpu", "GPUs", "GPUs asked of the queue by its active jobs (of each node times its nodes)"))
+
 _GPU_QUERY = "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits"
 # macOS has no /proc: the CPU its processes use now (`ps`, 100 = one core), and memory from
 # `sysctl` and `vm_stat` (free + inactive + speculative pages), said the way Linux says it.
@@ -40,6 +50,10 @@ _MAC = ("n=$(sysctl -n hw.ncpu); ps -A -o %cpu= | awk -v n=$n '{s += $1} END {pr
         "echo \"MemTotal: $(($(sysctl -n hw.memsize) / 1024)) kB\"; "
         "vm_stat | awk '/page size of/ {p = $8} /^Pages (free|inactive|speculative):/ {a += $NF} "
         "END {printf \"MemAvailable: %d kB\\n\", a * p / 1024}'")
+# What a host is, read once: the name of its CPU, its threads, the name of each card.
+_HARDWARE = ("grep -m1 'model name' /proc/cpuinfo 2>/dev/null || echo \"model name: $(sysctl -n machdep.cpu.brand_string)\"; "
+             "echo \"threads: $(nproc 2>/dev/null || sysctl -n hw.ncpu)\"; "
+             "nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | sed 's/^/gpu: /'; true")
 _SCRIPT = (f"if [ -r /proc/stat ]; then head -1 /proc/stat; grep -E '^(MemTotal|MemAvailable):' /proc/meminfo; "
            f"else {_MAC}; fi; {_GPU_QUERY} 2>/dev/null || true")
 
@@ -54,6 +68,38 @@ class Sample:
     error: str = ""
     via: str = ""  # "Ray" when its metrics said it
     nodes: list[dict] = field(default_factory=list)  # a queue's: see `ms_flow.remote.read_nodes`
+    hardware: dict = field(default_factory=dict)  # `cpu` (its name), `threads`, `gpus` (a name per card)
+
+
+def parse_hardware(text: str) -> dict:
+    """What `_HARDWARE` printed."""
+    said: dict = {"gpus": []}
+    for line in text.splitlines():
+        key, _, value = (part.strip() for part in line.partition(":"))
+        if key == "model name" and value:
+            said["cpu"] = value
+        elif key == "threads" and value.isdigit():
+            said["threads"] = int(value)
+        elif key == "gpu" and value:
+            said["gpus"].append(value)
+    return said
+
+
+def hardware_lines(sample: Sample) -> list[str]:
+    """What a machine has, for the hover of its card: CPU, memory, each kind of card."""
+    hardware, lines = sample.hardware, []
+    cpu = " · ".join(filter(None, (hardware.get("cpu", ""), f"{hardware['threads']} threads" if hardware.get("threads") else "")))
+    if cpu:
+        lines.append(f"<b>CPU</b> {html.escape(cpu)}")
+    if sample.mem_total_gb:
+        lines.append(f"<b>Memory</b> {sample.mem_total_gb:.0f} GB")
+    names = hardware.get("gpus") or []
+    cards = Counter()
+    for index in range(max(len(names), len(sample.gpus))):
+        total = sample.gpus[index][2] if index < len(sample.gpus) else 0.0
+        cards[(names[index] if index < len(names) else "GPU") + (f" · {total / 1024:.0f} GB" if total else "")] += 1
+    lines += [f"<b>GPU</b> {f'{n}× ' if n > 1 else ''}{html.escape(card)}" for card, n in cards.items()]
+    return lines
 
 
 def from_nodes(nodes: list[dict]) -> Sample:
@@ -80,9 +126,15 @@ def parse_metrics(text: str) -> Sample:
         if name in ("ray_node_gpus_utilization", "ray_node_gram_used", "ray_node_gram_available"):
             index = labels.split('GpuIndex="', 1)[-1].split('"', 1)[0]
             gpus.setdefault(index, {})[name] = float(value)
+            if 'GpuDeviceName="' in labels:
+                gpus[index]["name"] = labels.split('GpuDeviceName="', 1)[1].split('"', 1)[0]
         else:
             got.setdefault(name, float(value))
     sample = Sample(cpu=got.get("ray_node_cpu_utilization"), via="Ray")
+    if got.get("ray_node_cpu_count"):
+        sample.hardware["threads"] = int(got["ray_node_cpu_count"])
+    if any("name" in gpu for gpu in gpus.values()):
+        sample.hardware["gpus"] = [gpu.get("name", "GPU") for _index, gpu in sorted(gpus.items())]
     total = got.get("ray_node_mem_total", 0.0)
     if total:
         sample.mem_total_gb, sample.mem_used_gb = total / 1024**3, got.get("ray_node_mem_used", 0.0) / 1024**3
@@ -137,7 +189,7 @@ class _Reader:
         # `metrics()` gives the URL of the host's Ray metrics, or None while no Ray has it;
         # `nodes()`, those of the queue the host is the login node of
         self.address, self._ticks, self._psutil, self._metrics, self._url = address, None, None, metrics, None
-        self._nodes = nodes
+        self._nodes, self._hardware = nodes, None
         if not address:
             try:
                 import psutil
@@ -148,6 +200,25 @@ class _Reader:
                 pass
 
     def read(self) -> Sample:
+        sample = self._read()
+        if not sample.error and self._nodes is None:  # a queue's nodes say theirs
+            if self._hardware is None and sample.via != "Ray":  # Ray's metrics say it, with no ssh
+                self._hardware = self._read_hardware()
+            sample.hardware = {**(self._hardware or {}), **sample.hardware}
+        return sample
+
+    def _read_hardware(self) -> dict:
+        """Read once: a machine does not change its CPU. Nothing, if it cannot be read."""
+        try:
+            if not self.address:
+                return parse_hardware(subprocess.run(["sh", "-c", _HARDWARE], capture_output=True, text=True, timeout=10).stdout)
+            from ms_env import Host
+
+            return parse_hardware(Host(self.address).run(_HARDWARE, timeout=30).decode(errors="replace"))
+        except Exception:  # noqa: BLE001 - the hover only says less
+            return {}
+
+    def _read(self) -> Sample:
         try:
             if self._nodes is not None:
                 nodes = self._nodes()
@@ -180,9 +251,10 @@ class Sparkline(QWidget):
 
     _TOP = 18  # the label row
 
-    def __init__(self, title: str, parent=None):
+    def __init__(self, title: str, parent=None, *, icon: str = "", tip: str = ""):
         super().__init__(parent)
         self.title, self.values, self.interval, self.note = title, deque(maxlen=_HISTORY), 5, ""
+        self.icon, self.tip = icon, tip  # drawn before the name; what the measure is, over the label row
         self.setMinimumSize(120, 70)
         self.setMouseTracking(True)
 
@@ -203,8 +275,13 @@ class Sparkline(QWidget):
         small = p.font()
         small.setPixelSize(11)
         p.setFont(small)
-        p.setPen(pal.color(QPalette.ColorRole.PlaceholderText))
-        p.drawText(0, 0, w, top - 4, Qt.AlignLeft | Qt.AlignVCenter, self.title)
+        faint = pal.color(QPalette.ColorRole.PlaceholderText)
+        p.setPen(faint)
+        left = 0
+        if self.icon:
+            p.drawPixmap(0, 0, _icon(self.icon, faint.name(), top - 4, self.devicePixelRatioF()))
+            left = top
+        p.drawText(left, 0, w - left, top - 4, Qt.AlignLeft | Qt.AlignVCenter, self.title)
         now = next((v for v in reversed(self.values) if v is not None), None)
         small.setBold(True)
         p.setFont(small)
@@ -237,6 +314,9 @@ class Sparkline(QWidget):
         p.drawPolyline(points)
 
     def mouseMoveEvent(self, event):
+        if event.position().y() < self._TOP and self.tip:
+            QToolTip.showText(event.globalPosition().toPoint(), self.tip, self)
+            return
         index = round(event.position().x() / max(1.0, self.width()) * (_HISTORY - 1)) - (_HISTORY - len(self.values))
         if 0 <= index < len(self.values) and self.values[index] is not None:
             ago = (len(self.values) - 1 - index) * self.interval
@@ -264,8 +344,9 @@ class _HostCard(QFrame):
         self.setProperty("checked", False)
         self.setMinimumWidth(380)
         self.setCursor(Qt.PointingHandCursor)
-        self.setToolTip(f"{address or 'this computer'} · in {', '.join(self.executors) or 'no executor'}"
-                        + (f" · read every {interval}s" if interval else "") + "\nClick: only its jobs")
+        self._where = (f"{address or 'this computer'} · in {', '.join(self.executors) or 'no executor'}"
+                       + (f" · read every {interval}s" if interval else ""))
+        self._tip(None)
         box = QVBoxLayout(self)
         box.setContentsMargins(12, 8, 12, 10)
         box.setSpacing(6)
@@ -292,20 +373,18 @@ class _HostCard(QFrame):
         charts = QHBoxLayout(page)
         charts.setContentsMargins(0, 0, 0, 0)
         charts.setSpacing(12)
-        taken = " taken" if self.queue else ""
-        self.cpu, self.mem, self.gpu = (Sparkline(f"CPU{taken}", page), Sparkline(f"Memory{taken}", page),
-                                        Sparkline(f"GPU{taken}", page))
-        for chart in (self.cpu, self.mem, self.gpu):
-            chart.interval = interval or 0
-            charts.addWidget(chart, 1)
-        self.gpu.setVisible(False)  # until a read finds one
         self.pages.addWidget(page)
-        self.pages.setVisible(interval is not None)
-        box.addWidget(self.pages, 1)
-        if self.queue:  # its nodes one by one, behind a button of its header
+        if self.queue:
+            # A queue is shared: by default, what its jobs asked of it; behind "Nodes", each node and
+            # what every job has taken of it (Overall / per CPU, as system monitors do).
+            self.asked = {}
+            for icon, unit, tip in _ASKED:
+                self.asked[icon] = cell = _Asked(icon, unit, tip, page)
+                charts.addWidget(cell, 1)
             listed = QScrollArea(self.pages)
             listed.setWidgetResizable(True)
             listed.setFrameShape(QFrame.NoFrame)
+            listed.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # the rows elide nothing; a narrow card cuts the load
             listed.setStyleSheet("QScrollArea { background: transparent; } QScrollArea > QWidget > QWidget { background: transparent; }")
             self.node_rows = QWidget(listed)
             self.node_grid = QGridLayout(self.node_rows)
@@ -317,11 +396,22 @@ class _HostCard(QFrame):
             self.toggle = QToolButton(self)
             self.toggle.setText("Nodes")
             self.toggle.setCheckable(True)
-            self.toggle.setToolTip("Each node of the queue now, or all of them in time")
+            self.toggle.setToolTip("Each node of the queue, or what its jobs asked of it (the default)")
             self.toggle.setCursor(Qt.ArrowCursor)
             self.toggle.setStyleSheet("QToolButton { font-size:11px; padding:0 6px; }")
             self.toggle.toggled.connect(lambda on: self.pages.setCurrentIndex(int(on)))
             head.addWidget(self.toggle)
+        else:
+            self.cpu, self.mem, self.gpu = (
+                Sparkline("CPU", page, icon="cpu", tip="CPU use of the whole machine, by every program on it"),
+                Sparkline("Memory", page, icon="memory", tip="Memory (RAM) in use on the machine, by every program on it"),
+                Sparkline("GPU", page, icon="gpu", tip="GPU use: the mean over the machine's cards"))
+            for chart in (self.cpu, self.mem, self.gpu):
+                chart.interval = interval or 0
+                charts.addWidget(chart, 1)
+            self.gpu.setVisible(False)  # until a read finds one
+        self.pages.setVisible(interval is not None)
+        box.addWidget(self.pages, 1)
         self.said = QLabel("not read: the login node of a queue" if interval is None else "", self)
         self.said.setStyleSheet("color:palette(placeholder-text); font-size:11px;")
         self.said.setVisible(interval is None)
@@ -341,8 +431,18 @@ class _HostCard(QFrame):
             said.append(f"via {sample.via}")
         self.about.setText(" · ".join(said))
 
-    def set_jobs(self, active: int, cpus: int) -> None:
+    def _tip(self, sample: Sample | None) -> None:
+        """The hover of the card: where it is, then what it has (a queue: its nodes)."""
+        lines = [html.escape(self._where)]
+        if sample is not None:
+            lines += [queue_summary(sample.nodes)] if self.queue else hardware_lines(sample)
+        self.setToolTip("<br>".join(lines + ["<i>Click: only its jobs</i>"]))
+
+    def set_jobs(self, active: int, cpus: int, asked: dict | None = None) -> None:
         self.jobs.setText(f"{active} active job{'s' * (active != 1)}" + (f" · {cpus:,} CPUs in use" if cpus else ""))
+        if self.queue:
+            for icon, cell in self.asked.items():
+                cell.set((asked or {}).get(icon, 0))
 
     def set_checked(self, checked: bool) -> None:
         self.setProperty("checked", checked)
@@ -360,16 +460,15 @@ class _HostCard(QFrame):
             self.said.setText(sample.error)
             return
         self._describe(sample)
-        if sample.nodes:
-            used, cpus = sum(node["cpus_used"] for node in sample.nodes), sum(node["cpus"] for node in sample.nodes)
-            self.cpu.push(sample.cpu, f"{used:,}/{cpus:,}")
+        self._tip(sample)
+        if self.queue:
             self._list(sample.nodes)
-        else:
-            self.cpu.push(sample.cpu)
+            return
+        self.cpu.push(sample.cpu)
         self.mem.push(sample.mem, f"{sample.mem_used_gb:.1f}/{sample.mem_total_gb:.0f} GB")
         if sample.gpus:  # ponytail: the mean over the cards; one chart per card when a host has several that differ
             util = sum(g[0] for g in sample.gpus) / len(sample.gpus)
-            self.gpu.title = f"GPU{' taken' if self.queue else ''} {len(sample.gpus)}×"
+            self.gpu.title = f"GPU {len(sample.gpus)}×"
             self.gpu.push(util)
             self.gpu.setVisible(True)
 
@@ -383,14 +482,89 @@ class _HostCard(QFrame):
             cells = [("●", f"color:{color(hue).name()}; font-size:9px;"), (node["name"], "font-size:11.5px; font-weight:600;"),
                      (node["state"], faint), (f"{node['cpus_used']}/{node['cpus']} CPUs", "font-size:11px;"),
                      (f"{node['mem_used_gb']:.0f}/{node['mem_gb']:.0f} GB", "font-size:11px;"),
-                     (f"{node['gpus_used']}/{node['gpus']} GPUs" if node["gpus"] else "", "font-size:11px;"),
+                     (_gpus(node), "font-size:11px;"),
                      ("" if node["load"] is None else f"load {node['load']:.2f}", faint)]
             for column, (text, style) in enumerate(cells):
                 label = QLabel(text, self.node_rows)
                 label.setStyleSheet(style)
                 self.node_grid.addWidget(label, row, column)
-        self.node_grid.setColumnStretch(len(cells), 1)
+        self.node_grid.setColumnStretch(7, 1)
         self.node_grid.setRowStretch(len(nodes), 1)
+
+
+class _Asked(QWidget):
+    """An icon and how much of one resource a queue's jobs asked; what it is, on hover."""
+
+    def __init__(self, icon: str, unit: str, tip: str, parent=None):
+        super().__init__(parent)
+        self.unit = unit
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(6)
+        self.icon = QLabel(self)
+        self.icon.setPixmap(_icon(icon, self.palette().color(QPalette.PlaceholderText).name(), 18,
+                                  self.devicePixelRatioF()))
+        self.value = QLabel(self)
+        self.value.setStyleSheet("font-size:15px; font-weight:650;")
+        row.addWidget(self.icon)
+        row.addWidget(self.value)
+        row.addStretch(1)
+        self.setToolTip(tip)
+        self.set(0)
+
+    def set(self, amount: float) -> None:
+        self.value.setText(f"{amount:,.0f} {self.unit}" if amount else f"– {self.unit}")
+
+
+def _icon(name: str, color_hex: str, size: int, dpr: float) -> QPixmap:
+    svg = (_ICONS / f"{name}.svg").read_bytes().replace(b"currentColor", color_hex.encode())
+    pixmap = QPixmap(round(size * dpr), round(size * dpr))
+    pixmap.fill(Qt.transparent)
+    with QPainter(pixmap) as painter:
+        QSvgRenderer(QByteArray(svg)).render(painter)
+    pixmap.setDevicePixelRatio(dpr)
+    return pixmap
+
+
+def queue_asked(jobs) -> dict:
+    """What `jobs` (snapshots of one queue) ask of it, added up: `cpu`, `memory` (GB), `gpu`."""
+    total = {"cpu": 0, "memory": 0, "gpu": 0}
+    for job in jobs:
+        asked = getattr(job, "asked", None) or {}
+        nodes = int(asked.get("nodes") or 1)
+        for key, said in (("cpu", "cpus"), ("memory", "memory_gb"), ("gpu", "gpus")):
+            try:
+                total[key] += nodes * float(asked.get(said) or 0)
+            except (TypeError, ValueError):  # a site's own form ("a100:2"): not added
+                pass
+    return total
+
+
+# ponytail: a queue of more nodes than this lists the first ones; a scrolling popup if that hurts.
+_LISTED_NODES = 40
+
+
+def queue_summary(nodes: list[dict]) -> str:
+    """The whole of a queue, for the hover of its card: its nodes, what everyone has taken of their
+    CPUs, memory and cards, then each node."""
+    if not nodes:
+        return "The queue lists no nodes"
+    up = sum(not _down(node["state"]) for node in nodes)
+    taken = lambda key: sum(node[key] for node in nodes)  # noqa: E731
+    lines = [f"<b>{len(nodes)} node{'s' * (len(nodes) != 1)}</b>, {up} up · taken by every job of the queue:",
+             f"CPUs {taken('cpus_used'):,}/{taken('cpus'):,} · memory {taken('mem_used_gb'):,.0f}/{taken('mem_gb'):,.0f} GB"
+             + (f" · GPUs {taken('gpus_used')}/{taken('gpus')}" if taken("gpus") else "")]
+    rows = "".join(
+        f"<tr><td>{node['name']}</td><td>{node['state']}</td><td>{node['cpus_used']}/{node['cpus']} CPUs</td>"
+        f"<td>{node['mem_used_gb']:.0f}/{node['mem_gb']:.0f} GB</td>"
+        f"<td>{_gpus(node)}</td></tr>"
+        for node in nodes[:_LISTED_NODES])
+    more = f"<br>+{len(nodes) - _LISTED_NODES} more" if len(nodes) > _LISTED_NODES else ""
+    return "<br>".join(lines) + f"<table cellspacing='6'>{rows}</table>{more}"
+
+
+def _gpus(node: dict) -> str:
+    return f"{node['gpus_used']}/{node['gpus']} GPUs" if node["gpus"] else ""
 
 
 def _down(state: str) -> bool:
@@ -482,7 +656,7 @@ class HostsStrip(QScrollArea):
         self._jobs = jobs
         for card in self._cards.values():
             mine = [job for job in jobs if not job.is_terminal and job.executor in card.executors]
-            card.set_jobs(len(mine), sum(job.cpu_used or 0 for job in mine))
+            card.set_jobs(len(mine), sum(job.cpu_used or 0 for job in mine), queue_asked(mine))
 
     def stop(self) -> None:
         self._stop.set()  # daemons: each ends at its next wake-up, an ssh call in flight included
@@ -546,4 +720,5 @@ def workspace_hosts(workspace) -> list[tuple[str, str, str, list[str], int | Non
     return [tuple(row) for row in rows.values()]
 
 
-__all__ = ["HostsStrip", "INTERVALS", "Sample", "Sparkline", "from_nodes", "parse", "parse_metrics", "workspace_hosts"]
+__all__ = ["HostsStrip", "INTERVALS", "Sample", "Sparkline", "from_nodes", "parse", "parse_metrics", "queue_asked",
+           "queue_summary", "workspace_hosts"]

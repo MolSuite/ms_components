@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMessageBox,
     QProgressDialog,
@@ -249,6 +250,20 @@ class ProjectsMenuWidget(QFrame):
             return
         self.refresh()
 
+    def _confirm_open_project_delete(self, project: ProjectItem) -> bool:
+        """The project open now goes only once its name is typed: the application closes it,
+        restarts without it, then deletes its folder with everything in it."""
+        typed, ok = QInputDialog.getText(
+            self, "Delete the open project",
+            f"'{project.name}' is the project open now. The application closes it, restarts without it "
+            f"and deletes its folder with all its data and results:\n{project.path}\n\n"
+            "Jobs of this project that are still running are stopped.\n\n"
+            "Type the name of the project to delete it:")
+        if ok and typed.strip() != project.name:
+            QMessageBox.information(self, "Delete the open project",
+                                    f"The name did not match: '{project.name}' was not deleted.")
+        return ok and typed.strip() == project.name
+
     def _on_delete(self, projects: list[ProjectItem]) -> None:
         if not projects:
             return
@@ -264,7 +279,8 @@ class ProjectsMenuWidget(QFrame):
         in_use = [p for p in projects if self.active_project_id and str(p.id) == self.active_project_id]
         projects = [p for p in projects if p not in in_use]
         for project in in_use:
-            self.active_project_delete_requested.emit(str(project.id))
+            if self._confirm_open_project_delete(project):
+                self.active_project_delete_requested.emit(str(project.id))
         if not projects:
             return
 
