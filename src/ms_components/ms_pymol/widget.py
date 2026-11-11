@@ -1102,7 +1102,7 @@ class PymolDockWidget(MSDockWidget):
             self.side_panel_visibility_changed.emit(visible)
 
     def is_side_panel_visible(self) -> bool:
-        return bool(self._side_container.isVisible())
+        return not self._side_container.isHidden()  # own state; isVisible() is False while the dock is hidden
 
     def eventFilter(self, watched, event):
         if watched is self.pymol_widget and event.type() == QEvent.Type.MouseButtonRelease:
