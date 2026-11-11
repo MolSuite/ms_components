@@ -27,7 +27,7 @@ from pathlib import Path
 from PySide6.QtCore import QByteArray, QObject, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPalette, QPen, QPixmap
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QScrollArea,
+from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QScrollArea, QStackedWidget, QToolButton,
                                QToolTip, QVBoxLayout, QWidget)
 
 from ms_components.labels import ElidedLabel
@@ -368,22 +368,39 @@ class _HostCard(QFrame):
         head.addWidget(self.jobs)
         box.addLayout(head)
         self.queue = kind == "queue"
-        self.pages = page = QWidget(self)
+        self.pages = QStackedWidget(self)
+        page = QWidget(self.pages)
         charts = QHBoxLayout(page)
         charts.setContentsMargins(0, 0, 0, 0)
         charts.setSpacing(12)
+        self.pages.addWidget(page)
         if self.queue:
-            # A queue is shared: what its jobs asked of it, not what everyone has taken of it. The
-            # whole of it (its nodes, what is taken of each) is on the ⓘ of the header.
+            # A queue is shared: by default, what its jobs asked of it; behind "Nodes", each node and
+            # what every job has taken of it (Overall / per CPU, as system monitors do).
             self.asked = {}
             for icon, unit, tip in _ASKED:
                 self.asked[icon] = cell = _Asked(icon, unit, tip, page)
                 charts.addWidget(cell, 1)
-            self.info = QLabel("ⓘ", self)
-            self.info.setStyleSheet("color:palette(placeholder-text); font-size:14px;")
-            self.info.setCursor(Qt.WhatsThisCursor)
-            self.info.setToolTip("The queue has not said its nodes yet")
-            head.addWidget(self.info)
+            listed = QScrollArea(self.pages)
+            listed.setWidgetResizable(True)
+            listed.setFrameShape(QFrame.NoFrame)
+            listed.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # the rows elide nothing; a narrow card cuts the load
+            listed.setStyleSheet("QScrollArea { background: transparent; } QScrollArea > QWidget > QWidget { background: transparent; }")
+            self.node_rows = QWidget(listed)
+            self.node_grid = QGridLayout(self.node_rows)
+            self.node_grid.setContentsMargins(0, 0, 4, 0)
+            self.node_grid.setHorizontalSpacing(14)
+            self.node_grid.setVerticalSpacing(1)
+            listed.setWidget(self.node_rows)
+            self.pages.addWidget(listed)
+            self.toggle = QToolButton(self)
+            self.toggle.setText("Nodes")
+            self.toggle.setCheckable(True)
+            self.toggle.setToolTip("Each node of the queue, or what its jobs asked of it (the default)")
+            self.toggle.setCursor(Qt.ArrowCursor)
+            self.toggle.setStyleSheet("QToolButton { font-size:11px; padding:0 6px; }")
+            self.toggle.toggled.connect(lambda on: self.pages.setCurrentIndex(int(on)))
+            head.addWidget(self.toggle)
         else:
             self.cpu, self.mem, self.gpu = (
                 Sparkline("CPU", page, icon="cpu", tip="CPU use of the whole machine, by every program on it"),
@@ -393,8 +410,8 @@ class _HostCard(QFrame):
                 chart.interval = interval or 0
                 charts.addWidget(chart, 1)
             self.gpu.setVisible(False)  # until a read finds one
-        page.setVisible(interval is not None)
-        box.addWidget(page, 1)
+        self.pages.setVisible(interval is not None)
+        box.addWidget(self.pages, 1)
         self.said = QLabel("not read: the login node of a queue" if interval is None else "", self)
         self.said.setStyleSheet("color:palette(placeholder-text); font-size:11px;")
         self.said.setVisible(interval is None)
@@ -445,7 +462,7 @@ class _HostCard(QFrame):
         self._describe(sample)
         self._tip(sample)
         if self.queue:
-            self.info.setToolTip(queue_summary(sample.nodes))
+            self._list(sample.nodes)
             return
         self.cpu.push(sample.cpu)
         self.mem.push(sample.mem, f"{sample.mem_used_gb:.1f}/{sample.mem_total_gb:.0f} GB")
@@ -454,6 +471,25 @@ class _HostCard(QFrame):
             self.gpu.title = f"GPU {len(sample.gpus)}×"
             self.gpu.push(util)
             self.gpu.setVisible(True)
+
+    def _list(self, nodes: list[dict]) -> None:
+        """One row for each node: its state, then what the queue's jobs have taken of it."""
+        while self.node_grid.count():
+            self.node_grid.takeAt(0).widget().deleteLater()
+        faint = "color:palette(placeholder-text); font-size:11px;"
+        for row, node in enumerate(nodes):
+            hue = "red" if _down(node["state"]) else "green" if node["state"] in ("idle", "up") else "blue"
+            cells = [("●", f"color:{color(hue).name()}; font-size:9px;"), (node["name"], "font-size:11.5px; font-weight:600;"),
+                     (node["state"], faint), (f"{node['cpus_used']}/{node['cpus']} CPUs", "font-size:11px;"),
+                     (f"{node['mem_used_gb']:.0f}/{node['mem_gb']:.0f} GB", "font-size:11px;"),
+                     (_gpus(node), "font-size:11px;"),
+                     ("" if node["load"] is None else f"load {node['load']:.2f}", faint)]
+            for column, (text, style) in enumerate(cells):
+                label = QLabel(text, self.node_rows)
+                label.setStyleSheet(style)
+                self.node_grid.addWidget(label, row, column)
+        self.node_grid.setColumnStretch(7, 1)
+        self.node_grid.setRowStretch(len(nodes), 1)
 
 
 class _Asked(QWidget):
@@ -509,7 +545,7 @@ _LISTED_NODES = 40
 
 
 def queue_summary(nodes: list[dict]) -> str:
-    """The whole of a queue, for the ⓘ of its card: its nodes, what everyone has taken of their
+    """The whole of a queue, for the hover of its card: its nodes, what everyone has taken of their
     CPUs, memory and cards, then each node."""
     if not nodes:
         return "The queue lists no nodes"

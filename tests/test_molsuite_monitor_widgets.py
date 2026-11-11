@@ -341,8 +341,13 @@ def test_a_queue_is_read_from_what_it_says_of_its_nodes():
     card = _HostCard("hpc", "me@login", "queue", ["slurm"], 30)
     card.apply(sample)
     assert "2 nodes, 1 up" in card.about.text()
-    # A queue is shared: its card says what its jobs asked of it; the whole of it is on the ⓘ.
-    assert "CPUs 3/8" in card.info.toolTip() and "w2" in card.info.toolTip() and "1/2 GPUs" in card.info.toolTip()
+    # A queue is shared: by default its card says what its jobs asked of it; "Nodes", each node.
+    assert card.pages.currentIndex() == 0 and not card.toggle.isChecked()
+    card.toggle.setChecked(True)
+    shown = [card.node_grid.itemAt(i).widget().text() for i in range(card.node_grid.count())]
+    assert card.pages.currentIndex() == 1 and {"w1", "w2", "down*", "3/4 CPUs", "1/2 GPUs"} <= set(shown)
+    card.toggle.setChecked(False)
+    assert card.pages.currentIndex() == 0
     assert "me@login" in card.toolTip() and "CPUs 3/8" in card.toolTip()  # the hover of the card says it too
     jobs = [SimpleNamespace(asked={"nodes": 2, "cpus": 4, "memory_gb": 8, "gpus": 1}),
             SimpleNamespace(asked={"cpus": 2, "gpus": "a100:1"}), SimpleNamespace(asked=None)]
