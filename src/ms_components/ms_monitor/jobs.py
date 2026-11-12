@@ -30,6 +30,9 @@ def status_color(status: str, default: str | None = None) -> str:
 
 def counts_label(job: JobMonitorState) -> str:
     """`done/total · time left`, or `· took` once it ended."""
+    if job.nothing_to_do:
+        took = (job.finished_at - job.started_at).total_seconds() if job.finished_at and job.started_at else None
+        return "0 chunks" + ("" if took is None else f" · took {format_duration(took)}")
     total = f"{job.chunks_total:,}" if job.chunks_total else "?"
     left = job.seconds_left
     if job.is_terminal:
@@ -50,6 +53,8 @@ def badge_of(job) -> tuple[str, str]:
         return "WAITING FOR HOST", P["warn"]
     if job.canceling and not job.is_terminal:
         return "CANCELING", P["warn"]
+    if job.nothing_to_do:  # not a success with no work: there was nothing to run
+        return "NOTHING TO DO", P["text_muted"]
     return job.status.replace("_", " ").upper(), status_color(job.status)
 
 
