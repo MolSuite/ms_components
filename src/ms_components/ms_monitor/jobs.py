@@ -183,7 +183,7 @@ class _JobRow(QStyledItemDelegate):
         failed_w = p.fontMetrics().horizontalAdvance(failed) if failed else 0
         p.setFont(font)
         room = brect.left() - x - 8 - failed_w
-        name = p.fontMetrics().elidedText(job.name or job.job_id[:8], Qt.ElideRight, int(max(0, room)))
+        name = p.fontMetrics().elidedText(job.label, Qt.ElideRight, int(max(0, room)))
         p.setPen(text)
         p.drawText(QRectF(x, top, room, 18), Qt.AlignLeft | Qt.AlignVCenter, name)
         if failed:
@@ -303,7 +303,7 @@ class JobList(QListWidget):
             job = self.item(i).data(_ROLE)
             shown = (
                 (self._status == "all" or job.status == self._status)
-                and (not self._search or self._search in f"{job.name} {job.job_id} {job.status} {job.executor or ''}".lower())
+                and (not self._search or self._search in f"{job.label} {job.name} {job.job_id} {job.status} {job.executor or ''}".lower())
                 and (self._executors is None or job.executor in self._executors)
             )
             self.item(i).setHidden(not shown)

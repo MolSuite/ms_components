@@ -439,3 +439,12 @@ def test_the_hover_of_a_host_says_its_cpu_memory_and_cards():
     assert "AMD Ryzen 7 3700X 8-Core Processor · 16 threads" in tip and "<b>Memory</b> 47 GB" in tip
     assert "2× NVIDIA GeForce GTX 1660 SUPER · 6 GB" in tip and "Click: only its jobs" in tip
     assert _Reader("").read().hardware.get("threads")  # this machine, read with no ssh
+
+
+def test_a_titled_job_shows_its_title_and_keeps_its_name_in_the_tooltip():
+    QApplication.instance() or QApplication([])
+    detail = JobDetail()
+    detail.set_job(_job(name="amdock_docking_job", title="Docking · gnina (CNN)"))
+    assert detail._name.text() == "Docking · gnina (CNN)" and detail._name.toolTip() == "amdock_docking_job"
+    detail.set_job(_job(name="amdock_docking_job"))
+    assert detail._name.text() == "amdock_docking_job" and detail._name.toolTip() == ""

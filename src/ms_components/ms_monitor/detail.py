@@ -475,7 +475,8 @@ class JobDetail(QWidget):
             self._set_steps(None)
             return
         hue = status_color(job.status)
-        self._name.setText(job.name or job.job_id[:8])
+        self._name.setText(job.label)
+        self._name.setToolTip(job.name if job.title else "")
         badge, badge_hue = badge_of(job)
         self._badge.setText(badge)
         self._badge.setToolTip(job.unreachable)
