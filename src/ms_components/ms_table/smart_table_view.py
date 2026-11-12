@@ -1161,7 +1161,7 @@ class SmartTableView(QWidget):
             if self._config.context_menu_actions:
                 menu.addSeparator()
 
-        copy_action = menu.addAction("Copiar celda")
+        copy_action = menu.addAction("Copy cell")
         copy_action.triggered.connect(lambda: self._copy_cell(index))
 
         copy_row_action = menu.addAction("Copy row")

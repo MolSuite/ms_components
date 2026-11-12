@@ -36,7 +36,7 @@ _ICON_FILES: dict[str, str] = {
 
 @lru_cache(maxsize=128)
 def _svg_pixmap(name: str, color_hex: str, size: int, dpr: float) -> QPixmap:
-    """SVG → QPixmap, recoloreado (currentColor → color_hex), cacheado."""
+    """SVG → QPixmap, recolored (currentColor → color_hex), cached."""
     svg = (_ICONS / _ICON_FILES[name]).read_bytes().replace(b"currentColor", color_hex.encode())
     renderer = QSvgRenderer(QByteArray(svg))
     actual = max(1, int(size * dpr))
@@ -348,7 +348,7 @@ class FilterPopup(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
-        layout.addWidget(QLabel(f"Filtrar {col_def.label}"))
+        layout.addWidget(QLabel(f"Filter {col_def.label}"))
 
         self._checkboxes: list[QCheckBox] = []
         self._op_combo:   QComboBox | None = None

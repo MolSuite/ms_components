@@ -295,9 +295,9 @@ QLabel#PymolSceneContext {
     color: palette(placeholder-text);
 }
 
-/* Botón de extensión de las toolbars embebidas. Los componentes le asignan un
-   SVG hamburguesa y abren su menú al entrar con el cursor. La regla va al final
-   para vencer la especificidad de las reglas particulares de cada toolbar. */
+/* Overflow (extension) button of the embedded toolbars. Components give it a
+   hamburger SVG and open its menu when the cursor enters. The rule comes last
+   to win over the specificity of each toolbar's own rules. */
 QToolButton#qt_toolbar_ext_button,
 #SmartTableToolbar QToolButton#qt_toolbar_ext_button,
 #PymolControlBar QToolButton#qt_toolbar_ext_button {
