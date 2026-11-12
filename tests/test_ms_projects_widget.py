@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 from PySide6.QtWidgets import QDialog, QMessageBox
 
@@ -35,6 +36,35 @@ def test_folder_selection_emits_only_when_confirmed_including_the_same_folder(mo
         assert form.save_button.text()
     finally:
         form.deleteLater()
+
+
+def test_a_new_project_folder_can_be_typed_and_an_existing_one_looks_fixed(monkeypatch, tmp_path):
+    """The Path field was read-only yet styled like Name and Tags: typing into it did nothing."""
+    QApplication.instance() or QApplication([])
+    apps = _FakeBackend().list_apps()
+    form = ProjectFormDialog(apps=apps, mode="create", initial_data={"path": str(Path.home())})
+    warned = []
+    monkeypatch.setattr("ms_components.ms_projects.browser.QMessageBox.warning",
+                        lambda _parent, _title, text: warned.append(text))
+    try:
+        assert form.path_input.isEnabled() and not form.path_input.isReadOnly()
+        form.name_input.setText("Practice")
+        form.path_input.selectAll()
+        QTest.keyClicks(form.path_input, str(tmp_path / "typed"))
+        assert form.get_data()["path"] == tmp_path / "typed"
+
+        form.path_input.setText("relative/folder")
+        form.accept()
+        assert form.result() != QDialog.Accepted and "full folder path" in warned[-1]
+    finally:
+        form.deleteLater()
+
+    edit = ProjectFormDialog(apps=apps, mode="edit", initial_data={"name": "P", "path": str(tmp_path)})
+    try:
+        assert not edit.path_input.isEnabled() and not edit.browse_button.isEnabled()
+        assert edit.get_data()["path"] == tmp_path
+    finally:
+        edit.deleteLater()
 
 
 def test_project_form_is_announced_before_its_modal_loop_and_cancel_does_not_create(monkeypatch):

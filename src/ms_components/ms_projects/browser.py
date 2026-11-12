@@ -1023,7 +1023,13 @@ class ProjectFormDialog(QDialog):
         self.name_input        = QLineEdit(self.initial_data.get("name", ""))
         self.name_input.editingFinished.connect(lambda: self.name_committed.emit(self.name_input.text().strip()))
         self.path_input        = QLineEdit(str(self.initial_data.get("path", "")))
-        self.path_input.setReadOnly(True)
+        # A new project's folder can be typed or browsed; an existing one's cannot move, and the
+        # field looks it (greyed like App) instead of a read-only box that ignores typing.
+        self.path_input.setEnabled(not is_edit)
+        self.path_input.setToolTip(
+            "The project is stored in this folder." if is_edit else
+            "Folder for the project: type or paste a path, or Browse. A folder named after the "
+            "project is created inside it unless the path already ends with that name.")
         self.description_input = QTextEdit(self.initial_data.get("description", ""))
         self.description_input.setMinimumHeight(120)
         self.tags_input = QLineEdit(
@@ -1073,6 +1079,10 @@ class ProjectFormDialog(QDialog):
             return
         if not self.path_input.text().strip():
             QMessageBox.warning(self, "Invalid data", "The path cannot be empty.")
+            return
+        if not Path(self.path_input.text().strip()).expanduser().is_absolute():
+            QMessageBox.warning(self, "Invalid data",
+                                "The path must be a full folder path, e.g. ~/molsuite_projects.")
             return
         if self.app_combo.currentData() is None:
             QMessageBox.warning(self, "Invalid data", "You must select an app.")
