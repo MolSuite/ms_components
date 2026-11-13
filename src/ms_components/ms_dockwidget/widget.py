@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Dict, List, Optional
 
-from PySide6.QtCore import Qt, QSize, QMimeData, QPoint, QByteArray, QObject, QEvent, QTimer, QtMsgType, \
+from PySide6.QtCore import Qt, QSize, QMimeData, QPoint, QRect, QByteArray, QObject, QEvent, QTimer, QtMsgType, \
     qInstallMessageHandler
 from PySide6.QtGui import QAction, QDrag, QIcon
 from PySide6.QtWidgets import (QDockWidget, QFrame, QMainWindow, QMenu, QSizePolicy, QToolBar, QToolButton, QVBoxLayout,
@@ -795,6 +795,7 @@ class DockManager:
         # the region it came from. This lets users keep (for example) PyMOL on a
         # second monitor while opening another tool in the original side panel.
         self._windowed: set[str] = set()
+        self._window_geometry: dict[str, QRect] = {}  # where each window was when docked back
 
         # ── FIX P2: single flag that blocks ALL reactive handlers ──
         # While True, _on_dock_visibility_changed and
@@ -991,8 +992,24 @@ class DockManager:
         self._windowed.add(dock_id)
         self._remove_region_visible(entry.region, dock_id)
         self._make_native_window(dock_id)
+        dock.setGeometry(self._window_geometry.get(dock_id) or self._default_window_geometry(dock))
         QTimer.singleShot(0, dock.activateWindow)
         self.sync_buttons()
+
+    WINDOW_SCREEN_FRACTION = (0.6, 0.7)  # width, height of the available screen
+
+    def _default_window_geometry(self, dock: QWidget) -> QRect:
+        """A first-time window: a good share of the main window's screen, centred on it, and
+        never narrower than its contents ask for (a toolbar with every action showing). The
+        docked size is a strip of the main window, too small to work in on its own."""
+        screen = (self.mw.screen() or QApplication.primaryScreen()).availableGeometry()
+        fw, fh = self.WINDOW_SCREEN_FRACTION
+        wanted = max(dock.width(), int(screen.width() * fw), dock.sizeHint().width())
+        width = min(screen.width(), wanted)
+        height = min(screen.height(), max(dock.height(), int(screen.height() * fh)))
+        rect = QRect(0, 0, width, height)
+        rect.moveCenter(screen.center())
+        return rect
 
     def _make_native_window(self, dock_id: str) -> None:
         """Detach directly, clearing any prior QDockWidget utility-window mode."""
@@ -1038,6 +1055,8 @@ class DockManager:
         if dock is None:
             return
         entry = self.entries[dock_id]
+        if dock_id in self._windowed and dock.isWindow():
+            self._window_geometry[dock_id] = dock.geometry()  # reopens where the user left it
         self._updating = True
         try:
             self._windowed.discard(dock_id)

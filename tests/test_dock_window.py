@@ -174,3 +174,33 @@ def test_action_separator_sits_by_order_and_survives_a_rebuild(app):
     assert widgets[0] is manager.action_buttons["a"]["button"]
     assert widgets[2] is manager.action_buttons["b"]["button"]
     window.close()
+
+
+def test_window_opens_large_and_centred_then_reopens_where_left(app):
+    """A docked strip is too small to work in: the first window takes a good share of the
+    screen, centred; once moved/resized and docked back, it reopens where the user left it."""
+    window = QMainWindow()
+    manager = DockManager(window)
+    dock = _add_dock(manager, window, "diagram", visible=True)
+    manager.build()
+    window.resize(1200, 800)
+    window.show()
+    app.processEvents()
+
+    manager.open_in_window("diagram")
+    app.processEvents()
+    screen = window.screen().availableGeometry()
+    fw, fh = DockManager.WINDOW_SCREEN_FRACTION
+    assert dock.width() >= int(screen.width() * fw) - 1
+    assert dock.height() >= int(screen.height() * fh) - 1
+    assert abs(dock.geometry().center().x() - screen.center().x()) <= 3
+    assert abs(dock.geometry().center().y() - screen.center().y()) <= 3
+
+    dock.setGeometry(40, 50, 500, 400)
+    app.processEvents()
+    manager.dock_to_main_window("diagram")
+    app.processEvents()
+    manager.open_in_window("diagram")
+    app.processEvents()
+    assert dock.geometry().size() == QSize(500, 400)
+    assert (dock.geometry().x(), dock.geometry().y()) == (40, 50)
