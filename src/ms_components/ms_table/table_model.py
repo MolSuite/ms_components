@@ -193,6 +193,11 @@ class SmartTableModel(QAbstractTableModel):
                     section -= 1
                 if 0 <= section < len(self._visible_cols):
                     return self._visible_cols[section].label
+            if role == Qt.ToolTipRole:
+                if self._config.show_row_numbers:
+                    section -= 1
+                if 0 <= section < len(self._visible_cols):
+                    return self._visible_cols[section].header_tooltip
             if role == Qt.TextAlignmentRole:
                 return Qt.AlignCenter
             if role == Qt.FontRole:

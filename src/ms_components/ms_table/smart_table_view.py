@@ -355,7 +355,7 @@ class SmartTableView(QWidget):
         self._header = ActionHeader(self._config, self._table)
         self._table.setHorizontalHeader(self._header)
         self._header.setSectionResizeMode(QHeaderView.Interactive)
-        self._header.setStretchLastSection(True)
+        self._header.setStretchLastSection(self._config.stretch_last_column)
         if self._config.allow_column_reorder:
             self._header.setSectionsMovable(True)
 

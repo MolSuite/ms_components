@@ -105,6 +105,7 @@ class ColumnDef:
         formatter:  Function (raw_value) → str used for display.
         delegate:   Name of a custom Qt delegate (for editors).
         tooltip:    Static tooltip, or callable(row_data) → str.
+        header_tooltip: Tooltip on the column header (what the column means).
         db_column:  Override for the real DB column name (when it differs from field).
         expr:       SQLAlchemy expression producing the column value, for anything
                     that is not a model attribute (JSON_EXTRACT, CASE, func.*).
@@ -133,6 +134,7 @@ class ColumnDef:
     formatter:  Optional[Callable]     = None
     delegate:   Optional[str]          = None
     tooltip:    Any                    = None   # str | Callable
+    header_tooltip: Optional[str]      = None
     db_column:  Optional[str]          = None
     expr:       Any                    = None   # SQLAlchemy ColumnElement
     progress_max: Optional[str]        = None
@@ -315,6 +317,8 @@ class TableConfig:
         show_vertical_header: Show Qt's native vertical header.
         show_checkboxes:    Show the selection checkbox column.
         alternating_rows:   Alternate row colours.
+        stretch_last_column: The last column fills the table's spare width. Off, columns keep
+                            their widths and the spare width stays empty.
         allow_column_reorder: The user may reorder columns by dragging.
         allow_column_resize:  The user may resize columns.
         allow_row_resize:   The user may resize row heights.
@@ -346,6 +350,7 @@ class TableConfig:
     show_vertical_header:   bool                      = False
     show_checkboxes:        bool                      = False
     alternating_rows:       bool                      = True
+    stretch_last_column:    bool                      = True
     allow_column_reorder:   bool                      = True
     allow_column_resize:    bool                      = True
     allow_row_resize:       bool                      = False
