@@ -122,7 +122,8 @@ class ChipsSelect(QWidget):
         if editable:
             self._combo.setEditable(True)
             self._combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-            self._combo.lineEdit().setPlaceholderText("＋ type")
+            self._combo.lineEdit().setPlaceholderText("+ Add")
+            self._combo.lineEdit().setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._combo.lineEdit().returnPressed.connect(self._on_typed)
         self._combo.currentIndexChanged.connect(self._on_add)
         layout.addWidget(self._combo, 0, Qt.AlignmentFlag.AlignTop)
