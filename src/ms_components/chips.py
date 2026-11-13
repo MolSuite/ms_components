@@ -129,6 +129,12 @@ class ChipsSelect(QWidget):
         self._options: list[str] = []
         self._selected: list[str] = []
         self._last_height = 0
+        # Enter in the typed field means "add this chip". QLineEdit emits returnPressed and then
+        # *ignores* the key, which hands it up the parent chain to a dialog that clicks its
+        # default button - an import submitted mid-edit. The key passes through the combo on its
+        # way up, so the combo is where it stops.
+        if editable:
+            self._combo.installEventFilter(self)
 
     def sizeHint(self) -> QSize:
         # The table sizes rows from the cell widget's sizeHint, so report the wrapped height.
@@ -228,6 +234,9 @@ class ChipsSelect(QWidget):
     # --- Drag a chip onto another to reorder ------------------------------------------
     def eventFilter(self, chip, event) -> bool:
         kind = event.type()
+        if chip is self._combo:
+            # Only ever installed on an editable combo: see __init__.
+            return kind == QEvent.Type.KeyPress and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
         if kind == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
             self._press = event.position().toPoint()
         elif kind == QEvent.Type.MouseMove and self._press is not None:
