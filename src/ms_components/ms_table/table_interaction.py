@@ -39,4 +39,4 @@ class TableInteraction(QObject):
             if (event.button() == Qt.MouseButton.LeftButton and watched is view.viewport()
                     and was_selected and view.indexAt(event.position().toPoint()) == index):
                 self.reselected.emit(view, index, modifiers)
-        return super().eventFilter(watched, event)
+        return False  # never touch a deleted `watched` (teardown re-enters filters; errors chain and balloon)
