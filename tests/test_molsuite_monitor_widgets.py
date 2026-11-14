@@ -73,6 +73,27 @@ def test_the_throughput_card_leads_with_chunks_and_says_the_items_under_them():
     assert detail._speed.unit.text() == "chunks/s" and "tasks" in detail._speed.sub.text()
 
 
+def test_a_job_that_completed_with_nothing_to_run_says_so_and_not_completed():
+    from datetime import timedelta
+
+    from ms_components.ms_monitor.jobs import badge_of, counts_label
+    QApplication.instance() or QApplication([])
+    start = datetime.now()
+    empty = _job(status="completed", chunks_total=0, chunks_done=0, chunks_failed=0, chunks_running=0,
+                 started_at=start, finished_at=start, items_unit="ligands")
+    assert badge_of(empty)[0] == "NOTHING TO DO"
+    assert counts_label(empty) == "0 chunks · took 0s"
+    detail = JobDetail()
+    detail.set_job(empty)
+    assert detail._badge.text() == "NOTHING TO DO"
+    # A job with work keeps its status, and so does a job that ran nothing because it failed.
+    done = _job(status="completed", chunks_total=2, chunks_done=2, chunks_failed=0, chunks_running=0,
+                started_at=start, finished_at=start + timedelta(seconds=5))
+    assert badge_of(done)[0] == "COMPLETED" and counts_label(done) == "2/2 · took 5s"
+    assert badge_of(_job(status="failed", chunks_total=0, chunks_done=0, chunks_failed=0))[0] == "FAILED"
+    assert badge_of(_job(status="running", chunks_total=0, chunks_done=0, chunks_failed=0))[0] == "RUNNING"
+
+
 def test_the_detail_shows_the_numbers_the_tasks_and_the_failures_grouped():
     QApplication.instance() or QApplication([])
     detail = JobDetail()

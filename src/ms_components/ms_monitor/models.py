@@ -85,6 +85,11 @@ class JobMonitorState:
     def is_terminal(self) -> bool:
         return self.status in TERMINAL_JOB_STATUSES
 
+    @property
+    def nothing_to_do(self) -> bool:
+        """It completed without a chunk to run (its source had no work: everything was skipped)."""
+        return self.status == "completed" and not (self.chunks_total or self.chunks_settled)
+
 
 @dataclass(slots=True)
 class JobDetailState:
