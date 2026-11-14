@@ -37,6 +37,7 @@ class MolSuiteMonitorBridge(QObject):
         resume=None,
         destinations=None,
         measure=None,
+        title=None,
         parent: QObject | None = None,
     ) -> None:
         """`resume(job_id, executor or None)` and `destinations(job_id) -> names` are for an
@@ -45,7 +46,9 @@ class MolSuiteMonitorBridge(QObject):
         `measure(job_id) -> {"done": int, "total": int, "unit": str} | None` is what the
         application counts in a job besides its chunks (the records a chunk holds, say): the
         monitor shows its rate in that unit. Called on the polling thread, every poll while the
-        job runs and once after it ends; None for a job it does not measure."""
+        job runs and once after it ends; None for a job it does not measure.
+        `title(job_id, name) -> str | None` is what the application calls a job ("Docking ·
+        gnina", say), shown instead of its name; asked once a job, on the polling thread."""
         super().__init__(parent)
         self._workspace = workspace
         self._resume = resume or self._workspace_resume
@@ -58,6 +61,7 @@ class MolSuiteMonitorBridge(QObject):
             poll_ms=poll_ms,
             max_recent_jobs=max_recent_jobs,
             measure=measure,
+            title=title,
         )
         self._sync_state = MonitorSyncState()
         self._connect_poller(self._poller)

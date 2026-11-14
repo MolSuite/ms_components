@@ -241,3 +241,25 @@ def test_a_job_the_application_does_not_measure_shows_its_chunks_alone(ms, tmp_p
     ms.engine.wait(ms.submit(halves, executor="thread"), 30)
     [state] = bridge.refresh_now().jobs
     assert (state.items_unit, state.items_done, state.status) == ("", 0, "completed_with_errors")
+
+
+def test_the_application_titles_a_job_once_and_a_failing_title_keeps_its_name(ms, tmp_path):
+    """`title(job_id, name)` replaces the name of the job in the monitor; it is asked once a job."""
+    _open(ms, tmp_path)
+    asked = []
+
+    def title(job_id, name):
+        asked.append((job_id, name))
+        return f"Halves · {name}"
+
+    bridge = MolSuiteMonitorBridge(workspace=ms, poll_ms=50, title=title)
+    GATE.set()
+    ms.engine.wait(ms.submit(halves, executor="thread"), 30)
+    [state] = bridge.refresh_now().jobs
+    assert state.title == f"Halves · {state.name}" and state.label == state.title
+    bridge.refresh_now()
+    assert asked == [(state.job_id, state.name)]
+
+    failing = MolSuiteMonitorBridge(workspace=ms, poll_ms=50, title=lambda job_id, name: 1 / 0)
+    [state] = failing.refresh_now().jobs
+    assert (state.title, state.label) == ("", state.name)

@@ -38,6 +38,7 @@ class JobMonitorState:
     job_id: str  # the key of the job in the project's journal
     engine_id: int | None = None  # its id in this session's engine; None for a job of another session
     name: str = ""
+    title: str = ""  # what the application calls it (`title(job_id, name)`); "" shows `name`
     executor: str | None = None  # the name it was submitted to
     status: str = "waiting"
     error: str = ""
@@ -89,6 +90,11 @@ class JobMonitorState:
     def nothing_to_do(self) -> bool:
         """It completed without a chunk to run (its source had no work: everything was skipped)."""
         return self.status == "completed" and not (self.chunks_total or self.chunks_settled)
+
+    @property
+    def label(self) -> str:
+        """What the monitor calls it: the application's title, else the job's name, else its key."""
+        return self.title or self.name or self.job_id[:8]
 
 
 @dataclass(slots=True)

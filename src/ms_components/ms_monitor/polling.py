@@ -87,11 +87,14 @@ class MolSuiteMonitorPoller(QObject):
         poll_ms: int = 500,
         max_recent_jobs: int = 20,
         measure=None,
+        title=None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._workspace = workspace
         self._measure = measure
+        self._title = title
+        self._titles: dict[str, str] = {}  # asked once a job: what it is does not change
         self._measured: dict[str, dict] = {}  # the last word on a job that ended: asked no more
         # Only poll fast while jobs are active; back off hard when idle.
         self._active_poll_ms = max(100, poll_ms)
@@ -161,6 +164,18 @@ class MolSuiteMonitorPoller(QObject):
         self._last_snapshot = snapshot
         self.project_snapshot_updated.emit(snapshot)
 
+    def _apply_title(self, job: JobMonitorState) -> None:
+        """What the application calls `job`, from `title(job_id, name)`: asked once a job."""
+        if self._title is None:
+            return
+        if job.job_id not in self._titles:
+            try:
+                said = self._title(job.job_id, job.name)
+            except Exception:  # noqa: BLE001 — a name of the application must never stop the monitor
+                said = None
+            self._titles[job.job_id] = str(said or "")
+        job.title = self._titles[job.job_id]
+
     def _apply_measure(self, job: JobMonitorState, now: float) -> None:
         """What the application counts in `job`, from `measure(job_id)`: `{"done", "total", "unit"}`
         or None. A job that ended is asked once more and then kept."""
@@ -195,7 +210,9 @@ class MolSuiteMonitorPoller(QObject):
         self._speeds.keep(job.job_id for job in jobs)
         shown = {job.job_id for job in jobs}
         self._measured = {job_id: said for job_id, said in self._measured.items() if job_id in shown}
+        self._titles = {job_id: said for job_id, said in self._titles.items() if job_id in shown}
         for job in jobs:
+            self._apply_title(job)
             self._apply_measure(job, now)
             self._speeds.apply(job, now)
             if job.job_id == self.selected and not job.is_terminal:
