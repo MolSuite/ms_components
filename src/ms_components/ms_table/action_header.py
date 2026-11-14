@@ -8,19 +8,18 @@ Requires PySide6.QtSvg.
 
 from __future__ import annotations
 
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QByteArray, QPoint, QRect, Qt, Signal
+from PySide6.QtCore import QPoint, QRect, Qt, Signal
 from PySide6.QtGui import QDoubleValidator, QPainter, QPixmap
-from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFrame, QHBoxLayout,
     QHeaderView, QLabel, QLineEdit, QPushButton, QStyle, QStyleOptionHeader,
     QVBoxLayout, QWidget,
 )
 
+from ..icons import svg_pixmap
 from .table_config import ColumnDef, ColumnKind, FilterOperator, FilterSpec, SortSpec, TableConfig
 
 _ICONS = Path(__file__).parent / "icons"
@@ -34,19 +33,8 @@ _ICON_FILES: dict[str, str] = {
 }
 
 
-@lru_cache(maxsize=128)
 def _svg_pixmap(name: str, color_hex: str, size: int, dpr: float) -> QPixmap:
-    """SVG → QPixmap, recolored (currentColor → color_hex), cached."""
-    svg = (_ICONS / _ICON_FILES[name]).read_bytes().replace(b"currentColor", color_hex.encode())
-    renderer = QSvgRenderer(QByteArray(svg))
-    actual = max(1, int(size * dpr))
-    pixmap = QPixmap(actual, actual)
-    pixmap.setDevicePixelRatio(dpr)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    p = QPainter(pixmap)
-    renderer.render(p)
-    p.end()
-    return pixmap
+    return svg_pixmap(str(_ICONS / _ICON_FILES[name]), color_hex, size, size, dpr)
 
 
 # ── ActionHeader ──────────────────────────────────────────────────────────────

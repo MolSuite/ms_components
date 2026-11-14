@@ -24,12 +24,12 @@ from dataclasses import dataclass, field
 
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, QObject, QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QObject, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPalette, QPen, QPixmap
-from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QScrollArea, QStackedWidget, QToolButton,
                                QToolTip, QVBoxLayout, QWidget)
 
+from ms_components.icons import svg_pixmap
 from ms_components.labels import ElidedLabel
 from ms_components.theme import color
 
@@ -517,13 +517,7 @@ class _Asked(QWidget):
 
 
 def _icon(name: str, color_hex: str, size: int, dpr: float) -> QPixmap:
-    svg = (_ICONS / f"{name}.svg").read_bytes().replace(b"currentColor", color_hex.encode())
-    pixmap = QPixmap(round(size * dpr), round(size * dpr))
-    pixmap.fill(Qt.transparent)
-    with QPainter(pixmap) as painter:
-        QSvgRenderer(QByteArray(svg)).render(painter)
-    pixmap.setDevicePixelRatio(dpr)
-    return pixmap
+    return svg_pixmap(str(_ICONS / f"{name}.svg"), color_hex, size, size, dpr)
 
 
 def queue_asked(jobs) -> dict:
