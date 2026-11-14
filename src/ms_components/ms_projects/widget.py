@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from ms_components.ms_projects.backend import create_catalog_backend
-from ms_components.ms_projects.browser import ProjectFormDialog, ProjectItem, ProjectTreeWidget
+from ms_components.ms_projects.browser import PROJECT_DATE_FORMAT, ProjectFormDialog, ProjectItem, ProjectTreeWidget
 
 if TYPE_CHECKING:
     from ms_flow.core.project.catalog import ProjectCatalogBackend
@@ -144,7 +144,7 @@ class ProjectsMenuWidget(QFrame):
                 name=project.name,
                 description=project.description or "",
                 path=str(project.path),
-                last_modified=project.updated_at.strftime("%d/%m/%Y %H:%M"),
+                last_modified=project.updated_at.strftime(PROJECT_DATE_FORMAT),
                 app_id=(getattr(project, "app_id", "") or "").strip(),
                 favorite=bool(project.favorite),
                 language=self._manifest_name(project.app_id),

@@ -101,7 +101,7 @@ class PaginationControl(QWidget):
         layout.addItem(QSpacerItem(16, 0, QSizePolicy.Fixed, QSizePolicy.Minimum))
 
         # Items/page
-        layout.addWidget(QLabel("Filas:"))
+        layout.addWidget(QLabel("Rows:"))
 
         self.items_per_page_combo = QComboBox()
         self.items_per_page_combo.setObjectName("PageSizeCombo")

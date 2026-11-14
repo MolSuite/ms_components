@@ -10,7 +10,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QAction, QFont, QPainter, QColor, QPen, QBrush, QPainterPath, QMouseEvent,
-    QKeySequence, QPalette, QShortcut,
+    QFontMetrics, QKeySequence, QPalette, QShortcut,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
@@ -354,7 +354,10 @@ class ProjectItem:
 
 # ── ProjectTableModel ─────────────────────────────────────────────────────────
 
-_COL_NAME  = 0   # avatar + name + id
+# ISO: unambiguous ("10/11/2026" is October or November), and it sorts by date as text.
+PROJECT_DATE_FORMAT = "%Y-%m-%d %H:%M"
+
+_COL_NAME  = 0   # avatar + name + tags
 _COL_META  = 1   # description
 _COL_PATH  = 2   # path  (stretch)
 _COL_DATE  = 3   # last_modified
@@ -366,7 +369,7 @@ _COL_COUNT = 6
 class ProjectTableModel(QAbstractTableModel):
     """All projects in memory. Scope/filter/search/sort are pure Python."""
 
-    HEADERS = ["", "Description", "Modified", "Path", "", ""]
+    HEADERS = ["Name", "Description", "Path", "Modified", "", ""]
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -561,6 +564,8 @@ class ProjectRowDelegate(QStyledItemDelegate):
             painter.setPen(QPen(palette.color(role)))
             painter.setFont(self._font(option.font, 9 if col == _COL_META else 8))
             text = index.data(Qt.DisplayRole) or ""
+            if col == _COL_PATH:  # the full path is in the tooltip
+                text = painter.fontMetrics().elidedText(text, Qt.ElideMiddle, max(0, rect.width() - 12))
             flags = Qt.AlignLeft | Qt.AlignVCenter
             if col == _COL_META:
                 flags = Qt.AlignLeft | Qt.TextWordWrap
@@ -600,17 +605,20 @@ class ProjectRowDelegate(QStyledItemDelegate):
         tx = av_x + self._AVATAR + 10
         painter.setFont(self._font(base_font, 11, QFont.Bold))
         painter.setPen(palette.color(QPalette.ColorRole.Text))
-        painter.drawText(QRect(tx, rect.top()+8, rect.width()-tx-8, 20),
+        # The tags under the name, or the name alone, centred. The raw UUID that sat here told a
+        # user nothing; it stays in the name's tooltip.
+        tags = ", ".join(project.tags)
+        name_top = rect.top() + 8 if tags else rect.center().y() - 10
+        painter.drawText(QRect(tx, name_top, rect.width()-tx-8, 20),
                          Qt.AlignLeft | Qt.AlignVCenter, project.name or "")
-
-        # Project id
-        painter.setFont(self._font(base_font, 8))
-        painter.setPen(palette.color(QPalette.ColorRole.PlaceholderText))
-        painter.drawText(
-            QRect(tx, rect.top() + 30, rect.width() - tx - 8, 16),
-            Qt.AlignLeft | Qt.AlignVCenter,
-            f"ID: {project.id}",
-        )
+        if tags:
+            painter.setFont(self._font(base_font, 8))
+            painter.setPen(palette.color(QPalette.ColorRole.PlaceholderText))
+            painter.drawText(
+                QRect(tx, rect.top() + 30, rect.width() - tx - 8, 16),
+                Qt.AlignLeft | Qt.AlignVCenter,
+                tags,
+            )
 
     @staticmethod
     def _font(base_font: QFont, point_size: int, weight: QFont.Weight | None = None) -> QFont:
@@ -798,7 +806,9 @@ class ProjectTreeWidget(QWidget):
         hdr.setSectionResizeMode(_COL_MENU, QHeaderView.Fixed)
         hdr.setStretchLastSection(False)
         hdr.resizeSection(_COL_NAME, 300)
-        hdr.resizeSection(_COL_DATE, 100)
+        # As wide as a date in the row font (8 pt, see the delegate) plus its 6 px side padding.
+        date_font = ProjectRowDelegate._font(self.view.font(), 8)
+        hdr.resizeSection(_COL_DATE, QFontMetrics(date_font).horizontalAdvance("2026-12-31 23:59") + 16)
         hdr.resizeSection(_COL_STAR, 30)
         hdr.resizeSection(_COL_MENU, 30)
         hdr.setSortIndicatorShown(True)
@@ -1156,7 +1166,7 @@ class ProjectBrowserPanel(QWidget):
                 name         = p.name,
                 description  = p.description or "",
                 path         = str(p.path),
-                last_modified= p.updated_at.strftime("%d/%m/%Y %H:%M"),
+                last_modified= p.updated_at.strftime(PROJECT_DATE_FORMAT),
                 app_id       = (getattr(p, "app_id", "") or "").strip(),
                 favorite     = bool(p.favorite),
                 language     = self._manifest_name(p.app_id),
