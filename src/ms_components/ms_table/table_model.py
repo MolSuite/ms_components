@@ -27,11 +27,21 @@ RAW_OBJECT_ROLE  = Qt.UserRole + 1     # Original SQLModel object
 COLUMN_DEF_ROLE  = Qt.UserRole + 2     # ColumnDef of the column
 
 
+# Precomputed as ints: data()/flags() run per cell and role on every paint, and OR-ing Qt flag
+# enums in Python costs more than the rest of the call.
+_DEFAULT_ALIGN = int(Qt.AlignVCenter | Qt.AlignLeft)
 _ALIGN_MAP = {
-    AlignHint.LEFT:   Qt.AlignVCenter | Qt.AlignLeft,
-    AlignHint.CENTER: Qt.AlignVCenter | Qt.AlignHCenter,
-    AlignHint.RIGHT:  Qt.AlignVCenter | Qt.AlignRight,
+    AlignHint.LEFT:   _DEFAULT_ALIGN,
+    AlignHint.CENTER: int(Qt.AlignVCenter | Qt.AlignHCenter),
+    AlignHint.RIGHT:  int(Qt.AlignVCenter | Qt.AlignRight),
 }
+_BASE_FLAGS = Qt.ItemIsEnabled | Qt.ItemIsSelectable
+_EDITABLE_FLAGS = _BASE_FLAGS | Qt.ItemIsEditable
+# The roles data() answers; Qt asks for ~10 per cell, the rest return None before any work.
+_DATA_ROLES = frozenset(int(r) for r in (
+    Qt.DisplayRole, Qt.EditRole, Qt.TextAlignmentRole, Qt.ToolTipRole, Qt.BackgroundRole,
+    RAW_OBJECT_ROLE, COLUMN_DEF_ROLE,
+))
 
 
 class SmartTableModel(QAbstractTableModel):
@@ -217,7 +227,7 @@ class SmartTableModel(QAbstractTableModel):
         index: QModelIndex,
         role: int = Qt.DisplayRole
     ) -> Any:
-        if not index.isValid():
+        if int(role) not in _DATA_ROLES or not index.isValid():
             return None
 
         row_idx = index.row()
@@ -250,7 +260,7 @@ class SmartTableModel(QAbstractTableModel):
                 return str(value)
 
             case Qt.TextAlignmentRole:
-                return int(_ALIGN_MAP.get(col_def.align, Qt.AlignVCenter | Qt.AlignLeft))
+                return _ALIGN_MAP.get(col_def.align, _DEFAULT_ALIGN)
 
             case Qt.ToolTipRole:
                 if col_def.tooltip is None:
@@ -288,19 +298,15 @@ class SmartTableModel(QAbstractTableModel):
         if not index.isValid() or self.get_row_data(index.row()) is None:
             return Qt.NoItemFlags
 
-        base = Qt.ItemIsEnabled | Qt.ItemIsSelectable
-
         col_idx = index.column()
         if self._config.show_row_numbers:
             if col_idx == 0:
-                return base
+                return _BASE_FLAGS
             col_idx -= 1
 
-        if 0 <= col_idx < len(self._visible_cols):
-            if self._visible_cols[col_idx].editable:
-                base |= Qt.ItemIsEditable
-
-        return base
+        if 0 <= col_idx < len(self._visible_cols) and self._visible_cols[col_idx].editable:
+            return _EDITABLE_FLAGS
+        return _BASE_FLAGS
 
     def setData(
         self,
