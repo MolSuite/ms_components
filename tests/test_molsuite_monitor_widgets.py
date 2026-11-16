@@ -450,17 +450,16 @@ def test_a_titled_job_shows_its_title_and_keeps_its_name_in_the_tooltip():
     assert detail._name.text() == "amdock_docking_job" and detail._name.toolTip() == ""
 
 
-def test_a_job_submitted_after_others_is_listed_under_the_first_and_says_it_waits():
-    from ms_components.ms_monitor.jobs import _DEPTH, counts_label
+def test_a_job_submitted_after_others_still_going_says_it_waits_for_them_by_name():
+    from ms_components.ms_monitor.jobs import counts_label
 
     QApplication.instance() or QApplication([])
     widget = MolSuiteMonitorWidget()
-    prep, other = _job(job_id="prep", name="prepare"), _job(job_id="other", name="other")
-    dock = _job(job_id="dock", name="dock", status="waiting", chunks_done=0, chunks_failed=0, after=("prep", "gone"))
-    score = _job(job_id="score", name="score", status="waiting", chunks_done=0, chunks_failed=0, after=("dock",))
-    widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[score, dock, other, prep]))
-    view = widget._jobs_view
-    assert [job.job_id for job in view.jobs()] == ["other", "prep", "dock", "score"]
-    assert [view.item(i).data(_DEPTH) for i in range(view.count())] == [0, 0, 1, 2]
-    assert counts_label(dock).endswith("waits for the job it comes after")
-    view.grab()  # the branches paint
+    prep = _job(job_id="prep", name="prepare", title="Prepare receptors")
+    ended = _job(job_id="ended", name="import", status="completed")
+    dock = _job(job_id="dock", name="dock", status="waiting", chunks_done=0, chunks_failed=0, after=("prep", "ended", "gone"))
+    free = _job(job_id="free", name="score", status="waiting", chunks_done=0, chunks_failed=0, after=("ended",))
+    widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[prep, ended, dock, free]))
+    said = {job.job_id: counts_label(job) for job in widget._jobs_view.jobs()}
+    assert said["dock"].endswith("· waits for Prepare receptors")
+    assert "waits for" not in said["free"]  # what it came after has ended: it waits for room, not for a job
