@@ -54,6 +54,7 @@ class JobMonitorState:
     note: str = ""  # what its source says it is at, while it runs (a campaign: in the queue, how far there)
     canceling: bool = False  # canceled, waiting for its other machine to stop it there
     steps: tuple = ()  # every step its source went through, (epoch seconds, line), quick ones too
+    after: tuple = ()  # the job_ids of the jobs it was submitted after: the list draws it under them
     chunks_retried: int = 0
     peak_mem_mb: int = 0
     usage: dict = field(default_factory=dict)  # what it used, kept once it ended: see ms_flow's JobSnapshot.usage

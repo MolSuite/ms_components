@@ -5,7 +5,7 @@ apart) and the time left at the speed of the last minutes. Active jobs come firs
 """
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, Property, QPropertyAnimation, QRectF, QSize, Qt, Signal
+from PySide6.QtCore import QEasingCurve, Property, QPointF, QPropertyAnimation, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QFontMetricsF, QLinearGradient, QPainter, QPalette, QPen
 from PySide6.QtWidgets import QAbstractItemView, QApplication, QListWidget, QListWidgetItem, QStyle, QStyledItemDelegate, QWidget
 
@@ -38,6 +38,8 @@ def counts_label(job: JobMonitorState) -> str:
     if job.is_terminal:
         took = (job.finished_at - job.started_at).total_seconds() if job.finished_at and job.started_at else None
         tail = "" if took is None else f" · took {format_duration(took)}"
+    elif job.status == "waiting" and job.after and not job.note:
+        tail = " · waits for the job it comes after"
     else:
         tail = f" · {job.note or 'calculating…'}" if left is None else f" · {format_duration(left)} left"
     if job.items_unit:  # what the chunks hold, in the application's unit
@@ -123,7 +125,8 @@ class GlowBar(QWidget):
 
 
 
-_ROLE, _COLOR = Qt.UserRole, Qt.UserRole + 1
+_ROLE, _COLOR, _DEPTH = Qt.UserRole, Qt.UserRole + 1, Qt.UserRole + 2
+_INDENT = 14  # px for each job it comes after, drawn as a branch from the one above
 JOB_HUES = ("cyan", "blue", "magenta", "orange", "yellow", "green")  # a job's own color, in the order first seen
 
 
@@ -156,6 +159,12 @@ class _JobRow(QStyledItemDelegate):
         p.drawRoundedRect(QRectF(r.left() + 4, r.top() + 7, 3, r.height() - 14), 1.5, 1.5)
         x, right, top = r.left() + 15, r.right() - 9, r.top() + 7
         muted, text = pal.color(QPalette.ColorRole.PlaceholderText), pal.color(QPalette.ColorRole.Text)
+        depth = min(index.data(_DEPTH) or 0, 3)
+        if depth:  # a branch from the job it comes after, the row above
+            stem = x + _INDENT * (depth - 1) + 2
+            p.setPen(QPen(pal.color(QPalette.ColorRole.Mid), 1.2))
+            p.drawPolyline([QPointF(stem, option.rect.top()), QPointF(stem, top + 9), QPointF(stem + 8, top + 9)])
+            x += _INDENT * depth
         font, small = QFont(option.font), QFont(option.font)
         small.setPixelSize(11)
         tiny = QFont(small)
@@ -223,6 +232,33 @@ class _JobRow(QStyledItemDelegate):
         p.restore()
 
 
+def _under_their_own(jobs: list[JobMonitorState]) -> tuple[list[JobMonitorState], list[int]]:
+    """`jobs` with each one right under the first listed job it comes after, and how deep each is."""
+    listed = {job.job_id for job in jobs}
+    under: dict[str, list] = {}
+    for job in jobs:
+        up = next((key for key in job.after if key in listed and key != job.job_id), None)
+        if up is not None:
+            under.setdefault(up, []).append(job)
+    placed, ordered, depths = set(), [], []
+
+    def put(job, depth):
+        if job.job_id not in placed:
+            placed.add(job.job_id)
+            ordered.append(job)
+            depths.append(depth)
+            for child in under.get(job.job_id, ()):
+                put(child, depth + 1)
+
+    children = {id(job) for kids in under.values() for job in kids}
+    for job in jobs:
+        if id(job) not in children:
+            put(job, 0)
+    for job in jobs:  # ponytail: what only a cycle leaves goes at the top level
+        put(job, 0)
+    return ordered, depths
+
+
 class JobList(QListWidget):
     """The jobs, as polled, active first. `job_selected` says the job picked by the user."""
 
@@ -242,8 +278,10 @@ class JobList(QListWidget):
         self.currentItemChanged.connect(lambda item, _: self.job_selected.emit(None if item is None else item.data(_ROLE).job_id))
 
     def set_jobs(self, jobs: list[JobMonitorState]) -> None:
-        """The rows follow `jobs`; the selected one stays selected while it is listed."""
+        """The rows follow `jobs`, each job under the one it comes after; the selected one stays
+        selected while it is listed."""
         chosen = self.selected_job_id()
+        jobs, depths = _under_their_own(jobs)
         if [self.item(i).data(_ROLE).job_id for i in range(self.count())] != [job.job_id for job in jobs]:
             self.blockSignals(True)
             self.clear()
@@ -253,6 +291,7 @@ class JobList(QListWidget):
         for at, job in enumerate(jobs):
             self.item(at).setData(_ROLE, job)
             self.item(at).setData(_COLOR, self.color_of(job.job_id))
+            self.item(at).setData(_DEPTH, depths[at])
         self._apply_filters()
         if chosen and self.selected_job_id() != chosen:
             self.select_job(chosen)
