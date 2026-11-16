@@ -5,6 +5,8 @@ apart) and the time left at the speed of the last minutes. Active jobs come firs
 """
 from __future__ import annotations
 
+from dataclasses import replace
+
 from PySide6.QtCore import QEasingCurve, Property, QPropertyAnimation, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QFontMetricsF, QLinearGradient, QPainter, QPalette, QPen
 from PySide6.QtWidgets import QAbstractItemView, QApplication, QListWidget, QListWidgetItem, QStyle, QStyledItemDelegate, QWidget
@@ -223,6 +225,17 @@ class _JobRow(QStyledItemDelegate):
         p.restore()
 
 
+def _with_what_they_wait_for(jobs: list[JobMonitorState]) -> list[JobMonitorState]:
+    """A waiting job that came after listed jobs still going says it waits for them, by name."""
+    going = {job.job_id: job.title or job.name for job in jobs if not job.is_terminal}
+    said = []
+    for job in jobs:
+        names = [going[key] for key in job.after if key in going and key != job.job_id]
+        waits = job.status == "waiting" and names and not job.note
+        said.append(replace(job, note="waits for " + ", ".join(dict.fromkeys(names))) if waits else job)
+    return said
+
+
 class JobList(QListWidget):
     """The jobs, as polled, active first. `job_selected` says the job picked by the user."""
 
@@ -244,6 +257,7 @@ class JobList(QListWidget):
     def set_jobs(self, jobs: list[JobMonitorState]) -> None:
         """The rows follow `jobs`; the selected one stays selected while it is listed."""
         chosen = self.selected_job_id()
+        jobs = _with_what_they_wait_for(jobs)
         if [self.item(i).data(_ROLE).job_id for i in range(self.count())] != [job.job_id for job in jobs]:
             self.blockSignals(True)
             self.clear()

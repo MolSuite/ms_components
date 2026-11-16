@@ -448,3 +448,18 @@ def test_a_titled_job_shows_its_title_and_keeps_its_name_in_the_tooltip():
     assert detail._name.text() == "Docking · gnina (CNN)" and detail._name.toolTip() == "amdock_docking_job"
     detail.set_job(_job(name="amdock_docking_job"))
     assert detail._name.text() == "amdock_docking_job" and detail._name.toolTip() == ""
+
+
+def test_a_job_submitted_after_others_still_going_says_it_waits_for_them_by_name():
+    from ms_components.ms_monitor.jobs import counts_label
+
+    QApplication.instance() or QApplication([])
+    widget = MolSuiteMonitorWidget()
+    prep = _job(job_id="prep", name="prepare", title="Prepare receptors")
+    ended = _job(job_id="ended", name="import", status="completed")
+    dock = _job(job_id="dock", name="dock", status="waiting", chunks_done=0, chunks_failed=0, after=("prep", "ended", "gone"))
+    free = _job(job_id="free", name="score", status="waiting", chunks_done=0, chunks_failed=0, after=("ended",))
+    widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[prep, ended, dock, free]))
+    said = {job.job_id: counts_label(job) for job in widget._jobs_view.jobs()}
+    assert said["dock"].endswith("· waits for Prepare receptors")
+    assert "waits for" not in said["free"]  # what it came after has ended: it waits for room, not for a job
