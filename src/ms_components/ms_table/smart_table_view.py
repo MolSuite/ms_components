@@ -47,17 +47,17 @@ from pathlib import Path
 from typing import Any, Optional
 
 from PySide6.QtCore import (
-    QByteArray, QEvent, QItemSelectionModel, QObject, QRunnable, QSize,
+    QEvent, QItemSelectionModel, QObject, QRunnable, QSize,
     QSortFilterProxyModel, Qt, QThreadPool, QTimer, Signal,
 )
-from PySide6.QtGui import QAction, QIcon, QPainter, QPixmap
-from PySide6.QtSvg import QSvgRenderer
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QFileDialog, QHBoxLayout,
     QHeaderView, QLabel, QMenu, QPushButton, QSizePolicy, QFrame,
     QTableView, QToolBar, QToolButton, QVBoxLayout, QWidget
 )
 from ..backdrop import Backdrop
+from ..icons import widget_svg_icon
 from .action_header import ActionHeader, FilterPopup, SearchPopup
 from .cell_delegate import CellWidgetDelegate
 from .column_panel import ColumnConfigDialog
@@ -979,23 +979,9 @@ class SmartTableView(QWidget):
         return action, button
 
     def _toolbar_icon(self, name: str) -> QIcon:
-        """Render a currentColor SVG using the live palette."""
-        icon_path = _TOOLBAR_ICONS / name
-        svg = icon_path.read_bytes().replace(
-            b"currentColor", self.palette().buttonText().color().name().encode()
-        )
-        dpr = max(1.0, self.devicePixelRatioF())
-        logical_size = self._toolbar.iconSize() if self._toolbar is not None else QSize(16, 16)
-        pixmap = QPixmap(
-            max(1, round(logical_size.width() * dpr)),
-            max(1, round(logical_size.height() * dpr)),
-        )
-        pixmap.setDevicePixelRatio(dpr)
-        pixmap.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(pixmap)
-        QSvgRenderer(QByteArray(svg)).render(painter)
-        painter.end()
-        return QIcon(pixmap)
+        """A currentColor SVG in the live palette (rendered once per colour and size)."""
+        return widget_svg_icon(self, _TOOLBAR_ICONS / name,
+                               self._toolbar.iconSize() if self._toolbar is not None else None)
 
     def _refresh_toolbar_icons(self) -> None:
         for action, icon_name in self._builtin_action_icons.items():

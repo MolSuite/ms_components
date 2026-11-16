@@ -8,15 +8,15 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from ms_components.icons import widget_svg_icon
 from ms_components.labels import ElidedLabel
 from ms_components.ms_dockwidget.widget import MSDockWidget
 from ms_components.opengl import pymol_context_error, pymol_surface_format
 
 os.environ.setdefault("QT_API", "pyside6")
 
-from PySide6.QtCore import QByteArray, QEvent, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QActionGroup, QGuiApplication, QIcon, QPainter, QPixmap
-from PySide6.QtSvg import QSvgRenderer
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QAction, QActionGroup, QGuiApplication, QIcon
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -451,22 +451,9 @@ class PymolControlBar(QFrame):
         return action
 
     def _toolbar_icon(self, name: str) -> QIcon:
-        svg = (_TOOLBAR_ICONS / name).read_bytes().replace(
-            b"currentColor", self.palette().buttonText().color().name().encode()
-        )
-        dpr = max(1.0, self.devicePixelRatioF())
         toolbar = self.toolbar
-        size = toolbar.iconSize() if toolbar is not None and isValid(toolbar) else QSize(16, 16)
-        pixmap = QPixmap(
-            max(1, round(size.width() * dpr)),
-            max(1, round(size.height() * dpr)),
-        )
-        pixmap.setDevicePixelRatio(dpr)
-        pixmap.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(pixmap)
-        QSvgRenderer(QByteArray(svg)).render(painter)
-        painter.end()
-        return QIcon(pixmap)
+        return widget_svg_icon(self, _TOOLBAR_ICONS / name,
+                               toolbar.iconSize() if toolbar is not None and isValid(toolbar) else None)
 
     def _refresh_toolbar_icons(self) -> None:
         for action, icon_name in tuple(self._toolbar_action_icons.items()):

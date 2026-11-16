@@ -56,6 +56,7 @@ Every factory receives `row_data: dict` with the full row
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any, Callable, Optional
 
 from PySide6.QtCore import QModelIndex, QPoint, QRect, QRectF, QSize, Qt
@@ -73,6 +74,26 @@ from .table_config import ColumnKind
 # ──────────────────────────────────────────────────────────────────────────────
 # Rendering helpers
 # ──────────────────────────────────────────────────────────────────────────────
+
+# ponytail: keyed by the SVG bytes, so a paint_factory that builds the same SVG for every row renders
+# it once; one that bakes per-row data into it fills the cache (maxsize) and gains nothing.
+@lru_cache(maxsize=512)
+def _svg_to_pixmap(svg_bytes: bytes, width: int, height: int) -> Optional[QPixmap]:
+    try:
+        from PySide6.QtSvg import QSvgRenderer
+        size = QSize(width, height)
+        renderer = QSvgRenderer(svg_bytes)
+        default_size = renderer.defaultSize()
+        render_size = default_size.scaled(size, Qt.KeepAspectRatio) if default_size.isValid() else size
+        pixmap = QPixmap(render_size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        renderer.render(painter, QRectF(0, 0, render_size.width(), render_size.height()))
+        painter.end()
+        return pixmap
+    except Exception:
+        return None
+
 
 def _to_pixmap(source: Any, size: QSize) -> Optional[QPixmap]:
     """
@@ -100,21 +121,7 @@ def _to_pixmap(source: Any, size: QSize) -> Optional[QPixmap]:
         )
 
     if isinstance(source, (bytes, str)):
-        # Treat it as SVG
-        try:
-            from PySide6.QtSvg import QSvgRenderer
-            svg_bytes = source.encode() if isinstance(source, str) else source
-            renderer = QSvgRenderer(svg_bytes)
-            default_size = renderer.defaultSize()
-            render_size = default_size.scaled(size, Qt.KeepAspectRatio) if default_size.isValid() else size
-            pixmap = QPixmap(render_size)
-            pixmap.fill(Qt.transparent)
-            painter = QPainter(pixmap)
-            renderer.render(painter, QRectF(0, 0, render_size.width(), render_size.height()))
-            painter.end()
-            return pixmap
-        except Exception:
-            return None
+        return _svg_to_pixmap(source.encode() if isinstance(source, str) else source, size.width(), size.height())
 
     # QSvgRenderer, or any object with .render(QPainter)
     if hasattr(source, "render"):
