@@ -262,7 +262,15 @@ class TutorialController(QObject):
             else:
                 self.stop()
 
+    # The only event types the filter acts on; any other one leaves it at the first line.
+    _FILTERED = frozenset((QEvent.Type.KeyPress, QEvent.Type.KeyRelease, QEvent.Type.Close,
+                           QEvent.Type.ShortcutOverride, QEvent.Type.FocusIn))
+
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        # Installed on the whole app: building a big view sends it ~20k events, 160 ms in all
+        # when each one reached watched.window().
+        if event.type() not in self._FILTERED:
+            return False
         if (self.is_active and self.block_tab and isinstance(watched, QWidget)
                 and event.type() in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease)
                 and event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab)):
