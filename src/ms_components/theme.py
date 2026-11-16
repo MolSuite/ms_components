@@ -269,10 +269,13 @@ class _EdgedFusion(QProxyStyle):
     def __init__(self):
         super().__init__("Fusion")
 
+    # Every table cell's background passes here: the enum lookups are done once, not per call.
+    _INDICATORS = frozenset((QStyle.PrimitiveElement.PE_IndicatorCheckBox,
+                             QStyle.PrimitiveElement.PE_IndicatorRadioButton))
+
     def drawPrimitive(self, element, option, painter, widget=None):
         super().drawPrimitive(element, option, painter, widget)
-        if element not in (QStyle.PrimitiveElement.PE_IndicatorCheckBox,
-                           QStyle.PrimitiveElement.PE_IndicatorRadioButton):
+        if element not in self._INDICATORS:
             return
         if not option.state & QStyle.StateFlag.State_Enabled:
             return  # disabled keeps Fusion's faint edge: it should read as "off"

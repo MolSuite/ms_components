@@ -176,8 +176,11 @@ class ColumnDef:
 
     @property
     def display_key(self) -> str:
-        """Unique key used internally (dots replaced)."""
-        return self.field.replace(".", "__")
+        """Unique key used internally (dots replaced). Asked per cell and role on every paint."""
+        cached = self.__dict__.get("_display_key")
+        if cached is None or cached[0] != self.field:
+            cached = self.__dict__["_display_key"] = (self.field, self.field.replace(".", "__"))
+        return cached[1]
 
     @property
     def is_joined(self) -> bool:

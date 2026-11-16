@@ -23,7 +23,8 @@ class TableInteraction(QObject):
             QApplication.instance().installEventFilter(self)
 
     def eventFilter(self, watched, event):
-        if (event.type() == QEvent.Type.MouseButtonPress
+        kind = event.type()  # read once: window-wide, this runs for every event in the app
+        if (kind == QEvent.Type.MouseButtonPress
                 and event.button() == Qt.MouseButton.LeftButton
                 and isinstance(watched, QWidget)):
             view = watched.parentWidget()
@@ -33,7 +34,7 @@ class TableInteraction(QObject):
                 if index.isValid():
                     self._pressed = (view, index, event.modifiers(), view.selectionModel().isSelected(index))
                     self.pressed.emit(view, index, event.modifiers())
-        elif event.type() == QEvent.Type.MouseButtonRelease and self._pressed is not None:
+        elif kind == QEvent.Type.MouseButtonRelease and self._pressed is not None:
             view, index, modifiers, was_selected = self._pressed
             self._pressed = None
             if (event.button() == Qt.MouseButton.LeftButton and watched is view.viewport()

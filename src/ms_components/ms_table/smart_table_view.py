@@ -53,7 +53,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QFileDialog, QHBoxLayout,
-    QHeaderView, QLabel, QMenu, QPushButton, QSizePolicy, QFrame,
+    QHeaderView, QLabel, QMenu, QPushButton, QSizePolicy, QFrame, QStyle, QStyleOptionHeader,
     QTableView, QToolBar, QToolButton, QVBoxLayout, QWidget
 )
 from ..backdrop import Backdrop
@@ -87,6 +87,25 @@ class _Query(QRunnable):
         except Exception as exc:  # re-raised on the GUI thread, like a synchronous query
             result = exc
         self._delivery.done.emit(self._finish, result)
+
+
+class _RowNumberHeader(QHeaderView):
+    """The vertical header: row numbers only, at a fixed row height.
+
+    QHeaderView.sizeHint() measures up to 200 sections, asking the model for five roles each:
+    ~1000 calls into Python per relayout, a third of the time a tool switch took. The widest
+    number is the last row's, so one section is measured instead.
+    """
+
+    def sizeHint(self) -> QSize:
+        model = self.model()
+        rows = model.rowCount() if model is not None else 0
+        option = QStyleOptionHeader()
+        self.initStyleOption(option)
+        option.orientation = Qt.Vertical
+        option.text = str(model.headerData(rows - 1, Qt.Vertical) or rows) if rows else "0"
+        hint = self.style().sizeFromContents(QStyle.CT_HeaderSection, option, QSize(), self)
+        return QSize(hint.width(), self.defaultSectionSize())
 
 
 class SmartTableView(QWidget):
@@ -359,7 +378,10 @@ class SmartTableView(QWidget):
         if self._config.allow_column_reorder:
             self._header.setSectionsMovable(True)
 
-        v_header = self._table.verticalHeader()
+        v_header = _RowNumberHeader(Qt.Vertical, self._table)
+        v_header.setSectionsClickable(True)  # as QTableView's own: a click selects the row
+        v_header.setHighlightSections(True)
+        self._table.setVerticalHeader(v_header)
         if self._config.row_height:
             v_header.setDefaultSectionSize(self._config.row_height)
         v_header.setVisible(self._config.show_vertical_header)
