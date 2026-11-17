@@ -278,12 +278,15 @@ class ProjectsMenuWidget(QFrame):
             return
         in_use = [p for p in projects if self.active_project_id and str(p.id) == self.active_project_id]
         projects = [p for p in projects if p not in in_use]
-        for project in in_use:
-            if self._confirm_open_project_delete(project):
-                self.active_project_delete_requested.emit(str(project.id))
-        if not projects:
-            return
+        # Asked now, requested last: the host answers by closing and restarting the
+        # application, which destroys this widget (and the progress dialog parented to it).
+        confirmed = [p for p in in_use if self._confirm_open_project_delete(p)]
+        if projects:
+            self._delete_closed_projects(projects)
+        for project in confirmed:
+            self.active_project_delete_requested.emit(str(project.id))
 
+    def _delete_closed_projects(self, projects: list[ProjectItem]) -> None:
         progress = QProgressDialog("Deleting projects...", None, 0, len(projects), self)
         progress.setWindowTitle("Delete projects")
         progress.setWindowModality(Qt.WindowModal)
