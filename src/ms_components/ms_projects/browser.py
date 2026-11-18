@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
+from html import escape
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, List, Optional
 
 from PySide6.QtCore import (
-    Qt, Signal, QRect, QSize, QAbstractTableModel, QModelIndex, QEvent,
+    Qt, Signal, QPoint, QRect, QSize, QAbstractTableModel, QModelIndex, QEvent,
 )
 from PySide6.QtGui import (
     QAction, QFont, QPainter, QColor, QPen, QBrush, QPainterPath, QMouseEvent,
-    QFontMetrics, QKeySequence, QPalette, QShortcut,
+    QFontMetrics, QKeySequence, QPalette, QShortcut, QTextLayout, QTextOption,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
@@ -18,7 +19,7 @@ from PySide6.QtWidgets import (
     QHeaderView, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox,
     QProgressDialog, QPushButton, QSpinBox, QSplitter, QStyledItemDelegate,
     QStyle, QTabWidget, QTableWidget, QTableWidgetItem, QTextEdit, QToolButton,
-    QTreeView, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QToolTip, QTreeView, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from ms_components.ms_projects.backend import create_catalog_backend
@@ -514,6 +515,8 @@ class ProjectRowDelegate(QStyledItemDelegate):
     _AVATAR   = 34
     _BTN_SIZE = 26
     _BTN_R    = 6
+    _DESCRIPTION_LINES = 3
+    _DESCRIPTION_PADDING = 8
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -523,7 +526,10 @@ class ProjectRowDelegate(QStyledItemDelegate):
         self._hover_row = row
 
     def sizeHint(self, option, index) -> QSize:
-        return QSize(option.rect.width(), 62)
+        font = self._font(option.font, 9)
+        metrics = QFontMetrics(font, option.widget)
+        description_height = self._DESCRIPTION_LINES * metrics.lineSpacing() + 2 * self._DESCRIPTION_PADDING
+        return QSize(option.rect.width(), max(62, description_height))
 
     def paint(self, painter: QPainter, option, index):
         painter.save()
@@ -555,22 +561,22 @@ class ProjectRowDelegate(QStyledItemDelegate):
                 painter.drawRect(QRect(rect.left(), rect.top()+1, 3, rect.height()-1))
             self._paint_name_col(painter, rect, project, palette, option.font)
 
-        elif col in (_COL_META, _COL_PATH, _COL_DATE):
-            role = (
-                QPalette.ColorRole.Text
-                if col == _COL_META
-                else QPalette.ColorRole.PlaceholderText
-            )
-            painter.setPen(QPen(palette.color(role)))
-            painter.setFont(self._font(option.font, 9 if col == _COL_META else 8))
+        elif col == _COL_META:
+            painter.setPen(palette.color(QPalette.ColorRole.Text))
+            painter.setFont(self._font(option.font, 9))
+            bounds = rect.adjusted(6, self._DESCRIPTION_PADDING, -6, -self._DESCRIPTION_PADDING)
+            metrics = painter.fontMetrics()
+            for i, line in enumerate(self._description_lines(index.data(Qt.DisplayRole) or "", painter, bounds.width())):
+                baseline = bounds.top() + metrics.ascent() + i * metrics.lineSpacing()
+                painter.drawText(QPoint(bounds.left(), baseline), line)
+
+        elif col in (_COL_PATH, _COL_DATE):
+            painter.setPen(palette.color(QPalette.ColorRole.PlaceholderText))
+            painter.setFont(self._font(option.font, 8))
             text = index.data(Qt.DisplayRole) or ""
             if col == _COL_PATH:  # the full path is in the tooltip
                 text = painter.fontMetrics().elidedText(text, Qt.ElideMiddle, max(0, rect.width() - 12))
-            flags = Qt.AlignLeft | Qt.AlignVCenter
-            if col == _COL_META:
-                flags = Qt.AlignLeft | Qt.TextWordWrap
-            painter.drawText(rect.adjusted(6, 8 if col == _COL_META else 0, -6, -8 if col == _COL_META else 0),
-                             flags, text)
+            painter.drawText(rect.adjusted(6, 0, -6, 0), Qt.AlignLeft | Qt.AlignVCenter, text)
 
         elif col == _COL_STAR:
             self._paint_star(painter, rect, project, is_hover, palette, option.font)
@@ -579,6 +585,43 @@ class ProjectRowDelegate(QStyledItemDelegate):
             self._paint_menu_btn(painter, rect, is_hover, palette, option.font)
 
         painter.restore()
+
+    def _description_lines(self, text: str, painter: QPainter, width: int) -> list[str]:
+        text = text.strip()  # blank lines around it would take rows and fake an ellipsis
+        if not text or width <= 0:
+            return []
+        # QTextLayout treats a line separator as a forced break and reports UTF-16 positions.
+        text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\u2028")
+        encoded = text.encode("utf-16-le")
+        layout = QTextLayout(text, painter.font(), painter.device())
+        options = QTextOption()
+        options.setWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+        layout.setTextOption(options)
+        lines = []
+        end = 0
+        layout.beginLayout()
+        for _ in range(self._DESCRIPTION_LINES):
+            line = layout.createLine()
+            if not line.isValid():
+                break
+            line.setLineWidth(width)
+            start = line.textStart()
+            end = start + line.textLength()
+            lines.append(encoded[2 * start:2 * end].decode("utf-16-le").rstrip())
+        layout.endLayout()
+        if lines and 2 * end < len(encoded):
+            lines[-1] = painter.fontMetrics().elidedText(lines[-1] + "…", Qt.ElideRight, width)
+        return lines
+
+    def helpEvent(self, event, view, option, index):
+        if event.type() == QEvent.ToolTip and index.column() == _COL_META:
+            description = index.data(Qt.DisplayRole)
+            if description:
+                # Rich text gives the tooltip word wrapping. Escape project text before adding markup.
+                text = escape(description).replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br>")
+                QToolTip.showText(event.globalPos(), f"<qt>{text}</qt>", view.viewport(), option.rect)
+                return True
+        return super().helpEvent(event, view, option, index)
 
     def _paint_name_col(
         self,

@@ -4,8 +4,9 @@ from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QEvent, Qt, QPoint, QRect
+from PySide6.QtGui import QHelpEvent, QImage, QPainter
+from PySide6.QtWidgets import QApplication, QStyleOptionViewItem, QToolTip, QTreeView
 
 from ms_flow.core.apps import AppManifest
 from ms_flow.core.settings.manager import SettingsManager
@@ -14,6 +15,7 @@ from ms_components.ms_projects.browser import (
     MolSuiteSettingsPanel,
     ProjectBrowserPanel,
     ProjectItem,
+    ProjectRowDelegate,
     ProjectTableModel,
     ProjectTreeWidget,
     ProjectBrowserWindow,
@@ -216,6 +218,50 @@ def test_project_table_model_separates_id_from_description_and_exposes_tooltips(
     assert model.data(model.index(0, 1), Qt.DisplayRole) == "Long project description for tooltip and wrapped rendering."
     assert "ID: proj-001" in model.data(model.index(0, 0), Qt.ToolTipRole)
     assert model.data(model.index(0, 1), Qt.ToolTipRole) == "Long project description for tooltip and wrapped rendering."
+
+
+def test_project_description_elides_only_when_it_exceeds_three_lines():
+    app = QApplication.instance() or QApplication([])
+    image = QImage(300, 100, QImage.Format_RGB32)
+    painter = QPainter(image)
+    delegate = ProjectRowDelegate()
+    try:
+        width = painter.fontMetrics().horizontalAdvance("word word")
+        assert delegate._description_lines("word word word word word word", painter, width) == [
+            "word word", "word word", "word word",
+        ]
+        lines = delegate._description_lines("word word word word word word word", painter, width)
+        assert lines[:2] == ["word word", "word word"]
+        assert len(lines) == 3 and lines[2].endswith("…")
+        assert painter.fontMetrics().horizontalAdvance(lines[2]) <= width
+        assert delegate._description_lines("First 😀\r\nSecond\nThird\nFourth", painter, 250) == [
+            "First 😀", "Second", "Third…",
+        ]
+        assert delegate._description_lines("a\nb\nc\n\n", painter, 250) == ["a", "b", "c"]
+        assert delegate._description_lines("\n\nlate start", painter, 250) == ["late start"]
+        assert delegate._description_lines("  \n ", painter, 250) == []
+    finally:
+        painter.end()
+
+
+def test_project_description_hover_uses_full_escaped_text(monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    model = ProjectTableModel()
+    description = "First <draft> & notes\nSecond\nThird\nFourth"
+    model.load([ProjectItem("proj", "Project", description, "/tmp/project", "")])
+    view = QTreeView()
+    view.setModel(model)
+    delegate = ProjectRowDelegate(view)
+    option = QStyleOptionViewItem()
+    option.rect = QRect(0, 0, 200, 62)
+    event = QHelpEvent(QEvent.ToolTip, QPoint(10, 10), QPoint(10, 10))
+    shown = []
+    monkeypatch.setattr(QToolTip, "showText", lambda _pos, text, _widget, _rect: shown.append(text))
+
+    assert delegate.helpEvent(event, view, option, model.index(0, 1))
+    assert shown == ["<qt>First &lt;draft&gt; &amp; notes<br>Second<br>Third<br>Fourth</qt>"]
+    view.deleteLater()
+    app.processEvents()
 
 
 def test_project_tree_widget_rebalances_columns_on_resize():
