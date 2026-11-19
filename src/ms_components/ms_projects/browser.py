@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from ms_components.ms_projects.backend import create_catalog_backend
+from ms_components.ms_projects.naming import folder_for, folder_name
 from ms_components.theme import color as theme_color
 
 if TYPE_CHECKING:
@@ -1447,8 +1448,10 @@ class ProjectBrowserPanel(QWidget):
         try:
             folder = fd["path"].expanduser().resolve()
             name   = fd["name"].strip()
-            if folder.name != name:
-                folder = folder / name
+            if folder.name != folder_name(name):
+                # The name stays as typed; the folder is what a path parser can carry (see
+                # `naming`), as in `ProjectsMenuWidget.on_create_project`.
+                folder = folder_for(folder, name)
             ctx = self.backend.create_project(
                 name=name, folder=folder, description=fd["description"],
                 tags=fd["tags"], app_id=fd["app_id"])
