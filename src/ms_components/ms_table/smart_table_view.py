@@ -408,6 +408,10 @@ class SmartTableView(QWidget):
         self._empty_label = QLabel(self._config.empty_message)
         self._empty_label.setObjectName("EmptyLabel")
         self._empty_label.setAlignment(Qt.AlignCenter)
+        # Wrapped, so the message never sets the table's minimum width: a one-line label
+        # asks for its whole sentence, and a few empty tables side by side push the window's
+        # docks aside the first time they show.
+        self._empty_label.setWordWrap(True)
         action = self._config.empty_action
         if action is None and self._config.empty_backdrop is None:
             self._empty_widget = self._empty_label
