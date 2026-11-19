@@ -1,6 +1,8 @@
 """Labels shared by the components."""
 from __future__ import annotations
 
+import math
+
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QFrame, QLabel, QSizePolicy, QTextEdit
@@ -46,11 +48,17 @@ class WrappedText(QTextEdit):
     colour it with a style sheet (`color: ...`). `text()` is the whole text, surrounding blank
     lines dropped."""
 
+    #: The theme styles every QTextEdit as an input (border, padding): that drew a box and a
+    #: scroll bar around the text, and the padding was not in the height `_fit` asked for. Kept
+    #: in this widget's own sheet, which outranks the application's, whatever a caller adds.
+    _PLAIN = "QTextEdit { border: none; padding: 0; background: transparent; }"
+
     def __init__(self, text: str = "", parent=None, *, max_lines: int = 6) -> None:
         super().__init__(parent)
         self._max_lines = max(1, int(max_lines))
         self.setReadOnly(True)
         self.setFrameShape(QFrame.NoFrame)
+        self.setStyleSheet("")
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         palette = self.viewport().palette()
@@ -67,12 +75,23 @@ class WrappedText(QTextEdit):
     def text(self) -> str:
         return self.toPlainText()
 
+    def setStyleSheet(self, sheet: str) -> None:  # noqa: N802
+        """`sheet` on top of the plain look; bare declarations ("color: ...") apply to the text."""
+        sheet = str(sheet or "").strip()
+        if sheet and "{" not in sheet:
+            sheet = f"QTextEdit {{ {sheet} }}"
+        super().setStyleSheet(f"{self._PLAIN}\n{sheet}")
+        self._fit()
+
     def _fit(self) -> None:
         document = self.document()
         document.setTextWidth(self.viewport().width())
         cap = self._max_lines * self.fontMetrics().lineSpacing()
-        content = min(int(document.size().height() + 0.5), cap)
-        self.setFixedHeight(content + 2 * self.frameWidth())
+        # Rounded up: a fraction of a pixel short still brought up the scroll bar, which then
+        # took its width from the text. It only ever shows past `max_lines`.
+        needed = math.ceil(document.size().height())
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded if needed > cap else Qt.ScrollBarAlwaysOff)
+        self.setFixedHeight(min(needed, cap) + 2 * self.frameWidth())
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)

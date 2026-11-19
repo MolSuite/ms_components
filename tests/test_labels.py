@@ -54,3 +54,24 @@ def test_wrapped_text_drops_surrounding_blank_lines():
     assert view.text() == "Description."
     assert view.isReadOnly()
     del app
+
+
+def test_wrapped_text_stays_plain_under_a_theme_that_boxes_every_text_edit():
+    """The theme gives every QTextEdit an input's border and padding: the Project dialog's
+    path drew as a box with a scroll bar, its lines cut by the padding `_fit` did not count."""
+    app = QApplication.instance() or QApplication([])
+    before = app.styleSheet()
+    app.setStyleSheet("QTextEdit { border: 1px solid red; border-radius: 4px; padding: 3px 6px; }")
+    try:
+        host, view = _shown("/home/user/molsuite_projects/AmpC_DUDE-Z_virtual_screening_Unidock " * 2,
+                            260, max_lines=8)
+        view.setStyleSheet("color: palette(placeholder-text);")  # as a caller colours it
+        for _ in range(5):
+            app.processEvents()
+        assert view.frameWidth() == 0 and view.contentsMargins().top() == 0
+        assert view.height() >= view.document().size().height()  # every line shows
+        assert not view.verticalScrollBar().isVisible()
+        assert "color: palette(placeholder-text)" in view.styleSheet()
+        host.deleteLater()
+    finally:
+        app.setStyleSheet(before)
