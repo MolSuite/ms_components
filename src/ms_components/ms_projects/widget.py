@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from ms_components.ms_projects.backend import create_catalog_backend
+from ms_components.ms_projects.naming import folder_for, folder_name
 from ms_components.ms_projects.browser import PROJECT_DATE_FORMAT, ProjectFormDialog, ProjectItem, ProjectTreeWidget
 
 if TYPE_CHECKING:
@@ -185,8 +186,11 @@ class ProjectsMenuWidget(QFrame):
         try:
             folder = data["path"].expanduser().resolve()
             name = data["name"].strip()
-            if folder.name != name:
-                folder = folder / name
+            if folder.name != folder_name(name):
+                # The name stays as typed; the folder is what a path parser can carry (see
+                # `naming`): a project named "AmpC DUDE-Z screening (Unidock)" docked nothing,
+                # because Uni-Dock split its ligand list on the spaces in every path.
+                folder = folder_for(folder, name)
             context = self.backend.create_project(
                 name=name,
                 folder=folder,
