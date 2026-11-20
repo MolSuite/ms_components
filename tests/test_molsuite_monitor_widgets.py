@@ -106,7 +106,8 @@ def test_the_detail_shows_the_numbers_the_tasks_and_the_failures_grouped():
     assert detail._progress.value.text() == "2 / 8" and detail._pct.text() == "38%" and "1 pending" in detail._legend.text()
     assert detail._bar.parts == (2, 4, 1, 1) and (detail._speed.value.text(), detail._speed.unit.text()) == ("30.0", "chunks/min")
     assert detail._grid.isVisibleTo(detail) and detail._grid.cells == bytes([2, 2, 3, 1, 1, 1, 1, 0])
-    assert detail._tabs.tabText(0) == "Running  4" and "1 slow" in detail._tab_meta.text()
+    assert detail._tabs.tabText(detail._tabs.indexOf(detail._tasks)) == "Running  4"
+    assert "1 slow" in detail._tab_meta.text()
     slow = detail._tasks.topLevelItem(3)
     assert (slow.text(1), slow.text(4)) == ("pc3", "40%") and slow.toolTip(0).startswith("slow:")
     assert not detail._tasks.topLevelItem(0).toolTip(0).startswith("slow:")
@@ -116,7 +117,8 @@ def test_the_detail_shows_the_numbers_the_tasks_and_the_failures_grouped():
     top = [detail._errors.item(i).text() for i in range(detail._errors.count())]
     assert top == ["ValueError: bad ligand", "ValueError: no atoms", "… 2 more failed chunks not read"]
     assert detail._errors.item(0).data(Qt.UserRole + 1) == 2 and 'File "dock.py"' in detail._traceback.toPlainText()
-    assert detail._tabs.tabText(1) == "Errors  5" and detail._failed.sub.text() == "2 error types"
+    assert detail._tabs.tabText(detail._tabs.indexOf(detail._errors_tab)) == "Errors  5"
+    assert detail._failed.sub.text() == "2 error types"
 
     detail.set_job(_job(status="completed", engine_id=None))  # of another session: no grid, a note
     assert not detail._grid.isVisibleTo(detail) and "not run by this session" in detail._meta.text()
@@ -131,17 +133,20 @@ def test_the_detail_shows_the_numbers_the_tasks_and_the_failures_grouped():
     assert detail._fact["GPU"].text() == "0.50 GPU·h · 1 at most · 1,200 MB VRAM at most · 61 % busy on average"
 
 
-def test_a_campaign_shows_its_steps_first_its_queue_job_as_running_and_a_short_key():
+def test_a_campaign_keeps_summary_first_and_shows_steps_and_queue_progress():
     QApplication.instance() or QApplication([])
     detail = JobDetail()
     key = "c5062d49f65d65e0c9abb4d53e1f00aa"
     now = datetime.now().timestamp()
     campaign = _job(job_id=key, executor="hpc", steps=((now - 60, "sending its files"), (now - 20, "running in the queue")),
                     note="running in the queue (42): 3 of 8 done", progress=37.5)
-    detail.set_job(_job())  # a job of this machine first: Running is first
-    assert detail._tabs.indexOf(detail._tasks) == 0 and not detail._tabs.isTabVisible(detail._tabs.indexOf(detail._steps))
+    detail.set_job(_job())
+    assert detail._tabs.widget(0) is detail._summary and detail._tabs.currentWidget() is detail._tasks
+    assert not detail._tabs.isTabVisible(detail._tabs.indexOf(detail._steps))
     detail.set_job(campaign)
-    assert detail._tabs.indexOf(detail._steps) == 0 and detail._tabs.currentWidget() is detail._steps
+    assert detail._tabs.widget(0) is detail._summary and detail._tabs.currentWidget() is detail._tasks
+    assert detail._tabs.isTabVisible(detail._tabs.indexOf(detail._steps))
+    assert detail._steps.topLevelItemCount() == 2
     row = detail._tasks.topLevelItem(0)
     assert detail._tasks.topLevelItemCount() == 1 and row.text(0) == campaign.note and row.text(4) == "38%"
     assert detail._tabs.tabText(detail._tabs.indexOf(detail._tasks)) == "Running  1"
@@ -150,7 +155,22 @@ def test_a_campaign_shows_its_steps_first_its_queue_job_as_running_and_a_short_k
     detail.set_job(campaign)  # a poll of the same one keeps the tab chosen
     assert detail._tabs.currentWidget() is detail._errors_tab
     detail.set_job(_job())
-    assert detail._tabs.indexOf(detail._tasks) == 0 and detail._tabs.indexOf(detail._steps) == 3
+    assert detail._tabs.widget(0) is detail._summary and detail._tabs.currentWidget() is detail._tasks
+    assert not detail._tabs.isTabVisible(detail._tabs.indexOf(detail._steps))
+
+
+def test_tab_focus_follows_the_jobs_start_and_end_without_stealing_focus_on_polls():
+    QApplication.instance() or QApplication([])
+    detail = JobDetail()
+    detail.set_job(_job(status="waiting"))
+    assert detail._tabs.currentWidget() is detail._summary
+    detail.set_job(_job(status="running"))
+    assert detail._tabs.currentWidget() is detail._tasks
+    detail._tabs.setCurrentWidget(detail._errors_tab)
+    detail.set_job(_job(status="running", progress=90.0))
+    assert detail._tabs.currentWidget() is detail._errors_tab
+    detail.set_job(_job(status="completed"))
+    assert detail._tabs.currentWidget() is detail._summary
 
 
 def test_monitor_widget_lists_filters_and_selects_the_jobs_and_empties_without_a_project():
@@ -200,13 +220,16 @@ def test_opening_monitor_focuses_running_work_but_polling_keeps_manual_selection
     widget.show()
     app.processEvents()
     try:
+        assert widget._detail._tabs.currentWidget() is widget._detail._tasks
         widget._jobs_view.select_job("completed")
         widget.update_snapshot(snapshot)
         assert widget._selected_job_id() == "completed"
+        assert widget._detail._tabs.currentWidget() is widget._detail._summary
         widget.hide()
         widget.show()
         app.processEvents()
         assert widget._selected_job_id() == "running"
+        assert widget._detail._tabs.currentWidget() is widget._detail._summary
         assert widget._detail._name.text() == "P2Rank"
         assert widget._cancel_button.isEnabled()
 
@@ -215,6 +238,7 @@ def test_opening_monitor_focuses_running_work_but_polling_keeps_manual_selection
         widget.show()
         app.processEvents()
         assert widget._selected_job_id() == "other-running"
+        assert widget._detail._tabs.currentWidget() is widget._detail._summary
     finally:
         widget.close()
 
@@ -264,8 +288,12 @@ def test_reopening_monitor_selects_running_work_from_the_first_fresh_snapshot():
     widget.show()
     app.processEvents()
     try:
+        widget.hide()
+        widget.show()
+        app.processEvents()
         widget.update_snapshot(ProjectMonitorState(project_id="p", has_project=True, jobs=[_job(), done]))
         assert widget._selected_job_id() == "abc123"
+        assert widget._detail._tabs.currentWidget() is widget._detail._summary
     finally:
         widget.close()
 

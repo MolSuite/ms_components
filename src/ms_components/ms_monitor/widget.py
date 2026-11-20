@@ -32,7 +32,8 @@ class MolSuiteMonitorWidget(QWidget):
         super().__init__(parent)
         self._bridge = None
         self._snapshot: ProjectMonitorState | None = None
-        self._select_active_on_snapshot = False
+        self._shown_once = False
+        self._reopen_on_snapshot: bool | None = None
         # The failures of the selected job come from the journal: read again only when the job
         # changes or fails more, not each poll, so the list does not jump while it is read.
         self._failures_key = None
@@ -179,9 +180,12 @@ class MolSuiteMonitorWidget(QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self.select_active_job()
+        if self._shown_once:
+            self._detail.show_summary()
         # A hidden monitor can still hold the previous poll. Focus once more when
         # fresh data arrives, unless the user changes selection in the meantime.
-        self._select_active_on_snapshot = True
+        self._reopen_on_snapshot = self._shown_once
+        self._shown_once = True
         if self._bridge is not None:
             self._bridge.request_refresh()
 
@@ -236,7 +240,7 @@ class MolSuiteMonitorWidget(QWidget):
 
     def clear_snapshot(self) -> None:
         self._snapshot = None
-        self._select_active_on_snapshot = False
+        self._reopen_on_snapshot = None
         self._title_label.setText("No active project")
         self._summary_label.setText("Open a project to monitor jobs.")
         self._update_sync_state(None)
@@ -254,8 +258,8 @@ class MolSuiteMonitorWidget(QWidget):
         self._failures_key = None
 
     def update_snapshot(self, snapshot: ProjectMonitorState) -> None:
-        focus_active = self._select_active_on_snapshot
-        self._select_active_on_snapshot = False
+        reopening = self._reopen_on_snapshot
+        self._reopen_on_snapshot = None
         self._snapshot = snapshot
         if not snapshot.has_project:
             self.clear_snapshot()
@@ -273,9 +277,11 @@ class MolSuiteMonitorWidget(QWidget):
         self._jobs_view.set_jobs(snapshot.jobs)
         self._hosts.set_jobs(snapshot.jobs)
         self._rebuild_filters(snapshot)
-        if focus_active or self._selected_job() is None:
+        if reopening is not None or self._selected_job() is None:
             self.select_active_job()
         self._show_selected()
+        if reopening:
+            self._detail.show_summary()
 
     def _rebuild_filters(self, snapshot: ProjectMonitorState) -> None:
         current_status = self._status_filter.currentData()
@@ -346,7 +352,7 @@ class MolSuiteMonitorWidget(QWidget):
         self._bridge.resume_job(job_id, executor)
 
     def _on_current_job_changed(self, job_id) -> None:
-        self._select_active_on_snapshot = False
+        self._reopen_on_snapshot = None
         if self._bridge is not None:
             self._bridge.select_job(job_id)
         self._show_selected()
