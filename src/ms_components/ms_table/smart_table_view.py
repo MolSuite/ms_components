@@ -533,6 +533,7 @@ class SmartTableView(QWidget):
                 h.resizeSection(idx, col_def.width)
             if col_def.min_width:
                 h.setMinimumSectionSize(col_def.min_width)
+        self._header.fit_titles()
 
     # ──────────────────────────────────────────
     # Full menu for external hosts

@@ -11,8 +11,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QPoint, QRect, Qt, Signal
-from PySide6.QtGui import QDoubleValidator, QPainter, QPixmap
+from PySide6.QtCore import QEvent, QPoint, QRect, Qt, Signal
+from PySide6.QtGui import QDoubleValidator, QFont, QFontMetrics, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFrame, QHBoxLayout,
     QHeaderView, QLabel, QLineEdit, QPushButton, QStyle, QStyleOptionHeader,
@@ -50,6 +50,8 @@ class ActionHeader(QHeaderView):
 
     actionClicked = Signal(int, str, Qt.KeyboardModifiers)
     _ACTIONS = ("sort", "search", "filter")
+    _TEXT_LEFT = 8
+    _BTN_SLOT = 17  # must match size+gap in _action_rects
 
     def __init__(self, config: TableConfig, parent: QWidget | None = None) -> None:
         super().__init__(Qt.Orientation.Horizontal, parent)
@@ -103,9 +105,7 @@ class ActionHeader(QHeaderView):
         self.style().drawControl(QStyle.ControlElement.CE_Header, opt, painter, self)
 
         btn_rects = self._action_rects(rect, logical_index)
-        _btn_slot = 17  # must match size+gap in _action_rects
-        reserved  = len(btn_rects) * _btn_slot + (3 if btn_rects else 0)
-        text_rect = rect.adjusted(8, 0, -reserved, 0)
+        text_rect = rect.adjusted(self._TEXT_LEFT, 0, -self._reserved(len(btn_rects)), 0)
 
         title = str(
             self.model().headerData(
@@ -197,6 +197,50 @@ class ActionHeader(QHeaderView):
         self.viewport().unsetCursor()
         self.viewport().update()
         super().leaveEvent(event)
+
+    # ── Sizing ────────────────────────────────────────────────────────────
+
+    @classmethod
+    def _reserved(cls, n_buttons: int) -> int:
+        return n_buttons * cls._BTN_SLOT + (3 if n_buttons else 0)
+
+    @staticmethod
+    def _n_actions(col: ColumnDef) -> int:
+        return sum(bool(flag) for flag in (col.sortable, col.searchable, col.filterable))
+
+    def width_hint(self, col: ColumnDef) -> int:
+        """Narrowest section that shows ``col``'s whole title beside its buttons."""
+        # Measured bold: titles paint bold, which self.fontMetrics() doesn't reflect.
+        font = QFont(self.font())
+        font.setBold(True)
+        title = QFontMetrics(font).horizontalAdvance(col.label or col.field)
+        return self._TEXT_LEFT + title + 4 + self._reserved(self._n_actions(col))
+
+    def fit_titles(self) -> None:
+        """Widen any section too narrow for its title beside the sort/search/filter buttons.
+
+        Only grows, so configured or dragged widths that already fit are kept. Re-run on font
+        change and first show: the platform/theme font often lands after the widths are set.
+        """
+        offset = 1 if self._config.show_row_numbers else 0
+        for i, col in enumerate(self._config.visible_columns()):
+            idx = i + offset
+            if idx >= self.count():
+                break
+            need = self.width_hint(col)
+            if col.max_width:
+                need = min(need, col.max_width)
+            if self.sectionSize(idx) < need:
+                self.resizeSection(idx, need)
+
+    def changeEvent(self, event) -> None:
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.FontChange:
+            self.fit_titles()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self.fit_titles()
 
     # ── Helpers ───────────────────────────────────────────────────────────
 
