@@ -1257,6 +1257,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#ms_components.ms_projects.folder_for" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;folder_for
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ms_components.ms_projects.folder_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;folder_name
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3155,6 +3177,28 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ProjectsMenuWidget
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ms_components.ms_projects.folder_for" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;folder_for
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ms_components.ms_projects.folder_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;folder_name
       </span>
     </span>
   </a>
@@ -10247,6 +10291,14 @@ not get in. Blocks: not on the GUI thread.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
+            <td><code><span title="ms_components.ms_projects.naming">naming</span></code></td>
+            <td>
+              <div class="doc-md-description">
+                <p>The folder a project gets on disk, from the name its author typed.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
             <td><code><span title="ms_components.ms_projects.scratch">scratch</span></code></td>
             <td>
               <div class="doc-md-description">
@@ -10291,6 +10343,35 @@ not get in. Blocks: not on the GUI thread.</p>
     </table>
 
 
+
+
+<p><span class="doc-section-title">Functions:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            folder_for (ms_components.ms_projects.folder_for)" href="./#ms_components.ms_projects.folder_for">folder_for</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>A folder under <code>parent</code> for a project called <code>name</code>, free for it to be created in.</p>
+                </div>
+              </td>
+            </tr>
+            <tr class="doc-section-item">
+              <td><code><a class="autorefs autorefs-internal" title="            folder_name (ms_components.ms_projects.folder_name)" href="./#ms_components.ms_projects.folder_name">folder_name</a></code></td>
+              <td>
+                <div class="doc-md-description">
+                  <p>The folder name for a project called <code>name</code>: its words, joined by <code>_</code>.</p>
+                </div>
+              </td>
+            </tr>
+      </tbody>
+    </table>
 
 
 
@@ -10338,8 +10419,7 @@ not get in. Blocks: not on the GUI thread.</p>
 
                   <details class="mkdocstrings-source">
                     <summary>Source code in <code>src/ms_components/ms_projects/widget.py</code></summary>
-                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">49</span>
-<span class="normal">50</span>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">50</span>
 <span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span>
@@ -10365,7 +10445,8 @@ not get in. Blocks: not on the GUI thread.</p>
 <span class="normal">73</span>
 <span class="normal">74</span>
 <span class="normal">75</span>
-<span class="normal">76</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">76</span>
+<span class="normal">77</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">app_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -10417,6 +10498,109 @@ not get in. Blocks: not on the GUI thread.</p>
 
 </div>
 
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ms_components.ms_projects.folder_for" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">folder_for</span>
+
+
+<a href="#ms_components.ms_projects.folder_for" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">folder_for</span><span class="p">(</span><span class="n">parent</span><span class="p">:</span> <span class="n"><span title="pathlib.Path">Path</span></span> <span class="o">|</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pathlib.Path">Path</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>A folder under <code>parent</code> for a project called <code>name</code>, free for it to be created in.</p>
+<p>Two names that fold to one slug ("A/B run" and "A B run") would otherwise open the same
+folder and write over each other's project, so the second gets <code>_2</code>, the third <code>_3</code>.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/ms_components/ms_projects/naming.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">folder_for</span><span class="p">(</span><span class="n">parent</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""A folder under `parent` for a project called `name`, free for it to be created in.</span>
+
+<span class="sd">    Two names that fold to one slug ("A/B run" and "A B run") would otherwise open the same</span>
+<span class="sd">    folder and write over each other's project, so the second gets `_2`, the third `_3`.</span>
+<span class="sd">    """</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
+    <span class="n">base</span> <span class="o">=</span> <span class="n">folder_name</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="n">candidate</span> <span class="o">=</span> <span class="n">parent</span> <span class="o">/</span> <span class="n">base</span>
+    <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1000</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">candidate</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">candidate</span>
+        <span class="n">candidate</span> <span class="o">=</span> <span class="n">parent</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">base</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">"</span>
+    <span class="k">return</span> <span class="n">candidate</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ms_components.ms_projects.folder_name" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">folder_name</span>
+
+
+<a href="#ms_components.ms_projects.folder_name" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">folder_name</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="str">str</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The folder name for a project called <code>name</code>: its words, joined by <code>_</code>.</p>
+<p>Accents fold to their plain letters ("Mantén" -&gt; "Manten") and anything else is dropped, so
+the result holds no space, quote, newline or shell character. Never empty, never a name
+Windows reserves, never longer than 64 characters.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/ms_components/ms_projects/naming.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">folder_name</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The folder name for a project called `name`: its words, joined by `_`.</span>
+
+<span class="sd">    Accents fold to their plain letters ("Mantén" -&gt; "Manten") and anything else is dropped, so</span>
+<span class="sd">    the result holds no space, quote, newline or shell character. Never empty, never a name</span>
+<span class="sd">    Windows reserves, never longer than 64 characters.</span>
+<span class="sd">    """</span>
+    <span class="n">folded</span> <span class="o">=</span> <span class="n">unicodedata</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="s2">"NFKD"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">name</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">))</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"ascii"</span><span class="p">,</span> <span class="s2">"ignore"</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+    <span class="n">slug</span> <span class="o">=</span> <span class="n">_RUNS</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">"_"</span><span class="p">,</span> <span class="n">_KEEP</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">"_"</span><span class="p">,</span> <span class="n">folded</span><span class="p">))</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">"._-"</span><span class="p">)[:</span><span class="n">_MAX</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">"._-"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">slug</span> <span class="ow">or</span> <span class="n">slug</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"."</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">in</span> <span class="n">_RESERVED</span><span class="p">:</span>
+        <span class="n">slug</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"project_</span><span class="si">{</span><span class="n">slug</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">slug</span> <span class="k">else</span> <span class="s2">"project"</span>
+    <span class="k">return</span> <span class="n">slug</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
 
 
 
