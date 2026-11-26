@@ -140,8 +140,12 @@ def _builtin_preset(method_name: str):
     def apply(cmd, context: PymolSceneContext) -> None:
         from pymol import preset
 
-        method = getattr(preset, method_name)
-        method(str(context.target or "all"), _self=cmd)
+        target = str(context.target or "all")
+        getattr(preset, method_name)(target, _self=cmd)
+        if method_name == "ligand_sites":
+            # PyMOL ignores surface-exclusion flags when every atom in an object is flagged.
+            # A separately loaded ligand therefore needs its surface explicitly hidden.
+            cmd.hide("surface", f"({target}) and {preset.lig_sele}")
 
     return apply
 
@@ -894,13 +898,13 @@ class PymolControlBar(QFrame):
             ("pymol.pretty", "PyMOL · Pretty", "pretty"),
             ("pymol.publication", "PyMOL · Publication", "publication"),
             # The rest of PyMOL's Actions > Preset menu.
-            ("pymol.simple_no_solvent", "PyMOL · Simple (no solvent)", "simple_no_solvent"),
+            ("pymol.simple_no_solvent", "PyMOL · Simple (no solvent)", "simple_no_solv"),
             ("pymol.b_factor_putty", "PyMOL · B-factor Putty", "b_factor_putty"),
             ("pymol.technical", "PyMOL · Technical", "technical"),
             ("pymol.ligand_cartoon", "PyMOL · Ligand Sites (cartoon)", "ligand_cartoon"),
-            ("pymol.ligands", "PyMOL · Ligand Sites (surface)", "ligands"),
+            ("pymol.ligands", "PyMOL · Ligand Sites (surface)", "ligand_sites"),
             ("pymol.pretty_solv", "PyMOL · Pretty (solvent)", "pretty_solv"),
-            ("pymol.protein_interface", "PyMOL · Protein Interface", "protein_interface"),
+            ("pymol.protein_interface", "PyMOL · Protein Interface", "interface"),
         ):
             self._presets[key] = PymolPresetSpec(
                 key=key,

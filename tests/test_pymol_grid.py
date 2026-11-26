@@ -65,6 +65,43 @@ def grid_scene():
         app.processEvents()
 
 
+@pytest.mark.parametrize(("key", "target", "shown", "hidden"), [
+    ("pymol.simple_no_solvent", "all", ("polymer.protein and rep ribbon",), ("solvent and visible",)),
+    ("pymol.ligands", "all",
+     ("protein_a and rep surface", "ligand and rep sticks"),
+     ("ligand and rep surface", "distant_protein and rep surface")),
+    ("pymol.protein_interface", "polymer.protein",
+     ("protein_a and rep sticks", "protein_b and rep sticks", "distant_protein and rep cartoon"),
+     ("distant_protein and rep sticks",)),
+])
+def test_builtin_preset_menu_applies_the_expected_native_view(grid_scene, key, target, shown, hidden):
+    bar, cmd = grid_scene
+    cmd.delete("all")
+    for obj, chain, x in (("protein_a", "A", 0), ("protein_b", "B", 3), ("distant_protein", "C", 25)):
+        cmd.fragment("ala", obj)
+        cmd.alter(obj, f"chain={chain!r}")
+        cmd.translate((x, 0, 0), obj, camera=0)
+    cmd.fragment("gly", "ligand")
+    cmd.alter("ligand", "resn='LIG';hetatm=1")
+    cmd.translate((0, 3, 0), "ligand", camera=0)
+    cmd.sort()
+    cmd.pseudoatom("water", resn="HOH", name="O", elem="O", pos=(0, 6, 0), hetatm=1)
+    cmd.show("nonbonded", "water")
+    assert cmd.count_atoms("solvent and visible") == 1
+
+    bar.set_scene_context("generic", target=target)
+    applied, errors = [], []
+    bar.preset_applied.connect(applied.append)
+    bar.command_failed.connect(errors.append)
+    next(action for action in bar.preset_menu.actions() if action.data() == key).trigger()
+    assert not errors
+    assert applied == [key]
+    for selection in shown:
+        assert cmd.count_atoms(selection) > 0, selection
+    for selection in hidden:
+        assert cmd.count_atoms(selection) == 0, selection
+
+
 @pytest.mark.parametrize("clicks", [0, 1, 2])
 def test_hydrogen_modes_apply_globally_and_to_new_systems(grid_scene, clicks, monkeypatch):
     bar, cmd = grid_scene
