@@ -166,6 +166,7 @@ class PymolControlBar(QFrame):
 
     selection_mode_changed = Signal(int)
     preset_applied = Signal(str)
+    representation_applied = Signal(str)
     command_failed = Signal(str)
 
     def __init__(self, cmd, parent: QWidget | None = None):
@@ -749,11 +750,11 @@ class PymolControlBar(QFrame):
             lambda: self._cmd.center(self.active_target()),
         )
 
-    def apply_representation(self, representation: str) -> None:
+    def apply_representation(self, representation: str, *, use_selection: bool = True) -> None:
         normalized = str(representation or "").strip().lower()
         if normalized not in {value for _label, value in REPRESENTATIONS}:
             raise ValueError(f"Unsupported PyMOL representation: {representation}")
-        target = self.active_target()
+        target = self.active_target() if use_selection else self._scene_target()
 
         def apply() -> None:
             self._cmd.hide("everything", target)
@@ -761,7 +762,8 @@ class PymolControlBar(QFrame):
             self._restore_hidden_hydrogens(target)
             self.apply_hydrogen_visibility()
 
-        self._run_command(f"Display {normalized}", apply)
+        if self._run_command(f"Display {normalized}", apply) and target != "sele":
+            self.representation_applied.emit(normalized)
 
     def hide_representation(self, representation: str) -> None:
         normalized = str(representation or "").strip().lower()

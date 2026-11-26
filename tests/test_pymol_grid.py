@@ -91,6 +91,48 @@ def test_toolbar_uses_only_an_enabled_canvas_selection(grid_scene):
     assert bar.active_target() == target
 
 
+def test_scene_memory_keeps_whole_scene_display_changes(grid_scene):
+    bar, cmd = grid_scene
+    dock = SimpleNamespace(control_bar=bar, cmd=cmd, set_scene_context=bar.set_scene_context)
+    memory = install_scene_memory(dock)
+    preset = PymolPresetSpec(
+        key="test.sticks", label="Test sticks",
+        callback=lambda cmd, context: cmd.show_as("sticks", context.target),
+    )
+    bar.register_preset(preset)
+
+    def open_scene(kind, target):
+        cmd.show_as("lines", target)
+        set_scene_context(dock, kind, target=target)
+
+    open_scene("generic", "lig_9")
+    memory.remember_view()
+    open_scene("generic", "lig_7")
+    bar.apply_preset(preset.key)
+    bar.apply_representation("spheres")
+    cmd.select("sele", "lig_7", enable=1)
+    bar.apply_representation("dots")
+    assert cmd.count_atoms("lig_7 and rep dots") == 1
+
+    memory.keep_style_action.setChecked(True)
+    open_scene("generic", "lig_9")
+    assert cmd.count_atoms("lig_9 and rep spheres") == 1
+    assert cmd.count_atoms("lig_7 and rep dots") == 1
+    open_scene("other", "rec_7")
+    assert cmd.count_atoms("rec_7 and rep lines") == 1
+
+    memory.keep_style_action.setChecked(False)
+    open_scene("generic", "rec_9")
+    assert cmd.count_atoms("rec_9 and rep lines") == 1
+    open_scene("generic", "lig_9")
+    bar.apply_preset(preset.key)
+    open_scene("generic", "lig_7")
+    assert cmd.count_atoms("lig_7 and rep spheres") == 1
+    open_scene("generic", "lig_9")
+    assert cmd.count_atoms("lig_9 and rep sticks") == 1
+    assert cmd.count_atoms("lig_9 and rep spheres") == 0
+
+
 @pytest.mark.parametrize(("key", "target", "shown", "hidden"), [
     ("pymol.simple_no_solvent", "all", ("polymer.protein and rep ribbon",), ("solvent and visible",)),
     ("pymol.ligands", "all",
