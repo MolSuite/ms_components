@@ -184,6 +184,33 @@ def test_hydrogen_modes_apply_globally_and_to_new_systems(grid_scene, clicks, mo
     assert calls == []  # Repeated renders must not invalidate PyMOL's scene again.
 
 
+def test_surfaces_exclude_hydrogens_without_disabling_their_sticks(grid_scene, monkeypatch):
+    bar, cmd = grid_scene
+    cmd.fragment("ala", "receptor")
+    cmd.fragment("gly", "other")
+    cmd.flag("ignore", "receptor and name O", "set")
+    cmd.show("surface", "receptor and name CA")
+    hydrogens = cmd.count_atoms("receptor and hydro")
+    assert hydrogens > 0
+    assert bar.apply_hydrogen_visibility()
+    assert cmd.count_atoms("receptor and hydro and flag 25") == hydrogens
+    assert cmd.count_atoms("receptor and not hydro and flag 25") == 1
+    assert cmd.count_atoms("other and hydro and flag 25") == 0
+    assert cmd.count_atoms("receptor and hydro and visible") == 0
+
+    bar.hydrogens_action.trigger()  # hidden
+    bar.hydrogens_action.trigger()  # all as sticks
+    assert cmd.count_atoms("receptor and hydro and rep sticks") == hydrogens
+    assert cmd.count_atoms("receptor and hydro and flag 25") == hydrogens
+    assert cmd.count_atoms("receptor and name CA and rep surface") == 1
+
+    calls = []
+    monkeypatch.setattr(cmd, "flag", lambda *args: calls.append(args))
+    monkeypatch.setattr(cmd, "rebuild", lambda *args: calls.append(args))
+    assert bar.apply_hydrogen_visibility()
+    assert calls == []
+
+
 def _labels(cmd, obj):
     labels = []
     cmd.iterate(obj, "labels.append(label)", space={"labels": labels})

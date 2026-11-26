@@ -34,6 +34,9 @@ class FakeCmd:
             return ["sele"]
         return []
 
+    def get_object_list(self, _selection):
+        return []
+
     def count_atoms(self, selection):
         if "hydro" in selection and selection.endswith("and visible"):
             return int(self.hydrogens_visible)

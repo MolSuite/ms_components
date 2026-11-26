@@ -794,6 +794,15 @@ class PymolControlBar(QFrame):
         hidden = {"none": "hydro", "all": "", "polar": f"hydro and not ({polar})"}[self._hydrogen_mode]
 
         def apply() -> None:
+            # A hidden H can still shape the surface, leaving a hole where its faces are culled.
+            # Build heavy-atom surfaces while keeping PyMOL's existing ignore flags on other atoms.
+            # PyMOL's selection language uses the flag number (25 is "ignore").
+            surface_h = "(byobject (enabled and not hydro and rep surface)) and hydro and not flag 25"
+            objects = self._cmd.get_object_list(surface_h)
+            if objects:
+                self._cmd.flag("ignore", surface_h, "set")
+                for obj in objects:
+                    self._cmd.rebuild(obj, "surface")
             if hidden and self._cmd.count_atoms(f"({hidden}) and visible"):
                 self._cmd.hide("everything", hidden)
             if shown and self._cmd.count_atoms(f"({shown}) and not rep sticks"):
