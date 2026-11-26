@@ -470,6 +470,41 @@ def test_presets_keep_comparison_colors_and_the_overlay_layout(grid_scene):
     assert cmd.get("label_color", "panel_text3") == COMPARISON_COLORS[2]
 
 
+def test_comparison_preserves_preset_colors_through_layout_and_label_changes(grid_scene):
+    bar, cmd = grid_scene
+    bar.set_scene_context("comparison", grid_labels={1: "First", 3: "Second"})
+    bar.register_preset(PymolPresetSpec(
+        key="test.custom_colors",
+        label="Custom colors",
+        callback=lambda cmd, context: cmd.color("white", context.target),
+        use_comparison_colors=False,
+    ))
+
+    def colors(selection):
+        used = set()
+        cmd.iterate(selection, "used.add(color)", space={"used": used})
+        return used
+
+    white = {cmd.get_color_index("white")}
+    bar.apply_preset("test.custom_colors")
+    assert colors("rec_7 or rec_9") == white
+    bar.set_comparison_layout("overlay")
+    assert colors("rec_7 or rec_9") == white
+    bar.set_scene_context("comparison", grid_labels={1: "Renamed first", 3: "Second"})
+    assert _labels(cmd, "panel_text1") == ["Renamed first"]
+    assert cmd.get("label_color", "panel_text3") == COMPARISON_COLORS[2]
+    assert colors("rec_7 or rec_9") == white
+    bar.set_comparison_layout("grid")
+    assert colors("rec_7 or rec_9") == white
+
+    palette = {cmd.get_color_index(COMPARISON_COLORS[2])}
+    bar.apply_preset("pymol.simple")
+    assert colors("rec_9") == palette
+    bar.apply_preset("test.custom_colors")
+    bar.set_scene_context("comparison", target="rec_9 or lig_9")
+    assert colors("rec_9") == palette
+
+
 def test_overlay_legend_spacing_follows_the_viewport_height(grid_scene, monkeypatch):
     bar, cmd = grid_scene
     bar.set_scene_context("comparison")

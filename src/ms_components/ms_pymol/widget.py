@@ -132,6 +132,8 @@ class PymolPresetSpec:
     contexts: frozenset[str] = field(default_factory=frozenset)
     tooltip: str = ""
     per_grid_slot: bool = False
+    # Labels always use the slot palette. A preset can supply its own molecular colors.
+    use_comparison_colors: bool = True
 
     def supports(self, context_kind: str) -> bool:
         return not self.contexts or str(context_kind) in self.contexts
@@ -173,6 +175,7 @@ class PymolControlBar(QFrame):
         self._grid_label_objects: set[str] = set()
         self._preset_objects: set[str] = set()
         self._comparison_layout = "grid"
+        self._use_comparison_colors = True
         self._hydrogen_mode = "polar"
         self._presets: dict[str, PymolPresetSpec] = {}
         self.setObjectName("PymolControlBar")
@@ -550,10 +553,14 @@ class PymolControlBar(QFrame):
                 default_preset=str(default_preset or "").strip(),
                 grid_labels=dict(grid_labels or {}),
             )
-        was_comparison = self._context.is_comparison
+        previous = self._context
+        if (previous.kind, previous.target, previous.selections) != (
+            normalized.kind, normalized.target, normalized.selections,
+        ):
+            self._use_comparison_colors = True
         self._context = normalized
         self.comparison_menu.menuAction().setVisible(normalized.is_comparison)
-        if was_comparison or normalized.is_comparison:
+        if previous.is_comparison or normalized.is_comparison:
             self._run_command("Grid labels", self._sync_grid_labels)
         self.apply_hydrogen_visibility()
         self.refresh_context_label()
@@ -580,7 +587,9 @@ class PymolControlBar(QFrame):
         for value, action in self._comparison_layout_actions.items():
             action.setChecked(value == self._comparison_layout)
 
-    def _sync_grid_labels(self, *, color_objects: bool = True) -> None:
+    def _sync_grid_labels(self, *, color_objects: bool | None = None) -> None:
+        if color_objects is None:
+            color_objects = self._use_comparison_colors
         labels = dict(self._context.grid_labels)
         if self._context.is_comparison:
             self._cmd.set("grid_mode", int(self._comparison_layout == "grid"))
@@ -915,7 +924,8 @@ class PymolControlBar(QFrame):
             )
             self.apply_hydrogen_visibility()
             if self._context.is_comparison:
-                self._sync_grid_labels()
+                self._sync_grid_labels(color_objects=spec.use_comparison_colors)
+                self._use_comparison_colors = spec.use_comparison_colors
 
         if self._run_command(spec.label, apply):
             self.preset_applied.emit(normalized_key)
