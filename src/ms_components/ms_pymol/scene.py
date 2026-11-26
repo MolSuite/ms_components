@@ -127,8 +127,15 @@ def set_additive(dock, additive: bool) -> None:
 
 
 def clear_scene(dock) -> None:
+    """Empty the viewer and reset its active context while retaining molecule history."""
     dock.cmd.delete("all")
     dock._scene_replaced_slots = {}
+    memory = getattr(dock, "scene_memory", None)
+    if memory is not None:
+        memory.clear_active_scene()
+    setter = getattr(dock, "set_scene_context", None)
+    if callable(setter):
+        setter("generic", target="all", selections=None, default_preset="", grid_labels=None)
 
 
 def prepare_scene(dock, *objects: str) -> None:
@@ -231,6 +238,11 @@ class SceneMemory(QObject):
         self.keep_style = False
         self.interacting = False  # a mouse button is down on the canvas
         self._wheel_pending = False
+
+    def clear_active_scene(self) -> None:
+        self.key = ""
+        self.kind = ""
+        self.interacting = False
 
     def apply(self, kind: str, target: str, selections: dict[str, str] | None, *, restore_view: bool = True) -> None:
         kind = str(kind or "generic")
