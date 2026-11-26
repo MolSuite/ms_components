@@ -703,13 +703,22 @@ class PymolControlBar(QFrame):
             if spec.supports(kind)
         ]
 
-    def active_target(self) -> str:
+    def _active_selection_count(self) -> int:
         if self._cmd is not None:
             try:
-                if int(self._cmd.count_atoms("sele") or 0) > 0:
-                    return "sele"
+                # PyMOL deselects by disabling the selection while retaining its atoms.
+                if "sele" in self._cmd.get_names("selections", enabled_only=1):
+                    return int(self._cmd.count_atoms("sele") or 0)
             except Exception:
                 pass
+        return 0
+
+    def active_target(self) -> str:
+        if self._active_selection_count() > 0:
+            return "sele"
+        return self._scene_target()
+
+    def _scene_target(self) -> str:
         return str(self._context.target or "all").strip() or "all"
 
     def zoom_active(self) -> None:
@@ -811,12 +820,7 @@ class PymolControlBar(QFrame):
         self.context_label.setToolTip("\n".join([*context_lines, *details]))
 
     def _active_selection_summary(self) -> tuple[str, list[str]]:
-        if self._cmd is None:
-            return "", []
-        try:
-            atom_count = int(self._cmd.count_atoms("sele") or 0)
-        except Exception:
-            return "", []
+        atom_count = self._active_selection_count()
         if atom_count <= 0:
             return "", []
         residues: set[tuple[str, str, str]] = set()

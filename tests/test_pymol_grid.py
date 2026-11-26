@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -10,6 +11,7 @@ import pytest
 from PySide6.QtWidgets import QApplication
 
 from ms_components.ms_pymol import COMPARISON_COLORS, PymolControlBar, PymolPresetSpec, PymolSceneContext
+from ms_components.ms_pymol import install_scene_memory, set_scene_context
 
 
 def test_preset_interactions_stay_in_each_complex_panel(grid_scene):
@@ -63,6 +65,30 @@ def grid_scene():
         yield bar, cmd
         bar.close()
         app.processEvents()
+
+
+def test_toolbar_uses_only_an_enabled_canvas_selection(grid_scene):
+    bar, cmd = grid_scene
+    target = "rec_7 or rec_9"
+    bar.set_scene_context("generic", target=target)
+    cmd.select("saved", "lig_7")
+    cmd.select("sele", "rec_7", enable=1)
+    bar.apply_representation("spheres")
+    assert cmd.count_atoms("rec_7 and rep spheres") == 1
+    assert cmd.count_atoms("rec_9 and rep spheres") == 0
+
+    next(action for action in bar.selection_mode_action.menu().actions()
+         if action.text() == "Clear selection").trigger()
+    assert "sele" not in cmd.get_names("selections", enabled_only=1)
+    assert cmd.count_atoms("sele") == cmd.count_atoms("saved") == 1
+    bar.apply_representation("sticks")
+    assert cmd.count_atoms(f"({target}) and rep sticks") == 2
+    assert "Selected residues:" not in bar.context_label.toolTip()
+
+    cmd.select("sele", "rec_9", enable=1)
+    assert bar.active_target() == "sele"
+    cmd.disable("sele")
+    assert bar.active_target() == target
 
 
 @pytest.mark.parametrize(("key", "target", "shown", "hidden"), [
