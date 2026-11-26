@@ -100,6 +100,7 @@ REPRESENTATIONS = (
 )
 
 _TOOLBAR_ICONS = Path(__file__).parent / "icons"
+_HIDDEN_HYDROGENS = "_ms_hidden_hydrogens"
 COMPARISON_COLORS = (
     "orange", "tv_green", "cyan", "magenta", "yellow",
     "salmon", "violet", "lime", "deepteal", "hotpink",
@@ -748,6 +749,7 @@ class PymolControlBar(QFrame):
         def apply() -> None:
             self._cmd.hide("everything", target)
             self._cmd.show(normalized, target)
+            self._restore_hidden_hydrogens(target)
             self.apply_hydrogen_visibility()
 
         self._run_command(f"Display {normalized}", apply)
@@ -757,10 +759,19 @@ class PymolControlBar(QFrame):
         valid = {"everything", *(value for _label, value in REPRESENTATIONS)}
         if normalized not in valid:
             raise ValueError(f"Unsupported PyMOL representation: {representation}")
-        self._run_command(
-            f"Hide {normalized}",
-            lambda: self._cmd.hide(normalized, self.active_target()),
-        )
+        def apply() -> None:
+            target = self.active_target()
+            self._cmd.hide(normalized, target)
+            if normalized == "everything":
+                # Keep explicit hides through redraws and hydrogen-mode changes. PyMOL
+                # tracks the selected atom identities as objects are replaced or removed.
+                self._cmd.select(_HIDDEN_HYDROGENS, f"({target}) and hydro", enable=0, merge=1)
+
+        self._run_command(f"Hide {normalized}", apply)
+
+    def _restore_hidden_hydrogens(self, target: str) -> None:
+        if _HIDDEN_HYDROGENS in self._cmd.get_names("selections"):
+            self._cmd.select(_HIDDEN_HYDROGENS, f"?{_HIDDEN_HYDROGENS} and not ({target})", enable=0)
 
     def toggle_hydrogens(self) -> None:
         previous = self._hydrogen_mode
@@ -791,6 +802,8 @@ class PymolControlBar(QFrame):
         # reading of which residues are the small molecules.
         polar = "hydro and neighbor (elem N+O+S) and organic"
         shown = {"none": "", "all": "hydro", "polar": polar}[self._hydrogen_mode]
+        if shown:
+            shown = f"({shown}) and not ?{_HIDDEN_HYDROGENS}"
         hidden = {"none": "hydro", "all": "", "polar": f"hydro and not ({polar})"}[self._hydrogen_mode]
 
         def apply() -> None:
@@ -896,6 +909,10 @@ class PymolControlBar(QFrame):
                         associate_scene_objects(self._cmd, [name], reference=objects[0])
             else:
                 spec.callback(self._cmd, self._context)
+            # A preset can leave parts of the target hidden.
+            self._restore_hidden_hydrogens(
+                f"({self._context.target}) and (visible or neighbor (visible and not hydro))"
+            )
             self.apply_hydrogen_visibility()
             if self._context.is_comparison:
                 self._sync_grid_labels()

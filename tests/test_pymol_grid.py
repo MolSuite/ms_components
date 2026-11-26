@@ -211,6 +211,32 @@ def test_surfaces_exclude_hydrogens_without_disabling_their_sticks(grid_scene, m
     assert calls == []
 
 
+@pytest.mark.parametrize("picked", [False, True], ids=["whole-scene", "single-hydrogen"])
+def test_hide_everything_stays_hidden_until_displayed(grid_scene, picked):
+    bar, cmd = grid_scene
+    cmd.delete("all")
+    cmd.fragment("ser", "ligand")
+    cmd.alter("ligand", "resn='LIG';hetatm=1")
+    cmd.sort("ligand")
+    cmd.show_as("sticks", "ligand")
+    bar.set_scene_context("generic", target="ligand")
+    if picked:
+        cmd.select("sele", "first (hydro and visible)", enable=1)
+    target = bar.active_target()
+    visible_before = cmd.count_atoms(f"({target}) and hydro and visible")
+    assert visible_before > 0
+
+    bar.hide_representation("everything")
+    assert bar.apply_hydrogen_visibility()
+    assert cmd.count_atoms(f"({target}) and visible") == 0
+    assert bar.active_target() == target
+    if picked:
+        assert cmd.count_atoms("ligand and not sele and hydro and visible") > 0
+
+    bar.apply_representation("sticks")
+    assert cmd.count_atoms(f"({target}) and hydro and visible") == visible_before
+
+
 def _labels(cmd, obj):
     labels = []
     cmd.iterate(obj, "labels.append(label)", space={"labels": labels})
