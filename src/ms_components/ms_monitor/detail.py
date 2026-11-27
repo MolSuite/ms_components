@@ -440,9 +440,9 @@ class JobDetail(QWidget):
         self._steps.setFrameShape(QFrame.NoFrame)
         self._steps.header().setSectionResizeMode(QHeaderView.ResizeToContents)
         self._steps.header().setStretchLastSection(True)
+        self._tabs.addTab(self._summary, "Summary")
         self._tabs.addTab(self._tasks, "Running")
         self._tabs.addTab(errors, "Errors")
-        self._tabs.addTab(self._summary, "Summary")
         self._tabs.addTab(self._steps, "Steps")
         self._tabs.setTabVisible(self._tabs.indexOf(self._steps), False)  # only a job whose source says its steps (a campaign)
         self._errors.currentItemChanged.connect(self._show_traceback)
@@ -455,6 +455,7 @@ class JobDetail(QWidget):
         self.set_job(None)
 
     def set_job(self, job: JobMonitorState | None) -> None:
+        previous = self._job
         self._job = job
         for widget in (self._swatch, self._badge, self._on, self._chip, self._meta):
             widget.setVisible(job is not None)
@@ -473,6 +474,7 @@ class JobDetail(QWidget):
             self.set_failures([], 0)
             self._set_summary(None)
             self._set_steps(None)
+            self.show_summary()
             return
         hue = status_color(job.status)
         self._name.setText(job.label)
@@ -532,24 +534,20 @@ class JobDetail(QWidget):
         self._set_tasks(job)
         self._set_summary(job)
         self._set_steps(job)
+        if previous is None or (previous.job_id, previous.status) != (job.job_id, job.status):
+            self._tabs.setCurrentWidget(self._tasks if job.status == "running" else self._summary)
+
+    def show_summary(self) -> None:
+        self._tabs.setCurrentWidget(self._summary)
 
     def set_color(self, color: str) -> None:
         """The job's own color, as the list paints it."""
         self._swatch.setStyleSheet(f"background:{color}; border-radius:3px;")
 
     def _set_steps(self, job: JobMonitorState | None) -> None:
-        """Every step it went through, with how long it took: the next one's start, or now. A job
-        with steps (a campaign) has them as its first tab, shown when it is chosen."""
+        """Show the stages a campaign went through, with how long each took."""
         steps = job.steps if job is not None else ()
-        at = self._tabs.indexOf(self._steps)
-        if bool(steps) != (at == 0):
-            self._tabs.removeTab(at)
-            at = self._tabs.insertTab(0 if steps else self._tabs.count(), self._steps, "Steps")
-        self._tabs.setTabVisible(at, bool(steps))
-        chosen = job.job_id if job is not None else None
-        if steps and chosen != getattr(self, "_steps_of", None):
-            self._tabs.setCurrentIndex(at)
-        self._steps_of = chosen if steps else None
+        self._tabs.setTabVisible(self._tabs.indexOf(self._steps), bool(steps))
         if not steps or (steps == getattr(self, "_shown_steps", None) and job.is_terminal):
             return
         self._shown_steps = steps
