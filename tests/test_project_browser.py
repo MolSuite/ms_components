@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
 from PySide6.QtCore import QEvent, Qt, QPoint, QRect
-from PySide6.QtGui import QHelpEvent, QImage, QPainter
+from PySide6.QtGui import QFontMetricsF, QHelpEvent, QImage, QPainter
 from PySide6.QtWidgets import QApplication, QStyleOptionViewItem, QToolTip, QTreeView
 
 from ms_flow.core.apps import AppManifest
@@ -226,7 +227,8 @@ def test_project_description_elides_only_when_it_exceeds_three_lines():
     painter = QPainter(image)
     delegate = ProjectRowDelegate()
     try:
-        width = painter.fontMetrics().horizontalAdvance("word word")
+        # The layout wraps at fractional advances: an integer width can be a fraction short.
+        width = math.ceil(QFontMetricsF(painter.font(), image).horizontalAdvance("word word"))
         assert delegate._description_lines("word word word word word word", painter, width) == [
             "word word", "word word", "word word",
         ]
