@@ -55,6 +55,9 @@ class JobMonitorState:
     canceling: bool = False  # canceled, waiting for its other machine to stop it there
     steps: tuple = ()  # every step its source went through, (epoch seconds, line), quick ones too
     after: tuple = ()  # the job_ids of the jobs it was submitted after: the list says which it waits for
+    task_steps: tuple = ()  # what each of its tasks does, in order, as its task says
+    chunks_per_task: int = 1  # how many chunks a task carries now
+    chunk_seconds: float | None = None  # a chunk's seconds in the tasks that ended, a moving average
     chunks_retried: int = 0
     peak_mem_mb: int = 0
     usage: dict = field(default_factory=dict)  # what it used, kept once it ended: see ms_flow's JobSnapshot.usage

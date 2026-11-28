@@ -37,6 +37,9 @@ def job_state(job, now: float) -> JobMonitorState:
         canceling=getattr(job, "canceling", False),
         steps=tuple(getattr(job, "steps", ())),
         after=tuple(getattr(job, "after", None) or ()),  # an older ms_flow does not say
+        task_steps=tuple(getattr(job, "task_steps", ())),  # ms_flow < 0.13 does not say these three
+        chunks_per_task=getattr(job, "chunks_per_task", 1),
+        chunk_seconds=getattr(job, "chunk_seconds", None),
         chunks_retried=job.chunks_retried,
         peak_mem_mb=job.peak_mem_mb,
         usage=getattr(job, "usage", None) or {},  # ms_flow < 0.8 does not keep it
