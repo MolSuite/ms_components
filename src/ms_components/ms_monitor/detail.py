@@ -1,5 +1,5 @@
 """The selected job: a header, four numbers (ETA, progress, throughput, failures), a cell per
-chunk, and its tasks in flight, failures and summary.
+chunk, and tabs: its summary, its tasks in flight, its failures, and what its tasks do.
 
 The grid shows at most `GRID_MAX` chunks of `JobMonitorState.chunk_states`, a cell each,
 column by column. Past that it is a window: when the furthest chunk that began reaches the
@@ -8,7 +8,6 @@ is said as counts above it, so the cells keep moving while the counts stay exact
 """
 from __future__ import annotations
 
-import statistics
 from datetime import datetime
 
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
@@ -42,7 +41,7 @@ from ms_components.ms_monitor.models import FailureState, JobMonitorState, TaskM
 from ms_components.ms_monitor.palette import P
 from ms_components.theme import font
 
-SLOW = 2.5  # a task that has run this many times the median of its job's tasks reads as slow
+SLOW = 2.5  # a task that has run this many times what its chunks take on average reads as slow
 GRID_MAX = 1000  # cells at most
 GRID_STEP = 500  # how far the window moves when the work reaches its end
 
@@ -399,15 +398,22 @@ class JobDetail(QWidget):
         self._tabs.setUsesScrollButtons(False)
         self._tabs.tabBar().setElideMode(Qt.ElideNone)
         self._tabs.tabBar().setExpanding(False)
-        self._tab_meta = _muted("", 11.5)
-        self._tab_meta.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._tab_meta.setContentsMargins(0, 0, 4, 2)
-        self._tabs.setCornerWidget(self._tab_meta, Qt.TopRightCorner)
         side_box.addWidget(self._tabs)
 
-        self._tasks = QTreeWidget(side)
+        # What runs, under a line of its own that says how many and how long a chunk takes: in
+        # the tab, not by the tabs, so that what changes every poll moves nothing else.
+        self._running = QWidget(side)
+        running_box = QVBoxLayout(self._running)
+        running_box.setContentsMargins(4, 6, 4, 0)
+        running_box.setSpacing(4)
+        self._tab_meta = _muted("", 11.5)
+        self._tab_meta.setTextFormat(Qt.RichText)
+        self._tab_meta.setFixedHeight(18)
+        running_box.addWidget(self._tab_meta)
+        self._tasks = QTreeWidget(self._running)
+        running_box.addWidget(self._tasks, 1)
         self._task_rows: list[tuple] = []  # what each row shows now, so a snapshot touches only what changed
-        self._tasks.setHeaderLabels(["Input", "Host", "Attempt", "Elapsed", "Progress"])
+        self._tasks.setHeaderLabels(["Input", "Chunks", "Host", "Attempt", "Elapsed", "Progress"])
         self._tasks.setRootIsDecorated(False)
         self._tasks.setUniformRowHeights(True)
         self._tasks.setFrameShape(QFrame.NoFrame)
@@ -440,9 +446,16 @@ class JobDetail(QWidget):
         self._steps.setFrameShape(QFrame.NoFrame)
         self._steps.header().setSectionResizeMode(QHeaderView.ResizeToContents)
         self._steps.header().setStretchLastSection(True)
+        self._work = QLabel(side)
+        self._work.setWordWrap(True)
+        self._work.setTextFormat(Qt.RichText)
+        self._work.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self._work.setContentsMargins(6, 8, 6, 8)
+        self._work.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._tabs.addTab(self._summary, "Summary")
-        self._tabs.addTab(self._tasks, "Running")
+        self._tabs.addTab(self._running, "Running")
         self._tabs.addTab(errors, "Errors")
+        self._tabs.addTab(self._work, "Task")
         self._tabs.addTab(self._steps, "Steps")
         self._tabs.setTabVisible(self._tabs.indexOf(self._steps), False)  # only a job whose source says its steps (a campaign)
         self._errors.currentItemChanged.connect(self._show_traceback)
@@ -469,9 +482,10 @@ class JobDetail(QWidget):
             self._show_grid(None)
             self._tasks.clear()
             self._task_rows = []
-            self._tabs.setTabText(self._tabs.indexOf(self._tasks), "Running")
+            self._tabs.setTabText(self._tabs.indexOf(self._running), "Running")
             self._tab_meta.setText("")
             self.set_failures([], 0)
+            self._set_work(None)
             self._set_summary(None)
             self._set_steps(None)
             self.show_summary()
@@ -532,10 +546,11 @@ class JobDetail(QWidget):
 
         self._show_grid(job)
         self._set_tasks(job)
+        self._set_work(job)
         self._set_summary(job)
         self._set_steps(job)
         if previous is None or (previous.job_id, previous.status) != (job.job_id, job.status):
-            self._tabs.setCurrentWidget(self._tasks if job.status == "running" else self._summary)
+            self._tabs.setCurrentWidget(self._running if job.status == "running" else self._summary)
 
     def show_summary(self) -> None:
         self._tabs.setCurrentWidget(self._summary)
@@ -614,18 +629,19 @@ class JobDetail(QWidget):
             since = job.steps[-1][0]
             tasks = [TaskMonitorState(job.note or job.steps[-1][1], host=job.executor, progress=job.progress,
                                       seconds=max(0.0, datetime.now().timestamp() - since))]
-        median = statistics.median(task.seconds for task in tasks) if len(tasks) >= 3 else None
+        each = job.chunk_seconds  # what a chunk took in the tasks that ended: None until one did
         warn = QColor(P["warn"])
         plain = self._tasks.palette().color(QPalette.ColorRole.Text)
         rows, slow = [], 0
         for task in tasks:
-            what = task.input + (f" +{task.chunks - 1}" if task.chunks > 1 else "")
-            late = median is not None and median > 0 and task.seconds > SLOW * median
+            expected = each * task.chunks if each else 0.0
+            late = expected > 0 and task.seconds > SLOW * expected
             slow += late
-            rows.append(((what, task.host or "", str(task.attempt), format_duration(task.seconds),
+            rows.append(((task.input, f"{task.chunks:,}", task.host or "", str(task.attempt), format_duration(task.seconds),
                           "—" if task.progress is None else f"{task.progress:.0f}%"),
                          warn if late else plain,
-                         f"slow: {task.seconds / median:.1f}× the median" if late else task.input))
+                         f"slow: {task.seconds / expected:.1f}× what {task.chunks:,} chunk{'s' * (task.chunks != 1)} take on average"
+                         if late else task.input))
         # Every Qt call from Python waits for the GIL, which the engine's threads keep busy on a
         # big machine: rewrite only the cells that changed (mostly just the elapsed time).
         while self._tasks.topLevelItemCount() > len(rows):
@@ -635,23 +651,39 @@ class JobDetail(QWidget):
         before = self._task_rows
         for at, (texts, color, tip) in enumerate(rows):
             item = self._tasks.topLevelItem(at)
-            old_texts, old_color, old_tip = before[at] if at < len(before) else ((None,) * 5, None, None)
+            old_texts, old_color, old_tip = before[at] if at < len(before) else ((None,) * 6, None, None)
             for column, (text, old_text) in enumerate(zip(texts, old_texts)):
                 if text != old_text:
                     item.setText(column, text)
             if color != old_color:
-                for column in range(5):
+                for column in range(6):
                     item.setForeground(column, color)
             if tip != old_tip:
                 item.setToolTip(0, tip)
         self._task_rows = rows
-        self._tabs.setTabText(self._tabs.indexOf(self._tasks), f"Running  {len(tasks)}" if tasks else "Running")
-        said = [f"{len(tasks)} running"] if tasks else []
-        if median is not None:
-            said.append(f"median {format_duration(median)}")
+        self._tabs.setTabText(self._tabs.indexOf(self._running), f"Running  {len(tasks)}" if tasks else "Running")
+        carried = sum(task.chunks for task in tasks)
+        said = [f"{len(tasks):,} task{'s' * (len(tasks) != 1)}" + (f" · {carried:,} chunks" if carried != len(tasks) else "")] if tasks else []
+        if each:
+            said.append(f"a chunk ≈ {_took(each)} (moving average of the tasks that ended)")
         if slow:
             said.append(f"<span style='color:{warn.name()}'>⚠ {slow} slow</span>")
         self._tab_meta.setText(" · ".join(said))
+
+    def _set_work(self, job: JobMonitorState | None) -> None:
+        """What each task of the job does, as its task says, and how its chunks travel."""
+        text = ""
+        if job is not None:
+            many = job.chunks_per_task
+            text = (f"<p><b>A task</b> carries {many:,} chunk{'s' * (many != 1)}"
+                    + (": short chunks share one, so handing them out costs little" if many > 1 else "") + ".")
+            if job.chunk_seconds:
+                text += f"<br>A chunk takes ≈ {_took(job.chunk_seconds)} in its worker (moving average of the tasks that ended)."
+            text += "</p>" + ("<p><b>Each chunk goes through</b></p><ol>" + "".join(f"<li>{_html(step)}</li>" for step in job.task_steps)
+                              + "</ol>" if job.task_steps else
+                              "<p style='color:palette(placeholder-text)'>Its task does not say its steps.</p>")
+        if text != self._work.text():
+            self._work.setText(text)
 
     def _set_failed_kpi(self) -> None:
         job = self._job
@@ -779,6 +811,10 @@ def _queue_used(queue: dict, memory: str) -> tuple[str, str, str]:
 
 
 __all__ = ["ChunkGrid", "GRID_MAX", "GRID_STEP", "JobDetail", "counts", "grid_window", "layout_cells", "reason"]
+
+
+def _html(text: str) -> str:
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _took(seconds: float) -> str:

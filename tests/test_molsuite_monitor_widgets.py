@@ -99,18 +99,24 @@ def test_the_detail_shows_the_numbers_the_tasks_and_the_failures_grouped():
     detail = JobDetail()
     tasks = [TaskMonitorState(input=f"lig{i}", seconds=10, host="pc2") for i in range(3)]
     tasks.append(TaskMonitorState(input="slow", seconds=60, progress=40.0, host="pc3"))
+    tasks.append(TaskMonitorState(input="packed", chunks=8, seconds=60, host="pc4"))  # 8 chunks: not slow at 60 s
     detail.set_job(_job(chunks_total=8, chunks_done=2, chunks_failed=1, chunks_running=4, throughput_eps=0.5,
-                        tasks=tasks, chunk_states=bytes([2, 2, 3, 1, 1, 1, 1])))
+                        tasks=tasks, chunk_states=bytes([2, 2, 3, 1, 1, 1, 1]), chunk_seconds=10.0,
+                        task_steps=("read the shard", "prepare <each>")))
 
     assert detail._left.value.text() == "10s"
     assert detail._progress.value.text() == "2 / 8" and detail._pct.text() == "38%" and "1 pending" in detail._legend.text()
     assert detail._bar.parts == (2, 4, 1, 1) and (detail._speed.value.text(), detail._speed.unit.text()) == ("30.0", "chunks/min")
     assert detail._grid.isVisibleTo(detail) and detail._grid.cells == bytes([2, 2, 3, 1, 1, 1, 1, 0])
-    assert detail._tabs.tabText(detail._tabs.indexOf(detail._tasks)) == "Running  4"
-    assert "1 slow" in detail._tab_meta.text()
+    assert detail._tabs.tabText(detail._tabs.indexOf(detail._running)) == "Running  5"
+    # what a chunk takes over the tasks that ended, times the chunks a task carries, says which is slow
+    assert "1 slow" in detail._tab_meta.text() and "12 chunks" in detail._tab_meta.text() and "10.0s" in detail._tab_meta.text()
     slow = detail._tasks.topLevelItem(3)
-    assert (slow.text(1), slow.text(4)) == ("pc3", "40%") and slow.toolTip(0).startswith("slow:")
+    assert (slow.text(2), slow.text(5)) == ("pc3", "40%") and slow.toolTip(0).startswith("slow:")
     assert not detail._tasks.topLevelItem(0).toolTip(0).startswith("slow:")
+    assert detail._tasks.topLevelItem(4).text(1) == "8" and not detail._tasks.topLevelItem(4).toolTip(0).startswith("slow:")
+    work = detail._work.text()
+    assert "<li>read the shard</li>" in work and "prepare &lt;each&gt;" in work and "1 chunk." in work
 
     other = TRACEBACK.replace("bad ligand", "no atoms")
     detail.set_failures([FailureState(1, TRACEBACK, "a"), FailureState(2, TRACEBACK, "b"), FailureState(1, other, "c")], 5)
@@ -141,21 +147,21 @@ def test_a_campaign_keeps_summary_first_and_shows_steps_and_queue_progress():
     campaign = _job(job_id=key, executor="hpc", steps=((now - 60, "sending its files"), (now - 20, "running in the queue")),
                     note="running in the queue (42): 3 of 8 done", progress=37.5)
     detail.set_job(_job())
-    assert detail._tabs.widget(0) is detail._summary and detail._tabs.currentWidget() is detail._tasks
+    assert detail._tabs.widget(0) is detail._summary and detail._tabs.currentWidget() is detail._running
     assert not detail._tabs.isTabVisible(detail._tabs.indexOf(detail._steps))
     detail.set_job(campaign)
-    assert detail._tabs.widget(0) is detail._summary and detail._tabs.currentWidget() is detail._tasks
+    assert detail._tabs.widget(0) is detail._summary and detail._tabs.currentWidget() is detail._running
     assert detail._tabs.isTabVisible(detail._tabs.indexOf(detail._steps))
     assert detail._steps.topLevelItemCount() == 2
     row = detail._tasks.topLevelItem(0)
-    assert detail._tasks.topLevelItemCount() == 1 and row.text(0) == campaign.note and row.text(4) == "38%"
-    assert detail._tabs.tabText(detail._tabs.indexOf(detail._tasks)) == "Running  1"
+    assert detail._tasks.topLevelItemCount() == 1 and row.text(0) == campaign.note and row.text(5) == "38%"
+    assert detail._tabs.tabText(detail._tabs.indexOf(detail._running)) == "Running  1"
     assert detail._fact["key"].text() == "c5062d49…" and detail._fact["key"].toolTip() == key
     detail._tabs.setCurrentWidget(detail._errors_tab)
     detail.set_job(campaign)  # a poll of the same one keeps the tab chosen
     assert detail._tabs.currentWidget() is detail._errors_tab
     detail.set_job(_job())
-    assert detail._tabs.widget(0) is detail._summary and detail._tabs.currentWidget() is detail._tasks
+    assert detail._tabs.widget(0) is detail._summary and detail._tabs.currentWidget() is detail._running
     assert not detail._tabs.isTabVisible(detail._tabs.indexOf(detail._steps))
 
 
@@ -165,7 +171,7 @@ def test_tab_focus_follows_the_jobs_start_and_end_without_stealing_focus_on_poll
     detail.set_job(_job(status="waiting"))
     assert detail._tabs.currentWidget() is detail._summary
     detail.set_job(_job(status="running"))
-    assert detail._tabs.currentWidget() is detail._tasks
+    assert detail._tabs.currentWidget() is detail._running
     detail._tabs.setCurrentWidget(detail._errors_tab)
     detail.set_job(_job(status="running", progress=90.0))
     assert detail._tabs.currentWidget() is detail._errors_tab
@@ -220,7 +226,7 @@ def test_opening_monitor_focuses_running_work_but_polling_keeps_manual_selection
     widget.show()
     app.processEvents()
     try:
-        assert widget._detail._tabs.currentWidget() is widget._detail._tasks
+        assert widget._detail._tabs.currentWidget() is widget._detail._running
         widget._jobs_view.select_job("completed")
         widget.update_snapshot(snapshot)
         assert widget._selected_job_id() == "completed"
