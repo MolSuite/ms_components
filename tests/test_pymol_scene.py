@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -10,6 +11,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QWidget
 from ms_components.ms_pymol import (
     PymolSceneContext,
     add_scene_actions,
+    clear_scene,
     install_scene_memory,
     is_interacting,
     prepare_scene,
@@ -135,6 +137,33 @@ def test_a_replacing_scene_clears_everything():
     dock.cmd.objects.update({"a": 1})
     prepare_scene(dock, "b")
     assert dock.cmd.calls == [("delete", "all")] and not dock.cmd.objects
+
+
+def test_clearing_the_scene_resets_its_context_without_replaying_a_style():
+    _app()
+    dock = _Dock()
+    applied = []
+    dock.control_bar = SimpleNamespace(apply_preset=applied.append)
+    memory = install_scene_memory(dock)
+    memory.keep_style = True
+    dock.cmd.objects["lig"] = 0
+    set_scene_context(dock, "ligand", target="lig", selections={"ligand": "lig"})
+    memory.preset_applied("app.ligand")
+    memory.eventFilter(dock.pymol_widget, QEvent(QEvent.MouseButtonRelease))
+    remembered = dict(memory.cache)
+
+    clear_scene(dock)
+
+    assert ("delete", "all") in dock.cmd.calls and not dock.cmd.objects
+    context = dock.scene_context
+    assert (context.kind, context.target, context.selections) == ("generic", "all", {})
+    assert (memory.key, memory.kind) == ("", "")
+    assert not applied
+    # The molecule's style and camera survive, and a later view change is not stored for it.
+    dock.cmd.view = (9.0, 9.0, 9.0)
+    memory.eventFilter(dock.pymol_widget, QEvent(QEvent.MouseButtonRelease))
+    assert memory.cache == remembered
+    assert memory.style_by_kind["ligand"].preset == "app.ligand"
 
 
 def test_scene_menu_lists_its_sections():

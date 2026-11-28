@@ -100,6 +100,7 @@ REPRESENTATIONS = (
 )
 
 _TOOLBAR_ICONS = Path(__file__).parent / "icons"
+_HIDDEN_HYDROGENS = "_ms_hidden_hydrogens"
 COMPARISON_COLORS = (
     "orange", "tv_green", "cyan", "magenta", "yellow",
     "salmon", "violet", "lime", "deepteal", "hotpink",
@@ -131,6 +132,8 @@ class PymolPresetSpec:
     contexts: frozenset[str] = field(default_factory=frozenset)
     tooltip: str = ""
     per_grid_slot: bool = False
+    # Labels always use the slot palette. A preset can supply its own molecular colors.
+    use_comparison_colors: bool = True
 
     def supports(self, context_kind: str) -> bool:
         return not self.contexts or str(context_kind) in self.contexts
@@ -140,8 +143,12 @@ def _builtin_preset(method_name: str):
     def apply(cmd, context: PymolSceneContext) -> None:
         from pymol import preset
 
-        method = getattr(preset, method_name)
-        method(str(context.target or "all"), _self=cmd)
+        target = str(context.target or "all")
+        getattr(preset, method_name)(target, _self=cmd)
+        if method_name == "ligand_sites":
+            # PyMOL ignores surface-exclusion flags when every atom in an object is flagged.
+            # A separately loaded ligand therefore needs its surface explicitly hidden.
+            cmd.hide("surface", f"({target}) and {preset.lig_sele}")
 
     return apply
 
@@ -159,6 +166,7 @@ class PymolControlBar(QFrame):
 
     selection_mode_changed = Signal(int)
     preset_applied = Signal(str)
+    representation_applied = Signal(str)
     command_failed = Signal(str)
 
     def __init__(self, cmd, parent: QWidget | None = None):
@@ -168,6 +176,7 @@ class PymolControlBar(QFrame):
         self._grid_label_objects: set[str] = set()
         self._preset_objects: set[str] = set()
         self._comparison_layout = "grid"
+        self._use_comparison_colors = True
         self._hydrogen_mode = "polar"
         self._presets: dict[str, PymolPresetSpec] = {}
         self.setObjectName("PymolControlBar")
@@ -545,10 +554,14 @@ class PymolControlBar(QFrame):
                 default_preset=str(default_preset or "").strip(),
                 grid_labels=dict(grid_labels or {}),
             )
-        was_comparison = self._context.is_comparison
+        previous = self._context
+        if (previous.kind, previous.target, previous.selections) != (
+            normalized.kind, normalized.target, normalized.selections,
+        ):
+            self._use_comparison_colors = True
         self._context = normalized
         self.comparison_menu.menuAction().setVisible(normalized.is_comparison)
-        if was_comparison or normalized.is_comparison:
+        if previous.is_comparison or normalized.is_comparison:
             self._run_command("Grid labels", self._sync_grid_labels)
         self.apply_hydrogen_visibility()
         self.refresh_context_label()
@@ -575,7 +588,9 @@ class PymolControlBar(QFrame):
         for value, action in self._comparison_layout_actions.items():
             action.setChecked(value == self._comparison_layout)
 
-    def _sync_grid_labels(self, *, color_objects: bool = True) -> None:
+    def _sync_grid_labels(self, *, color_objects: bool | None = None) -> None:
+        if color_objects is None:
+            color_objects = self._use_comparison_colors
         labels = dict(self._context.grid_labels)
         if self._context.is_comparison:
             self._cmd.set("grid_mode", int(self._comparison_layout == "grid"))
@@ -699,13 +714,22 @@ class PymolControlBar(QFrame):
             if spec.supports(kind)
         ]
 
-    def active_target(self) -> str:
+    def _active_selection_count(self) -> int:
         if self._cmd is not None:
             try:
-                if int(self._cmd.count_atoms("sele") or 0) > 0:
-                    return "sele"
+                # PyMOL deselects by disabling the selection while retaining its atoms.
+                if "sele" in self._cmd.get_names("selections", enabled_only=1):
+                    return int(self._cmd.count_atoms("sele") or 0)
             except Exception:
                 pass
+        return 0
+
+    def active_target(self) -> str:
+        if self._active_selection_count() > 0:
+            return "sele"
+        return self._scene_target()
+
+    def _scene_target(self) -> str:
         return str(self._context.target or "all").strip() or "all"
 
     def zoom_active(self) -> None:
@@ -726,28 +750,39 @@ class PymolControlBar(QFrame):
             lambda: self._cmd.center(self.active_target()),
         )
 
-    def apply_representation(self, representation: str) -> None:
+    def apply_representation(self, representation: str, *, use_selection: bool = True) -> None:
         normalized = str(representation or "").strip().lower()
         if normalized not in {value for _label, value in REPRESENTATIONS}:
             raise ValueError(f"Unsupported PyMOL representation: {representation}")
-        target = self.active_target()
+        target = self.active_target() if use_selection else self._scene_target()
 
         def apply() -> None:
             self._cmd.hide("everything", target)
             self._cmd.show(normalized, target)
+            self._restore_hidden_hydrogens(target)
             self.apply_hydrogen_visibility()
 
-        self._run_command(f"Display {normalized}", apply)
+        if self._run_command(f"Display {normalized}", apply) and target != "sele":
+            self.representation_applied.emit(normalized)
 
     def hide_representation(self, representation: str) -> None:
         normalized = str(representation or "").strip().lower()
         valid = {"everything", *(value for _label, value in REPRESENTATIONS)}
         if normalized not in valid:
             raise ValueError(f"Unsupported PyMOL representation: {representation}")
-        self._run_command(
-            f"Hide {normalized}",
-            lambda: self._cmd.hide(normalized, self.active_target()),
-        )
+        def apply() -> None:
+            target = self.active_target()
+            self._cmd.hide(normalized, target)
+            if normalized == "everything":
+                # Keep explicit hides through redraws and hydrogen-mode changes. PyMOL
+                # tracks the selected atom identities as objects are replaced or removed.
+                self._cmd.select(_HIDDEN_HYDROGENS, f"({target}) and hydro", enable=0, merge=1)
+
+        self._run_command(f"Hide {normalized}", apply)
+
+    def _restore_hidden_hydrogens(self, target: str) -> None:
+        if _HIDDEN_HYDROGENS in self._cmd.get_names("selections"):
+            self._cmd.select(_HIDDEN_HYDROGENS, f"?{_HIDDEN_HYDROGENS} and not ({target})", enable=0)
 
     def toggle_hydrogens(self) -> None:
         previous = self._hydrogen_mode
@@ -778,9 +813,20 @@ class PymolControlBar(QFrame):
         # reading of which residues are the small molecules.
         polar = "hydro and neighbor (elem N+O+S) and organic"
         shown = {"none": "", "all": "hydro", "polar": polar}[self._hydrogen_mode]
+        if shown:
+            shown = f"({shown}) and not ?{_HIDDEN_HYDROGENS}"
         hidden = {"none": "hydro", "all": "", "polar": f"hydro and not ({polar})"}[self._hydrogen_mode]
 
         def apply() -> None:
+            # A hidden H can still shape the surface, leaving a hole where its faces are culled.
+            # Build heavy-atom surfaces while keeping PyMOL's existing ignore flags on other atoms.
+            # PyMOL's selection language uses the flag number (25 is "ignore").
+            surface_h = "(byobject (enabled and not hydro and rep surface)) and hydro and not flag 25"
+            objects = self._cmd.get_object_list(surface_h)
+            if objects:
+                self._cmd.flag("ignore", surface_h, "set")
+                for obj in objects:
+                    self._cmd.rebuild(obj, "surface")
             if hidden and self._cmd.count_atoms(f"({hidden}) and visible"):
                 self._cmd.hide("everything", hidden)
             if shown and self._cmd.count_atoms(f"({shown}) and not rep sticks"):
@@ -807,12 +853,7 @@ class PymolControlBar(QFrame):
         self.context_label.setToolTip("\n".join([*context_lines, *details]))
 
     def _active_selection_summary(self) -> tuple[str, list[str]]:
-        if self._cmd is None:
-            return "", []
-        try:
-            atom_count = int(self._cmd.count_atoms("sele") or 0)
-        except Exception:
-            return "", []
+        atom_count = self._active_selection_count()
         if atom_count <= 0:
             return "", []
         residues: set[tuple[str, str, str]] = set()
@@ -879,9 +920,14 @@ class PymolControlBar(QFrame):
                         associate_scene_objects(self._cmd, [name], reference=objects[0])
             else:
                 spec.callback(self._cmd, self._context)
+            # A preset can leave parts of the target hidden.
+            self._restore_hidden_hydrogens(
+                f"({self._context.target}) and (visible or neighbor (visible and not hydro))"
+            )
             self.apply_hydrogen_visibility()
             if self._context.is_comparison:
-                self._sync_grid_labels()
+                self._sync_grid_labels(color_objects=spec.use_comparison_colors)
+                self._use_comparison_colors = spec.use_comparison_colors
 
         if self._run_command(spec.label, apply):
             self.preset_applied.emit(normalized_key)
@@ -894,13 +940,13 @@ class PymolControlBar(QFrame):
             ("pymol.pretty", "PyMOL · Pretty", "pretty"),
             ("pymol.publication", "PyMOL · Publication", "publication"),
             # The rest of PyMOL's Actions > Preset menu.
-            ("pymol.simple_no_solvent", "PyMOL · Simple (no solvent)", "simple_no_solvent"),
+            ("pymol.simple_no_solvent", "PyMOL · Simple (no solvent)", "simple_no_solv"),
             ("pymol.b_factor_putty", "PyMOL · B-factor Putty", "b_factor_putty"),
             ("pymol.technical", "PyMOL · Technical", "technical"),
             ("pymol.ligand_cartoon", "PyMOL · Ligand Sites (cartoon)", "ligand_cartoon"),
-            ("pymol.ligands", "PyMOL · Ligand Sites (surface)", "ligands"),
+            ("pymol.ligands", "PyMOL · Ligand Sites (surface)", "ligand_sites"),
             ("pymol.pretty_solv", "PyMOL · Pretty (solvent)", "pretty_solv"),
-            ("pymol.protein_interface", "PyMOL · Protein Interface", "protein_interface"),
+            ("pymol.protein_interface", "PyMOL · Protein Interface", "interface"),
         ):
             self._presets[key] = PymolPresetSpec(
                 key=key,

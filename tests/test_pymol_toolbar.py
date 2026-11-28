@@ -20,6 +20,7 @@ class FakeCmd:
     def __init__(self):
         self.selection_mode = 1
         self.selected_atoms = 0
+        self.selection_enabled = True
         self.hydrogens_visible = True
         self.selected_residues: set[tuple[str, str, str]] = set()
         self.calls: list[tuple] = []
@@ -28,7 +29,12 @@ class FakeCmd:
         assert name == "mouse_selection_mode"
         return self.selection_mode
 
-    def get_names(self, _kind):
+    def get_names(self, kind, enabled_only=0):
+        if kind == "selections" and self.selected_atoms and (self.selection_enabled or not enabled_only):
+            return ["sele"]
+        return []
+
+    def get_object_list(self, _selection):
         return []
 
     def count_atoms(self, selection):
@@ -57,8 +63,7 @@ class FakeCmd:
         self.calls.append(("png", filename, kwargs))
 
     def deselect(self):
-        self.selected_atoms = 0
-        self.selected_residues.clear()
+        self.selection_enabled = False
         self.calls.append(("deselect",))
 
     def iterate(self, selection, _expression, *, space):
@@ -113,12 +118,13 @@ def test_hydrogen_action_cycles_global_modes_despite_a_selection():
     bar.set_scene_context("ligand", target="ligand_7")
 
     cmd.selected_atoms = 4
+    polar = "(hydro and neighbor (elem N+O+S) and organic) and not ?_ms_hidden_hydrogens"
     assert bar.hydrogens_action.isCheckable()
     assert bar.hydrogens_action.isChecked()
     assert bar.hydrogens_action.data() == "polar"
     assert "polar" in bar.hydrogens_action.toolTip()
     polar_icon = bar._toolbar_action_icons[bar.hydrogens_action]
-    assert cmd.calls[-1] == ("show", "sticks", "hydro and neighbor (elem N+O+S) and organic")
+    assert cmd.calls[-1] == ("show", "sticks", polar)
     bar.hydrogens_action.trigger()
     assert not bar.hydrogens_action.isChecked()
     assert bar.hydrogens_action.data() == "none"
@@ -126,7 +132,7 @@ def test_hydrogen_action_cycles_global_modes_despite_a_selection():
     bar.hydrogens_action.trigger()
     assert bar.hydrogens_action.isChecked()
     assert bar.hydrogens_action.data() == "all"
-    assert cmd.calls[-1] == ("show", "sticks", "hydro")
+    assert cmd.calls[-1] == ("show", "sticks", "(hydro) and not ?_ms_hidden_hydrogens")
     all_icon = bar._toolbar_action_icons[bar.hydrogens_action]
     bar.hydrogens_action.trigger()
     assert bar.hydrogens_action.isChecked()
@@ -134,7 +140,7 @@ def test_hydrogen_action_cycles_global_modes_despite_a_selection():
     assert "polar" in bar.hydrogens_action.toolTip()
     assert bar._toolbar_action_icons[bar.hydrogens_action] != all_icon
     assert bar._toolbar_action_icons[bar.hydrogens_action] == polar_icon
-    assert cmd.calls[-1] == ("show", "sticks", "hydro and neighbor (elem N+O+S) and organic")
+    assert cmd.calls[-1] == ("show", "sticks", polar)
     bar.close()
 
 
@@ -211,6 +217,10 @@ def test_pymol_toolbar_summarizes_selected_residues_in_the_context_label():
 
     bar.clear_selection()
     assert ("deselect",) in cmd.calls
+    assert cmd.count_atoms("sele") == 12
+    assert bar.active_target() == "receptor_7"
+    assert bar.context_label.text() == "Receptor · receptor_7"
+    assert "Selected residues:" not in bar.context_label.toolTip()
 
 
 def test_pymol_toolbar_uses_menu_actions_and_hover_overflow():

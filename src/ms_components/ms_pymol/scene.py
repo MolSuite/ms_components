@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 from collections import OrderedDict
 from collections.abc import Callable
+from dataclasses import dataclass, replace
 
 from PySide6.QtCore import QEvent, QObject, QTimer
 from PySide6.QtGui import QAction
@@ -126,8 +127,15 @@ def set_additive(dock, additive: bool) -> None:
 
 
 def clear_scene(dock) -> None:
+    """Empty the viewer and reset its active context while retaining molecule history."""
     dock.cmd.delete("all")
     dock._scene_replaced_slots = {}
+    memory = getattr(dock, "scene_memory", None)
+    if memory is not None:
+        memory.clear_active_scene()
+    setter = getattr(dock, "set_scene_context", None)
+    if callable(setter):
+        setter("generic", target="all", selections=None, default_preset="", grid_labels=None)
 
 
 def prepare_scene(dock, *objects: str) -> None:
@@ -213,42 +221,63 @@ def set_scene_context(
 VIEW_CACHE_LIMIT = 20
 
 
+@dataclass(frozen=True)
+class _SceneStyle:
+    preset: str = ""
+    representation: str = ""
+
+
 class SceneMemory(QObject):
     def __init__(self, dock) -> None:
         super().__init__(dock if isinstance(dock, QObject) else None)
         self._dock = dock
         self.cache: OrderedDict[str, dict] = OrderedDict()
-        self.style_by_kind: dict[str, str] = {}
+        self.style_by_kind: dict[str, _SceneStyle] = {}
         self.key = ""
         self.kind = ""
         self.keep_style = False
         self.interacting = False  # a mouse button is down on the canvas
         self._wheel_pending = False
 
+    def clear_active_scene(self) -> None:
+        self.key = ""
+        self.kind = ""
+        self.interacting = False
+
     def apply(self, kind: str, target: str, selections: dict[str, str] | None, *, restore_view: bool = True) -> None:
         kind = str(kind or "generic")
         sel = "|".join(f"{k}={v}" for k, v in sorted((selections or {}).items()))
         self.key, self.kind = f"{kind}::{target or 'all'}::{sel}", kind
-        entry = self.cache.get(self.key)
-        if entry is not None:
+        entry = self.cache.get(self.key, {})
+        if entry:
             self.cache.move_to_end(self.key)
-            if entry.get("preset"):
-                self._apply_preset(entry["preset"])
-            if restore_view and entry.get("view") is not None:
-                try:
-                    self._dock.cmd.set_view(entry["view"])  # last, over any preset zoom
-                except Exception:
-                    pass
-        elif self.keep_style and self.style_by_kind.get(kind):
-            self._apply_preset(self.style_by_kind[kind])
+        style = entry.get("style")
+        if style is None and self.keep_style:
+            style = self.style_by_kind.get(kind)
+        if style is not None:
+            if style.preset:
+                self._apply_preset(style.preset)
+            if style.representation:
+                self._dock.control_bar.apply_representation(style.representation, use_selection=False)
+        if restore_view and entry.get("view") is not None:
+            try:
+                self._dock.cmd.set_view(entry["view"])  # last, over any preset zoom
+            except Exception:
+                pass
 
     def preset_applied(self, key: str) -> None:
-        if not key:
-            return
+        if key:
+            self._remember_style(_SceneStyle(preset=key))
+
+    def representation_applied(self, representation: str) -> None:
+        style = self.cache.get(self.key, {}).get("style", _SceneStyle())
+        self._remember_style(replace(style, representation=representation))
+
+    def _remember_style(self, style: _SceneStyle) -> None:
         if self.kind:
-            self.style_by_kind[self.kind] = key
+            self.style_by_kind[self.kind] = style
         if self.key:
-            self._store(preset=key)
+            self._store(style=style)
 
     def remember_view(self) -> None:
         cmd = getattr(self._dock, "cmd", None)
@@ -296,6 +325,8 @@ def install_scene_memory(dock) -> SceneMemory:
     bar = getattr(dock, "control_bar", None)
     if getattr(bar, "preset_applied", None) is not None:
         bar.preset_applied.connect(memory.preset_applied)
+    if getattr(bar, "representation_applied", None) is not None:
+        bar.representation_applied.connect(memory.representation_applied)
     if hasattr(bar, "add_action"):
         keep = bar.add_action(
             "Keep style", icon_name="style.svg", checkable=True,

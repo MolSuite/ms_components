@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -10,6 +11,7 @@ import pytest
 from PySide6.QtWidgets import QApplication
 
 from ms_components.ms_pymol import COMPARISON_COLORS, PymolControlBar, PymolPresetSpec, PymolSceneContext
+from ms_components.ms_pymol import install_scene_memory, set_scene_context
 
 
 def test_preset_interactions_stay_in_each_complex_panel(grid_scene):
@@ -63,6 +65,109 @@ def grid_scene():
         yield bar, cmd
         bar.close()
         app.processEvents()
+
+
+def test_toolbar_uses_only_an_enabled_canvas_selection(grid_scene):
+    bar, cmd = grid_scene
+    target = "rec_7 or rec_9"
+    bar.set_scene_context("generic", target=target)
+    cmd.select("saved", "lig_7")
+    cmd.select("sele", "rec_7", enable=1)
+    bar.apply_representation("spheres")
+    assert cmd.count_atoms("rec_7 and rep spheres") == 1
+    assert cmd.count_atoms("rec_9 and rep spheres") == 0
+
+    next(action for action in bar.selection_mode_action.menu().actions()
+         if action.text() == "Clear selection").trigger()
+    assert "sele" not in cmd.get_names("selections", enabled_only=1)
+    assert cmd.count_atoms("sele") == cmd.count_atoms("saved") == 1
+    bar.apply_representation("sticks")
+    assert cmd.count_atoms(f"({target}) and rep sticks") == 2
+    assert "Selected residues:" not in bar.context_label.toolTip()
+
+    cmd.select("sele", "rec_9", enable=1)
+    assert bar.active_target() == "sele"
+    cmd.disable("sele")
+    assert bar.active_target() == target
+
+
+def test_scene_memory_keeps_whole_scene_display_changes(grid_scene):
+    bar, cmd = grid_scene
+    dock = SimpleNamespace(control_bar=bar, cmd=cmd, set_scene_context=bar.set_scene_context)
+    memory = install_scene_memory(dock)
+    preset = PymolPresetSpec(
+        key="test.sticks", label="Test sticks",
+        callback=lambda cmd, context: cmd.show_as("sticks", context.target),
+    )
+    bar.register_preset(preset)
+
+    def open_scene(kind, target):
+        cmd.show_as("lines", target)
+        set_scene_context(dock, kind, target=target)
+
+    open_scene("generic", "lig_9")
+    memory.remember_view()
+    open_scene("generic", "lig_7")
+    bar.apply_preset(preset.key)
+    bar.apply_representation("spheres")
+    cmd.select("sele", "lig_7", enable=1)
+    bar.apply_representation("dots")
+    assert cmd.count_atoms("lig_7 and rep dots") == 1
+
+    memory.keep_style_action.setChecked(True)
+    open_scene("generic", "lig_9")
+    assert cmd.count_atoms("lig_9 and rep spheres") == 1
+    assert cmd.count_atoms("lig_7 and rep dots") == 1
+    open_scene("other", "rec_7")
+    assert cmd.count_atoms("rec_7 and rep lines") == 1
+
+    memory.keep_style_action.setChecked(False)
+    open_scene("generic", "rec_9")
+    assert cmd.count_atoms("rec_9 and rep lines") == 1
+    open_scene("generic", "lig_9")
+    bar.apply_preset(preset.key)
+    open_scene("generic", "lig_7")
+    assert cmd.count_atoms("lig_7 and rep spheres") == 1
+    open_scene("generic", "lig_9")
+    assert cmd.count_atoms("lig_9 and rep sticks") == 1
+    assert cmd.count_atoms("lig_9 and rep spheres") == 0
+
+
+@pytest.mark.parametrize(("key", "target", "shown", "hidden"), [
+    ("pymol.simple_no_solvent", "all", ("polymer.protein and rep ribbon",), ("solvent and visible",)),
+    ("pymol.ligands", "all",
+     ("protein_a and rep surface", "ligand and rep sticks"),
+     ("ligand and rep surface", "distant_protein and rep surface")),
+    ("pymol.protein_interface", "polymer.protein",
+     ("protein_a and rep sticks", "protein_b and rep sticks", "distant_protein and rep cartoon"),
+     ("distant_protein and rep sticks",)),
+])
+def test_builtin_preset_menu_applies_the_expected_native_view(grid_scene, key, target, shown, hidden):
+    bar, cmd = grid_scene
+    cmd.delete("all")
+    for obj, chain, x in (("protein_a", "A", 0), ("protein_b", "B", 3), ("distant_protein", "C", 25)):
+        cmd.fragment("ala", obj)
+        cmd.alter(obj, f"chain={chain!r}")
+        cmd.translate((x, 0, 0), obj, camera=0)
+    cmd.fragment("gly", "ligand")
+    cmd.alter("ligand", "resn='LIG';hetatm=1")
+    cmd.translate((0, 3, 0), "ligand", camera=0)
+    cmd.sort()
+    cmd.pseudoatom("water", resn="HOH", name="O", elem="O", pos=(0, 6, 0), hetatm=1)
+    cmd.show("nonbonded", "water")
+    assert cmd.count_atoms("solvent and visible") == 1
+
+    bar.set_scene_context("generic", target=target)
+    applied, errors = [], []
+    bar.preset_applied.connect(applied.append)
+    bar.command_failed.connect(errors.append)
+    next(action for action in bar.preset_menu.actions() if action.data() == key).trigger()
+    assert not errors
+    assert applied == [key]
+    for selection in shown:
+        assert cmd.count_atoms(selection) > 0, selection
+    for selection in hidden:
+        assert cmd.count_atoms(selection) == 0, selection
 
 
 @pytest.mark.parametrize("clicks", [0, 1, 2])
@@ -119,6 +224,59 @@ def test_hydrogen_modes_apply_globally_and_to_new_systems(grid_scene, clicks, mo
     monkeypatch.setattr(cmd, "show", lambda *args: calls.append(args))
     assert bar.apply_hydrogen_visibility()
     assert calls == []  # Repeated renders must not invalidate PyMOL's scene again.
+
+
+def test_surfaces_exclude_hydrogens_without_disabling_their_sticks(grid_scene, monkeypatch):
+    bar, cmd = grid_scene
+    cmd.fragment("ala", "receptor")
+    cmd.fragment("gly", "other")
+    cmd.flag("ignore", "receptor and name O", "set")
+    cmd.show("surface", "receptor and name CA")
+    hydrogens = cmd.count_atoms("receptor and hydro")
+    assert hydrogens > 0
+    assert bar.apply_hydrogen_visibility()
+    assert cmd.count_atoms("receptor and hydro and flag 25") == hydrogens
+    assert cmd.count_atoms("receptor and not hydro and flag 25") == 1
+    assert cmd.count_atoms("other and hydro and flag 25") == 0
+    assert cmd.count_atoms("receptor and hydro and visible") == 0
+
+    bar.hydrogens_action.trigger()  # hidden
+    bar.hydrogens_action.trigger()  # all as sticks
+    assert cmd.count_atoms("receptor and hydro and rep sticks") == hydrogens
+    assert cmd.count_atoms("receptor and hydro and flag 25") == hydrogens
+    assert cmd.count_atoms("receptor and name CA and rep surface") == 1
+
+    calls = []
+    monkeypatch.setattr(cmd, "flag", lambda *args: calls.append(args))
+    monkeypatch.setattr(cmd, "rebuild", lambda *args: calls.append(args))
+    assert bar.apply_hydrogen_visibility()
+    assert calls == []
+
+
+@pytest.mark.parametrize("picked", [False, True], ids=["whole-scene", "single-hydrogen"])
+def test_hide_everything_stays_hidden_until_displayed(grid_scene, picked):
+    bar, cmd = grid_scene
+    cmd.delete("all")
+    cmd.fragment("ser", "ligand")
+    cmd.alter("ligand", "resn='LIG';hetatm=1")
+    cmd.sort("ligand")
+    cmd.show_as("sticks", "ligand")
+    bar.set_scene_context("generic", target="ligand")
+    if picked:
+        cmd.select("sele", "first (hydro and visible)", enable=1)
+    target = bar.active_target()
+    visible_before = cmd.count_atoms(f"({target}) and hydro and visible")
+    assert visible_before > 0
+
+    bar.hide_representation("everything")
+    assert bar.apply_hydrogen_visibility()
+    assert cmd.count_atoms(f"({target}) and visible") == 0
+    assert bar.active_target() == target
+    if picked:
+        assert cmd.count_atoms("ligand and not sele and hydro and visible") > 0
+
+    bar.apply_representation("sticks")
+    assert cmd.count_atoms(f"({target}) and hydro and visible") == visible_before
 
 
 def _labels(cmd, obj):
@@ -352,6 +510,41 @@ def test_presets_keep_comparison_colors_and_the_overlay_layout(grid_scene):
     assert cmd.get_setting_int("grid_mode") == 0
     assert cmd.get("cartoon_color", "rec_9") == COMPARISON_COLORS[2]
     assert cmd.get("label_color", "panel_text3") == COMPARISON_COLORS[2]
+
+
+def test_comparison_preserves_preset_colors_through_layout_and_label_changes(grid_scene):
+    bar, cmd = grid_scene
+    bar.set_scene_context("comparison", grid_labels={1: "First", 3: "Second"})
+    bar.register_preset(PymolPresetSpec(
+        key="test.custom_colors",
+        label="Custom colors",
+        callback=lambda cmd, context: cmd.color("white", context.target),
+        use_comparison_colors=False,
+    ))
+
+    def colors(selection):
+        used = set()
+        cmd.iterate(selection, "used.add(color)", space={"used": used})
+        return used
+
+    white = {cmd.get_color_index("white")}
+    bar.apply_preset("test.custom_colors")
+    assert colors("rec_7 or rec_9") == white
+    bar.set_comparison_layout("overlay")
+    assert colors("rec_7 or rec_9") == white
+    bar.set_scene_context("comparison", grid_labels={1: "Renamed first", 3: "Second"})
+    assert _labels(cmd, "panel_text1") == ["Renamed first"]
+    assert cmd.get("label_color", "panel_text3") == COMPARISON_COLORS[2]
+    assert colors("rec_7 or rec_9") == white
+    bar.set_comparison_layout("grid")
+    assert colors("rec_7 or rec_9") == white
+
+    palette = {cmd.get_color_index(COMPARISON_COLORS[2])}
+    bar.apply_preset("pymol.simple")
+    assert colors("rec_9") == palette
+    bar.apply_preset("test.custom_colors")
+    bar.set_scene_context("comparison", target="rec_9 or lig_9")
+    assert colors("rec_9") == palette
 
 
 def test_overlay_legend_spacing_follows_the_viewport_height(grid_scene, monkeypatch):
