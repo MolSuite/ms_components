@@ -387,11 +387,21 @@ class AppSettingsPanel(QWidget):
         item.setData(0, Qt.ItemDataRole.UserRole, node.key)
         item.setExpanded(node.parent_key is None)
         self._items[key] = item
-        page = node.widget if node.widget is not None else self._build_page(node)
+        page = self._hosted_page(node.widget) if node.widget is not None else self._build_page(node)
         self._pages[key] = page
         self.stack.addWidget(page)
         for child_key in tuple(node.child_keys):
             self._build_branch(child_key)
+
+    def _hosted_page(self, widget: QWidget) -> QScrollArea:
+        """A page added with `add_page`, in a scroll area as a built page is: a tall one (a form
+        of many fields) scrolls instead of growing the stack, and with it the dialog, past the
+        screen."""
+        scroll = QScrollArea(self.stack)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(widget)
+        return scroll
 
     def _build_page(self, node: _Node) -> QWidget:
         scroll = QScrollArea(self.stack)
